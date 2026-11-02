@@ -11,9 +11,15 @@ Download **360AI-1.0-USB.zip** under Assets for the ready-to-copy Xbox package. 
 
 The USB ZIP includes the executable, model GGUF, start guide, changelog, credits, model provenance, and required Gemma terms/use-policy notices. The unchanged model is sourced from [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), pinned to revision `5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d`. Model use and redistribution remain subject to the included [Gemma Terms of Use](https://ai.google.dev/gemma/terms).
 
-`360AI.xex` is also attached separately, for users who already have weights. `SHA256SUMS.txt` contains the asset checksums and the bundled model's checksum. This refresh edits the existing **1.0** release; the application executable and source tag remain unchanged.
+**The USB ZIP is the only packaged release download.** It already contains `360AI.xex` and the model weights. This refresh edits the existing **1.0** release; the USB ZIP, application executable and source tag remain unchanged.
 
-**360AI-1.0-PC-Bridge.zip is optional PC software**, for connecting external MCP servers to Xbox inference. It requires Node.js 22+ on the PC and does not go on the Xbox.
+Optional PC bridge source remains available in the repository's [`bridge` folder](https://github.com/zuhagames/360AI/tree/main/bridge), with setup in the [technical guide](https://github.com/zuhagames/360AI/blob/main/docs/TECHNICAL.md#connect-external-mcp-servers). It requires Node.js 22+ on the PC and does not go on the Xbox.
+
+USB ZIP SHA-256:
+
+```text
+66fc658be09238c20d1b342cc80a9c444efd997fcff82930c071362c4aad5eac
+```
 
 ## Features and fixes
 
