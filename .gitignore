@@ -3,3 +3,4 @@ gemma.xex
 bridge/mcp.json
 bridge/*.local.json
 *.log
+*.gguf

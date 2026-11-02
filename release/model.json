@@ -1,0 +1,13 @@
+{
+  "name": "Gemma 3 270M Instruct",
+  "filename": "gemma-3-270m-it-Q8_0.gguf",
+  "quantization": "Q8_0",
+  "repository": "second-state/gemma-3-270m-it-GGUF",
+  "revision": "5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d",
+  "url": "https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d/gemma-3-270m-it-Q8_0.gguf?download=true",
+  "size": 291545600,
+  "sha256": "0ef57d2c838458a1952664260dcba38e5bdda37494f3af732f06e4add24068e3",
+  "license": "Gemma Terms of Use",
+  "terms": "https://ai.google.dev/gemma/terms",
+  "use_policy": "https://ai.google.dev/gemma/prohibited_use_policy"
+}

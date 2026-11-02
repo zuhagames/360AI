@@ -2,6 +2,8 @@
 ==========
 
 - Packaged 360AI.xex for copying directly into a USB/HDD app folder.
+- Updated the existing 1.0 USB ZIP to include Gemma 3 270M Instruct Q8_0
+  weights, pinned source/checksum, and required terms and notices.
 - Gemma 2/3 plus dense Llama and Qwen2/2.5 GGUF execution paths.
 - Experimental Xenos pixel-shader matrix calculations with CPU fallback.
 - Tile-aligned R32F GPU resolve and untiled CPU readback; pixel-center sampling.
@@ -16,11 +18,13 @@
 VALIDATION
 Built and packaged with the Xbox 360 SDK. Native inference, weight
 decoding, tokenizer, HTTP/MCP and executable privilege tests pass.
+The bundled full GGUF also loads and generates text with the host build
+of this engine. Source and archived model SHA-256 checksums are verified.
 GPU performance and the corrected GPU path remain to be verified on
 physical Xbox 360 hardware. No GPU speed improvement is claimed.
 
 KNOWN LIMITS
-No GGUF weights are bundled. MoE, Qwen3, vision/audio, arbitrary chat
+MoE, Qwen3, vision/audio, arbitrary chat
 templates and unsupported RoPE scaling are not implemented. Architecture
 support does not mean every model fits console RAM. Consult the project
 README for the detailed compatibility list.

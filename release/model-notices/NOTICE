@@ -1,0 +1,12 @@
+Gemma is provided under and subject to the Gemma Terms of Use found at ai.google.dev/gemma/terms
+
+The bundled Gemma model is subject to the use restrictions in Section 3.2
+of the included GEMMA_TERMS.txt, including the Gemma Prohibited Use Policy
+copied in GEMMA_POLICY.txt. Those terms govern use and distribution of the
+bundled model; 360AI does not waive or replace them. Use or redistribution
+of the model must comply with those restrictions and applicable law.
+
+Original model: Google, Gemma 3 270M Instruct.
+Q8_0 GGUF conversion and publication: Second State.
+360AI redistributes the published GGUF unchanged. See MODEL_INFO.txt for
+the source revision, download URL and SHA-256 checksum.

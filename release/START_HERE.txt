@@ -4,11 +4,11 @@
 INSTALL
 1. Extract the ZIP on your PC.
 2. Copy the entire 360AI folder to your USB drive.
-3. Put your model GGUF in that SAME folder, beside 360AI.xex.
-   You can reuse your existing gemma-3-270m-it-Q8_0.gguf.
+3. The Gemma 3 270M Q8_0 model is already included beside 360AI.xex.
+   No separate model download is needed.
 4. Safely eject the USB, connect it to your modded Xbox 360, and open
    the 360AI folder with your existing XEX launcher (Aurora/XEXMenu).
-5. Launch 360AI.xex, select your model and choose Load model.
+5. Launch 360AI.xex, select gemma-3-270m-it-Q8_0.gguf and choose Load model.
 
 Example USB layout:
   USB:/360AI/360AI.xex
@@ -21,12 +21,16 @@ The folder can also be copied to your Xbox HDD. Keep the GGUF beside
 the executable. No SDK, Visual Studio, Node.js or separate shader files
 are needed on the console. The app does not install or replace a dashboard.
 
-MODEL REQUIRED
-Model weights are NOT included. Copy your existing GGUF into the app
-folder. Supported families include Gemma 2/3, dense Llama and Qwen2/2.5.
-Models must fit the Xbox's shared 512 MB RAM. Start with context 256-512
-if you run out of memory. Larger models and unlisted architectures may
-not run. This app requires a console that can already run unsigned XEXs.
+BUNDLED MODEL
+The full Gemma 3 270M Instruct Q8_0 GGUF is included (about 292 MB).
+Read NOTICE, GEMMA_TERMS.txt and GEMMA_POLICY.txt for its terms, and
+MODEL_INFO.txt for its source and checksum. No account or network is
+needed for local console chat once this ZIP is downloaded.
+
+Additional supported GGUFs can be placed beside the bundled model.
+Supported families include Gemma 2/3, dense Llama and Qwen2/2.5. Models
+must fit the Xbox's shared 512 MB RAM. Start with context 256-512 if you
+run out of memory. This app requires a console that can run unsigned XEXs.
 
 GPU OPTION
 GPU matrix math uses Xenos pixel shaders. It is experimental and is

@@ -74,6 +74,22 @@ static void checks(){
 }
 int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
+  if(argc>2 && std::string(argv[1])=="--model"){
+    gx_set_debug_level(GX_DEBUG_WARN);
+    Engine engine; if(!engine.load(argv[2])) return 1;
+    const ModelCfg& c=engine.cfg();
+    std::cout<<"Loaded real GGUF: "<<c.name<<" layers="<<c.num_layers<<" dim="<<c.model_dim<<std::endl;
+    std::vector<std::pair<std::string,std::string> > messages;
+    messages.push_back(std::make_pair(std::string("user"),std::string("Say hello in one short sentence.")));
+    std::vector<int> ids,out; engine.tok().encode_prompt(engine.tok().chat_prompt(messages),ids);
+    KVCache cache; cache.init(256,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
+    EngineCfg ec={0,1,true,0}; double start=gx_time_seconds();
+    engine.generate(ids,out,12,cache,ec);
+    std::string text=engine.tok().decode(out);
+    if(text.empty()) return 2;
+    std::cout<<"Generated "<<out.size()<<" tokens in "<<gx_time_seconds()-start<<" seconds: "<<text<<std::endl;
+    return 0;
+  }
   if(argc>2 && std::string(argv[1])=="--tokenize"){
     GGUF g; if(!g.load(path(argv[2]).c_str())) return 1; Tokenizer tok; if(!tok.load(g)) return 2;
     std::string line;

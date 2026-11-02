@@ -1,0 +1,22 @@
+BUNDLED MODEL
+Gemma 3 270M Instruct, Q8_0 GGUF
+Filename: gemma-3-270m-it-Q8_0.gguf
+Size: 291545600 bytes
+SHA-256: 0ef57d2c838458a1952664260dcba38e5bdda37494f3af732f06e4add24068e3
+
+Original model and weights: Google
+https://huggingface.co/google/gemma-3-270m-it
+
+GGUF quantization and publication: Second State
+https://huggingface.co/second-state/gemma-3-270m-it-GGUF
+Pinned revision: 5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d
+Download:
+https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d/gemma-3-270m-it-Q8_0.gguf
+
+This is a quantized model derivative, not Google's original checkpoint.
+Second State converted/quantized the weights to Q8_0 GGUF. 360AI packages
+that GGUF byte-for-byte without modifying the model file. Its source
+checksum is verified before packaging and after ZIP creation.
+
+Read NOTICE, GEMMA_TERMS.txt and GEMMA_POLICY.txt for the model's terms.
+The original model and conversion authors do not endorse 360AI.

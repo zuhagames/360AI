@@ -12,5 +12,7 @@ The original project describes itself as a port of Google's gemma.cpp:
 https://github.com/google/gemma.cpp
 
 Implementation references and compatibility documentation are linked in
-the 360AI repository README. Model weights are distributed separately by
-their respective publishers and are not included in this package.
+the 360AI repository README. The USB ZIP includes Google's Gemma 3 270M
+Instruct weights in a Q8_0 GGUF published by Second State, redistributed
+unchanged. Its model terms, notice, provenance and checksum are included
+in the USB ZIP. The optional PC bridge ZIP does not contain model weights.

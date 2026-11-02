@@ -6,9 +6,9 @@ Local GGUF text inference for a modded Xbox 360, with Gemma 2/3, dense Llama and
 
 ## Run on Xbox 360
 
-For the ready-to-copy package, download **360AI-1.0-USB.zip** from the [1.0 release](https://github.com/zuhagames/360AI/releases/tag/v1.0). Extract it, copy the `360AI` folder to your USB drive, and put your existing model GGUF beside `360AI.xex`. Model weights are not bundled. The separate PC-Bridge ZIP is optional and runs on a PC.
+For the complete ready-to-copy package, download **360AI-1.0-USB.zip** from the [1.0 release](https://github.com/zuhagames/360AI/releases/tag/v1.0). Extract it and copy the `360AI` folder to your USB drive. **Gemma 3 270M Instruct Q8_0 weights are included beside `360AI.xex`**, with their source/checksum, Gemma terms and notices. No separate model download is needed. The separate PC-Bridge ZIP is optional and runs on a PC.
 
-1. Copy [360AI.xex](360AI.xex) and a small, supported GGUF into the same folder on the console or USB drive.
+1. Copy the extracted `360AI` folder, including its model GGUF, onto the console or USB drive. If using the standalone [360AI.xex](360AI.xex), put a small supported GGUF beside it.
 2. Launch `360AI.xex` using your existing unsigned-XEX launcher.
 3. Select the model and set the context, sampling, chat and server options.
 4. Leave **GPU matrix math** enabled to try the GPU backend, or disable it to use the CPU. If the GPU startup numerical check fails, the menu reports it unavailable and inference uses the CPU.
@@ -128,7 +128,7 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Create and verify release archives with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Output is written to `build/releases/v1.0`, including the USB ZIP, optional PC bridge ZIP, executable and SHA-256 checksums.
+Fetch the pinned bundled model with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify release archives with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. The model's source, size and hash are recorded in `release/model.json`; weights are stored under the ignored `build/models` directory. Output is written to `build/releases/v1.0`, including the USB ZIP with weights and required notices, optional PC bridge ZIP, executable and SHA-256 checksums. Packaging verifies the GGUF checksum both before and after ZIP creation.
 
 ## Verification
 
@@ -143,5 +143,7 @@ node --test tests/*.test.mjs
 Native tests cover all supported quantized block layouts, dense Llama/Qwen loading and generation, rotary/activation operations, stop/BOS handling, JSON parsing, and MCP dispatch. Protocol tests exercise stdio, JSON/SSE HTTP, sessions, pagination, external tool feedback, allowlists, and the native HTTP server. Tokenizer tests compare 520 inputs against a separate regex/BPE reference.
 
 Synthetic fixtures validate execution paths, not output quality of full pretrained models. Console inference and GPU benchmarks remain hardware validation tasks.
+
+The bundled Gemma 3 270M Q8_0 model has also been loaded and used to generate text with the host build. Reproduce this check after fetching the model with `build/tests/native.exe --model build/models/gemma-3-270m-it-Q8_0.gguf`.
 
 Implementation references: [GGUF/GGML quantization layouts](https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-common.h), [Llama execution](https://github.com/ggml-org/llama.cpp/blob/master/src/models/llama.cpp), [Qwen2 execution](https://github.com/ggml-org/llama.cpp/blob/master/src/models/qwen2.cpp), and [MCP 2025-06-18 transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports).
