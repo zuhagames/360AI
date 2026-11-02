@@ -1,0 +1,63 @@
+stages:
+  - build
+  - release
+
+build:
+  stage: build
+  tags:
+    - xbox360
+  script:
+    - '& .\build.bat'
+    - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+    - '$packageUrl = "$env:CI_API_V4_URL/projects/$env:CI_PROJECT_ID/packages/generic/360ai/$env:CI_COMMIT_SHA/360AI.xex"'
+    - '& curl.exe --fail --silent --show-error --header "JOB-TOKEN: $env:CI_JOB_TOKEN" --upload-file 360AI.xex $packageUrl'
+    - 'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'
+  artifacts:
+    name: "360AI-$CI_COMMIT_SHORT_SHA"
+    when: always
+    paths:
+      - 360AI.xex
+    expire_in: 1 year
+
+release:
+  stage: release
+  tags:
+    - xbox360
+  needs:
+    - job: build
+      artifacts: true
+  rules:
+    - if: '$CI_COMMIT_TAG'
+      variables:
+        REL_TAG: '$CI_COMMIT_TAG'
+        REL_NAME: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        REL_TAG: 'build-$CI_COMMIT_SHORT_SHA'
+        REL_NAME: 'Build $CI_COMMIT_SHORT_SHA'
+  script:
+    - |
+      $ErrorActionPreference = 'Stop'
+      $headers = @{ 'JOB-TOKEN' = $env:CI_JOB_TOKEN }
+      $releaseDescription = "Automated build of $env:CI_COMMIT_SHA ($env:CI_COMMIT_TITLE)"
+      $releaseBody = @{
+        name = $env:REL_NAME
+        tag_name = $env:REL_TAG
+        ref = $env:CI_COMMIT_SHA
+        description = $releaseDescription
+        assets = @{
+          links = @(
+            @{
+              name = '360AI.xex'
+              url = "$env:CI_SERVER_URL/$env:CI_PROJECT_PATH/-/packages/generic/360ai/$env:CI_COMMIT_SHA/360AI.xex"
+            },
+            @{
+              name = 'pipeline artifacts'
+              url = "$env:CI_SERVER_URL/$env:CI_PROJECT_PATH/-/jobs/artifacts/$env:CI_COMMIT_SHA/raw/360AI.xex?job=build"
+            }
+          )
+        }
+      } | ConvertTo-Json -Depth 10
+      $apiUrl = "$env:CI_API_V4_URL/projects/$env:CI_PROJECT_ID/releases"
+      $response = Invoke-RestMethod -Method Post -Uri $apiUrl -Headers $headers -ContentType 'application/json' -Body $releaseBody
+      Write-Host "Created release $($response.tag_name)"

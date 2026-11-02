@@ -1,0 +1,14 @@
+{
+  "xbox": "http://192.168.1.100",
+  "mcpServers": {
+    "xbox": { "url": "http://192.168.1.100/mcp", "timeoutMs": 300000 },
+    "local": {
+      "command": "node",
+      "args": ["C:/path/to/your/mcp-server.mjs"]
+    },
+    "remote": {
+      "url": "https://your-server.example/mcp",
+      "headers": { "Authorization": "Bearer YOUR_TOKEN" }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<xex>
+  <titleid id="0xFFFF0055"/>
+  <!-- Permit plaintext LAN sockets to OpenAI/MCP clients on a PC. -->
+  <privilege id="6"/>
+</xex>
