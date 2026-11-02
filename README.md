@@ -9,6 +9,7 @@
 <p align="center">
   <a href="https://github.com/zuhagames/360AI/releases/latest"><img src="https://img.shields.io/github/v/release/zuhagames/360AI?style=flat-square&amp;label=release&amp;color=9acd32" alt="Latest release"></a>
   <a href="#installation"><img src="https://img.shields.io/badge/platform-Xbox%20360-107c10?style=flat-square" alt="Platform: Xbox 360"></a>
+  <a href="https://github.com/zuhagames/360AI/releases"><img src="https://img.shields.io/github/downloads/zuhagames/360AI/total?style=flat-square&amp;label=downloads&amp;color=9acd32" alt="Total release downloads"></a>
   <a href="https://ko-fi.com/zuhagames"><img src="https://img.shields.io/badge/Support-Ko--fi-ff5e5b?style=flat-square&amp;logo=kofi&amp;logoColor=white" alt="Support on Ko-fi"></a>
 </p>
 
