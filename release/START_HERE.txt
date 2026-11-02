@@ -1,0 +1,52 @@
+360AI 1.0 - Xbox 360 USB package
+================================
+
+INSTALL
+1. Extract the ZIP on your PC.
+2. Copy the entire 360AI folder to your USB drive.
+3. Put your model GGUF in that SAME folder, beside 360AI.xex.
+   You can reuse your existing gemma-3-270m-it-Q8_0.gguf.
+4. Safely eject the USB, connect it to your modded Xbox 360, and open
+   the 360AI folder with your existing XEX launcher (Aurora/XEXMenu).
+5. Launch 360AI.xex, select your model and choose Load model.
+
+Example USB layout:
+  USB:/360AI/360AI.xex
+  USB:/360AI/gemma-3-270m-it-Q8_0.gguf
+  USB:/360AI/START_HERE.txt
+  USB:/360AI/CHANGELOG.txt
+  USB:/360AI/CREDITS.txt
+
+The folder can also be copied to your Xbox HDD. Keep the GGUF beside
+the executable. No SDK, Visual Studio, Node.js or separate shader files
+are needed on the console. The app does not install or replace a dashboard.
+
+MODEL REQUIRED
+Model weights are NOT included. Copy your existing GGUF into the app
+folder. Supported families include Gemma 2/3, dense Llama and Qwen2/2.5.
+Models must fit the Xbox's shared 512 MB RAM. Start with context 256-512
+if you run out of memory. Larger models and unlisted architectures may
+not run. This app requires a console that can already run unsigned XEXs.
+
+GPU OPTION
+GPU matrix math uses Xenos pixel shaders. It is experimental and is
+enabled only when the startup numerical check passes. CPU fallback
+remains available. Speedup and full GPU correctness still need console
+testing. Diagnostics appear in settings and in 360AI.log in this folder.
+
+OPTIONAL OPENAI / MCP SERVER
+Turn OpenAI / MCP server ON before loading the model. Use the IP and
+port displayed on the console; the default port is 80, then 8080.
+Open http://CONSOLE-IP:PORT/health to check connectivity.
+OpenAI client base URL: http://CONSOLE-IP:PORT/v1
+Generation endpoints require POST with JSON, not browser navigation.
+The server is for your private LAN; it has no authentication.
+
+External MCP stdio/HTTPS servers use the separate PC-Bridge ZIP on a PC.
+Do not copy or run that bridge on the Xbox. Local console chat does not
+need the bridge or any PC software.
+
+PROJECT
+https://github.com/zuhagames/360AI
+This is a fork of Canyons' gemma.xex, expanded beyond Gemma:
+https://gitlab.com/canyons0/gemma.xex

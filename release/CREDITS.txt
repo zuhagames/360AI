@@ -1,0 +1,16 @@
+360AI
+https://github.com/zuhagames/360AI
+
+360AI is a fork of Canyons' gemma.xex:
+https://gitlab.com/canyons0/gemma.xex
+
+Credit for the original Xbox 360 port belongs to Canyons and the original
+project's contributors. 360AI expands the project beyond Gemma with Llama
+and Qwen2/2.5 execution paths, GPU matrix calculations and MCP integration.
+
+The original project describes itself as a port of Google's gemma.cpp:
+https://github.com/google/gemma.cpp
+
+Implementation references and compatibility documentation are linked in
+the 360AI repository README. Model weights are distributed separately by
+their respective publishers and are not included in this package.

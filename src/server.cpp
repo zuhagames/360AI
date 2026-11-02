@@ -3,6 +3,7 @@
 #include "json.h"
 #include "mcp.h"
 #include "gpu.h"
+#include "version.h"
 #include <errno.h>
 
 #ifdef _XBOX
@@ -247,6 +248,7 @@ static void handle_client(SOCKET s){
   if(path=="/health" || path=="/"){
     if(method!="GET"){ reply(s,405,"{\"error\":\"use GET\"}"); return; }
     Json health=Json::object(); health["application"]=Json("360AI");
+    health["version"]=Json(GX_VERSION);
     health["status"]=Json(engine && engine->ready() ? "ok" : "no model");
     health["backend"]=Json(gx_gpu_status()); health["gpu_diagnostic"]=Json(gx_gpu_diagnostic());
     health["api_base"]=Json("/v1"); health["completions"]=Json("POST /v1/completions with a JSON prompt");

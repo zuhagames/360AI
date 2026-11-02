@@ -1,0 +1,29 @@
+360AI 1.0 - optional PC MCP bridge
+=================================
+
+This package runs on a PC, not on the Xbox. It is not required for local
+console chat or the Xbox OpenAI-compatible API.
+
+Requirements: Node.js 22 or later. No npm dependencies are required.
+
+1. Extract this folder on your PC.
+2. Copy bridge/mcp.example.json to bridge/mcp.json.
+3. Set xbox to your console's address, and keep only external MCP server
+   entries that you have configured. Replace the example paths/URLs.
+4. Open a terminal in this folder.
+
+List available tools:
+  node bridge/cli.mjs --config bridge/mcp.json --list
+
+Use tools with Xbox inference (substitute a real tool name from --list):
+  node bridge/cli.mjs --config bridge/mcp.json --prompt "What is 2 plus 3?" --allow-tools local/add
+
+The bridge supports MCP protocol 2025-06-18 over stdio and Streamable
+HTTP/HTTPS, including JSON/SSE responses and session headers. Tools must
+be explicitly named in --allow-tools before model output can execute them.
+Small models may not produce reliable tool-call JSON.
+
+The PC handles tool processes and TLS; the model runs on the Xbox.
+Keep configurations containing credentials private.
+
+Full documentation: https://github.com/zuhagames/360AI

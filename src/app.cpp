@@ -3,6 +3,7 @@
 #include "platform.h"
 #include "server.h"
 #include "gpu.h"
+#include "version.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -148,7 +149,7 @@ int App::run(){
 
 void App::browse_frame(){
   f32 cw = gxui_char_w(), lh = gxui_line_h();
-  gxui_text_shadow(40, 30, GX_ACCENT, "360AI");
+  gxui_text_shadow(40, 30, GX_ACCENT, "360AI %s", GX_VERSION);
   gxui_text_shadow(40, 30 + lh, GXRGB(180,180,190),
                    "Gemma 2/3, Llama, Qwen2/2.5 GGUF from %s", kBrowseDir);
 

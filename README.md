@@ -6,6 +6,8 @@ Local GGUF text inference for a modded Xbox 360, with Gemma 2/3, dense Llama and
 
 ## Run on Xbox 360
 
+For the ready-to-copy package, download **360AI-1.0-USB.zip** from the [1.0 release](https://github.com/zuhagames/360AI/releases/tag/v1.0). Extract it, copy the `360AI` folder to your USB drive, and put your existing model GGUF beside `360AI.xex`. Model weights are not bundled. The separate PC-Bridge ZIP is optional and runs on a PC.
+
 1. Copy [360AI.xex](360AI.xex) and a small, supported GGUF into the same folder on the console or USB drive.
 2. Launch `360AI.xex` using your existing unsigned-XEX launcher.
 3. Select the model and set the context, sampling, chat and server options.
@@ -125,6 +127,8 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 ```
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
+
+Create and verify release archives with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Output is written to `build/releases/v1.0`, including the USB ZIP, optional PC bridge ZIP, executable and SHA-256 checksums.
 
 ## Verification
 

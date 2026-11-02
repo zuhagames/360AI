@@ -1,6 +1,7 @@
 #include "mcp.h"
 #include "engine.h"
 #include "gpu.h"
+#include "version.h"
 
 static Json rpc_error(const Json& id,int code,const char* message){
   Json r=Json::object(); r["jsonrpc"]=Json("2.0"); r["id"]=id;
@@ -33,7 +34,7 @@ int gx_mcp_dispatch(const std::string& body,Engine* engine,u32 context,
     }
     result["protocolVersion"]=Json("2025-06-18");
     result["capabilities"]["tools"]=Json::object();
-    result["serverInfo"]["name"]=Json("360AI"); result["serverInfo"]["version"]=Json("0.3.0");
+    result["serverInfo"]["name"]=Json("360AI"); result["serverInfo"]["version"]=Json(GX_VERSION);
   } else if(method=="ping"){
   } else if(method=="tools/list"){
     Json::parse("{\"tools\":[{\"name\":\"model_info\",\"description\":\"Inspect the Xbox model and compute backend\",\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}},{\"name\":\"generate\",\"description\":\"Generate text locally on the Xbox 360\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"prompt\":{\"type\":\"string\"},\"max_tokens\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":512}},\"required\":[\"prompt\"],\"additionalProperties\":false}}]}",result);

@@ -142,7 +142,7 @@ export class McpClient {
   }
   async connect() {
     const result = await this.request('initialize', {
-      protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: '360AI-bridge', version: '0.3.0' },
+      protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: '360AI-bridge', version: '1.0.0' },
     });
     if (result.protocolVersion !== PROTOCOL) throw new Error(`Unsupported MCP version ${result.protocolVersion}`);
     const message = { jsonrpc: '2.0', method: 'notifications/initialized' };

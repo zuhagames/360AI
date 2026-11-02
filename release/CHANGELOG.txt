@@ -1,0 +1,26 @@
+360AI 1.0
+==========
+
+- Packaged 360AI.xex for copying directly into a USB/HDD app folder.
+- Gemma 2/3 plus dense Llama and Qwen2/2.5 GGUF execution paths.
+- Experimental Xenos pixel-shader matrix calculations with CPU fallback.
+- Tile-aligned R32F GPU resolve and untiled CPU readback; pixel-center sampling.
+- GPU startup diagnostics include actual/expected values if validation fails.
+- Corrected packed quantized-weight layouts and multi-block decoding.
+- OpenAI-compatible completions/chat endpoints with streaming.
+- Xbox insecure-LAN socket privilege and per-socket plaintext configuration.
+- Health endpoint and local browser-client CORS/preflight support.
+- MCP tools endpoint; optional PC bridge for external MCP servers.
+- Original project credited to Canyons and contributors.
+
+VALIDATION
+Built and packaged with the Xbox 360 SDK. Native inference, weight
+decoding, tokenizer, HTTP/MCP and executable privilege tests pass.
+GPU performance and the corrected GPU path remain to be verified on
+physical Xbox 360 hardware. No GPU speed improvement is claimed.
+
+KNOWN LIMITS
+No GGUF weights are bundled. MoE, Qwen3, vision/audio, arbitrary chat
+templates and unsupported RoPE scaling are not implemented. Architecture
+support does not mean every model fits console RAM. Consult the project
+README for the detailed compatibility list.
