@@ -1,18 +1,100 @@
-# 360AI
+<p align="center">
+  <img src="docs/assets/360ai-banner.svg" alt="360AI — by ZuhaGames and Canyons" width="900">
+</p>
 
-Local GGUF text inference for a modded Xbox 360, with Gemma 2/3, dense Llama and Qwen2-family execution paths, experimental Xenos GPU matrix calculations, an OpenAI-compatible HTTP API, and MCP integration.
+<h3 align="center">Local AI. On your Xbox 360.</h3>
 
-**360AI is a fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex).** The original Xbox 360 port is the foundation of this project. This fork expands beyond Gemma with Llama and Qwen2/2.5 support, GPU matrix calculations, and MCP integration. Credit for the original project belongs to Canyons and its contributors.
+<p align="center">
+  Chat on your console, run compatible GGUF models offline,<br>
+  and connect your apps through an OpenAI-compatible API and MCP.
+</p>
+
+<p align="center">
+  <a href="https://github.com/zuhagames/360AI/releases/latest"><img src="https://img.shields.io/github/v/release/zuhagames/360AI?style=flat-square&amp;label=release&amp;color=92c83e" alt="Latest release"></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/platform-Xbox%20360-107c10?style=flat-square" alt="Platform: Xbox 360"></a>
+  <a href="#model-compatibility"><img src="https://img.shields.io/badge/models-Gemma%20%C2%B7%20Llama%20%C2%B7%20Qwen-92c83e?style=flat-square" alt="Models: Gemma, Llama and Qwen"></a>
+  <a href="https://github.com/zuhagames/360AI/releases"><img src="https://img.shields.io/github/downloads/zuhagames/360AI/total?style=flat-square&amp;label=downloads&amp;color=92c83e" alt="Total release downloads"></a>
+  <a href="https://ko-fi.com/zuhagames"><img src="https://img.shields.io/badge/Support-Ko--fi-ff5e5b?style=flat-square&amp;logo=kofi&amp;logoColor=white" alt="Support ZuhaGames on Ko-fi"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/zuhagames/360AI/releases/download/v1.0/360AI-1.0-USB.zip"><img src="docs/assets/download-usb.svg" alt="Download 360AI 1.0 USB bundle — model included" width="312" height="44"></a>
+</p>
+
+<p align="center">
+  <sub>Includes the app + Gemma 3 270M Instruct Q8_0 weights. Extract, copy to USB, and launch.</sub>
+</p>
+
+<p align="center">
+  <a href="#installation">Installation</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#model-compatibility">Models</a> ·
+  <a href="#http-api">API</a> ·
+  <a href="#mcp-on-the-console">MCP</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.0">Release notes</a> ·
+  <a href="#help-and-support">Help &amp; support</a>
+</p>
+
+---
+
+## About 360AI
+
+360AI brings local language models to a modded Xbox 360. Chat directly on the console or use it as an inference server for other devices on your network. Local chat runs on the Xbox itself and can work offline.
+
+**Made by ZuhaGames together with Canyons, a developer on the ZuhaGames team.** 360AI is a fork of his original [gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma with dense Llama and Qwen2-family execution paths, experimental GPU matrix calculations, and MCP integration.
+
+## Features
+
+| Feature | What you can do |
+| --- | --- |
+| **Console chat** | Talk to a local model using your controller and the on-screen keyboard. |
+| **Models included** | Start with the bundled Gemma 3 270M Instruct Q8_0, or load another compatible GGUF. |
+| **More model families** | Gemma 2/3, dense Llama, and Qwen2/2.5 paths, subject to compatibility and available RAM. |
+| **Your settings** | Choose context size, temperature, and top-k sampling on the console. |
+| **LAN API** | Connect text clients through OpenAI-compatible chat/completions endpoints, including streaming. |
+| **MCP tools** | Use the console MCP endpoint and an optional PC bridge for external MCP servers. |
+| **Experimental GPU path** | Try Xenos pixel-shader matrix calculations, with a startup numerical check and CPU fallback. |
+
+GPU speedups are not established. The current backend can be as slow as, or slower than, CPU inference; see [GPU calculations](#gpu-calculations).
+
+## Installation
+
+**[Download the complete 1.0 USB bundle](https://github.com/zuhagames/360AI/releases/download/v1.0/360AI-1.0-USB.zip)** — approximately 275 MB, including model weights. Choose `360AI-1.0-USB.zip` under release assets; the automatic source-code archives are for development.
+
+1. Extract the ZIP on your PC.
+2. Copy the entire **`360AI` folder** to your USB drive. Keep `360AI.xex` and the included `.gguf` model together.
+3. Connect the USB drive to your modded Xbox 360 and launch **`360AI.xex`** with your existing XEX launcher.
+4. Select the included model, choose your settings, and select **Load model**.
+
+No separate weights, SDK, or shader download is needed for console chat. The PC bridge is optional and runs on a PC.
+
+<details>
+<summary><strong>Included in the USB bundle</strong></summary>
+
+```text
+360AI/
+├── 360AI.xex
+├── gemma-3-270m-it-Q8_0.gguf
+├── START_HERE.txt
+├── CHANGELOG.txt
+├── CREDITS.txt
+├── MODEL_INFO.txt
+├── NOTICE
+├── GEMMA_TERMS.txt
+└── GEMMA_POLICY.txt
+```
+
+The model's source and checksum are included. Model use remains subject to the bundled Gemma terms and use policy. Release checksums are available in [SHA256SUMS.txt](https://github.com/zuhagames/360AI/releases/download/v1.0/SHA256SUMS.txt).
+
+</details>
 
 ## Run on Xbox 360
 
-For the complete ready-to-copy package, download **360AI-1.0-USB.zip** from the [1.0 release](https://github.com/zuhagames/360AI/releases/tag/v1.0). Extract it and copy the `360AI` folder to your USB drive. **Gemma 3 270M Instruct Q8_0 weights are included beside `360AI.xex`**, with their source/checksum, Gemma terms and notices. No separate model download is needed. The separate PC-Bridge ZIP is optional and runs on a PC.
+After launching the app:
 
-1. Copy the extracted `360AI` folder, including its model GGUF, onto the console or USB drive. If using the standalone [360AI.xex](360AI.xex), put a small supported GGUF beside it.
-2. Launch `360AI.xex` using your existing unsigned-XEX launcher.
-3. Select the model and set the context, sampling, chat and server options.
-4. Leave **GPU matrix math** enabled to try the GPU backend, or disable it to use the CPU. If the GPU startup numerical check fails, the menu reports it unavailable and inference uses the CPU.
-5. Enable **OpenAI / MCP server** to access the console over your LAN. The chat screen displays its actual address and port (80, or 8080 if 80 cannot be bound).
+1. Select the model and set the context, sampling, chat and server options before choosing **Load model**.
+2. Leave **GPU matrix math** enabled to try the GPU backend, or disable it to use the CPU. If the GPU startup numerical check fails, the menu reports it unavailable and inference uses the CPU.
+3. Enable **OpenAI / MCP server** before loading the model to access the console over your LAN. The chat screen displays its actual address and port (80, or 8080 if 80 cannot be bound).
 
 A console capable of running unsigned XEX files is required. Models, the tokenizer, KV cache, UI and GPU buffers all share 512 MB of RAM. Architecture support does not guarantee a model will fit. Start with a small quantized model and a 256–512 token context; raise the context only when memory allows.
 
@@ -40,7 +122,7 @@ Results are resolved into a tile-aligned, tiled R32F texture and untiled before 
 
 At startup, a GPU readback check compares 65 rows × 260 columns against CPU results, exercising both tile boundaries. Initialization or dispatch failure falls back to CPU. The setting defaults to GPU enabled when available. The settings screen and `360AI.log` report the exact failed operation or first mismatching row instead of a generic unavailable message.
 
-This backend is experimental. Uploads, GPU/CPU synchronization and readbacks may make it slower than the CPU for some models. Shader compilation and Xbox executable packaging were verified locally; GPU execution, rendering behavior, numerical parity on real weights, and tokens/second still require a physical console. No GPU speedup is claimed.
+This backend is experimental. Uploads, GPU/CPU synchronization and readbacks may make it slower than the CPU for some models. The startup shader/readback self-test has passed on a user's physical console. Numerical parity on real weights and measured tokens/second comparisons still need hardware validation. No GPU speedup is claimed. For a performance comparison, use the same model and prompt with GPU on/off and set the debug level to **warning** to avoid verbose per-layer file logging.
 
 ## HTTP API
 
@@ -147,3 +229,21 @@ Synthetic fixtures validate execution paths, not output quality of full pretrain
 The bundled Gemma 3 270M Q8_0 model has also been loaded and used to generate text with the host build. Reproduce this check after fetching the model with `build/tests/native.exe --model build/models/gemma-3-270m-it-Q8_0.gguf`.
 
 Implementation references: [GGUF/GGML quantization layouts](https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-common.h), [Llama execution](https://github.com/ggml-org/llama.cpp/blob/master/src/models/llama.cpp), [Qwen2 execution](https://github.com/ggml-org/llama.cpp/blob/master/src/models/qwen2.cpp), and [MCP 2025-06-18 transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports).
+
+## Help and support
+
+Found a bug or having trouble getting started? [Open an issue](https://github.com/zuhagames/360AI/issues) with your 360AI version, model filename, relevant `360AI.log` lines, and what happened. For API connectivity, start with the [`/health` check](#make-a-completion-request).
+
+If you enjoy the project and want to support future development, you can [support ZuhaGames on Ko-fi](https://ko-fi.com/zuhagames).
+
+## Credits
+
+Developed by **ZuhaGames with Canyons**, a member of the ZuhaGames development team. 360AI is a fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex); thanks to Canyons and the original contributors for the Xbox 360 foundation.
+
+The bundled model is **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF). Its attribution, provenance, and terms are included in the download.
+
+<p align="center">
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.0">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
+  <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
+</p>
