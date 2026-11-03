@@ -14,9 +14,7 @@ if ((Get-Item -LiteralPath $modelPath).Length -ne $model.size -or
 $outputDirectory = Join-Path $projectRoot "build\releases\v$Version"
 $stageDirectory = Join-Path $outputDirectory ([Guid]::NewGuid().ToString('N'))
 $usbDirectory = Join-Path $stageDirectory '360AI'
-$bridgeDirectory = Join-Path $stageDirectory '360AI-PC-Bridge'
 New-Item -ItemType Directory -Path $usbDirectory -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $bridgeDirectory 'bridge') -Force | Out-Null
 
 $executable = Join-Path $projectRoot '360AI.xex'
 if (-not (Test-Path -LiteralPath $executable)) { throw 'Build 360AI.xex first with build.bat.' }
@@ -28,17 +26,9 @@ foreach ($name in @('NOTICE', 'GEMMA_TERMS.txt', 'GEMMA_POLICY.txt', 'MODEL_INFO
 foreach ($name in @('START_HERE.txt', 'CHANGELOG.txt', 'CREDITS.txt')) {
   Copy-Item -LiteralPath (Join-Path $projectRoot "release\$name") -Destination (Join-Path $usbDirectory $name)
 }
-foreach ($name in @('cli.mjs', 'mcp-client.mjs', 'mcp.example.json')) {
-  Copy-Item -LiteralPath (Join-Path $projectRoot "bridge\$name") -Destination (Join-Path $bridgeDirectory "bridge\$name")
-}
-Copy-Item -LiteralPath (Join-Path $projectRoot 'release\PC_BRIDGE.txt') -Destination (Join-Path $bridgeDirectory 'START_HERE.txt')
-Copy-Item -LiteralPath (Join-Path $projectRoot 'release\CREDITS.txt') -Destination (Join-Path $bridgeDirectory 'CREDITS.txt')
 
 $usbZip = Join-Path $outputDirectory "360AI-$Version-USB.zip"
-$bridgeZip = Join-Path $outputDirectory "360AI-$Version-PC-Bridge.zip"
 Compress-Archive -LiteralPath $usbDirectory -DestinationPath $usbZip -Force
-Compress-Archive -LiteralPath $bridgeDirectory -DestinationPath $bridgeZip -Force
-Copy-Item -LiteralPath $executable -Destination (Join-Path $outputDirectory '360AI.xex') -Force
 
 # Verify the USB archive contents and binary identity before publishing it.
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -66,11 +56,9 @@ try {
   if ($modelHash -ne $model.sha256) { throw 'Archived model checksum mismatch.' }
 } finally { $archive.Dispose() }
 
-$checksums = foreach ($name in @('360AI.xex', "360AI-$Version-USB.zip", "360AI-$Version-PC-Bridge.zip")) {
-  $hash = (Get-FileHash -LiteralPath (Join-Path $outputDirectory $name) -Algorithm SHA256).Hash.ToLowerInvariant()
-  "$hash  $name"
+$zipInfo = Get-Item -LiteralPath $usbZip
+[PSCustomObject]@{
+  Name = $zipInfo.Name
+  Length = $zipInfo.Length
+  SHA256 = (Get-FileHash -LiteralPath $usbZip -Algorithm SHA256).Hash.ToLowerInvariant()
 }
-$checksums += '# Bundled model (after extracting the USB ZIP):'
-$checksums += "$($model.sha256)  360AI/$($model.filename)"
-[IO.File]::WriteAllLines((Join-Path $outputDirectory 'SHA256SUMS.txt'), $checksums, [Text.Encoding]::ASCII)
-Get-ChildItem -LiteralPath $outputDirectory -File | Select-Object Name, Length

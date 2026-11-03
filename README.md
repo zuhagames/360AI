@@ -29,6 +29,8 @@
 
 Made by **ZuhaGames & Canyons**. A fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma.
 
+AI tools were used to assist with development, debugging, and documentation.
+
 ## Installation
 
 1. Download and extract **[360AI-1.0-USB.zip](https://github.com/zuhagames/360AI/releases/download/v1.0/360AI-1.0-USB.zip)**.

@@ -1,6 +1,12 @@
 360AI 1.0
 ==========
 
+- Faster top-k candidate selection and softmax limited to selected tokens.
+- Removed an unused model forward pass at the response token limit or stop.
+- Warning-level logging by default to reduce per-layer USB log writes.
+- Release packaging produces only the complete USB ZIP and prints its checksum.
+- README discloses AI assistance with development, debugging and documentation.
+
 - Packaged 360AI.xex for copying directly into a USB/HDD app folder.
 - Updated the existing 1.0 USB ZIP to include Gemma 3 270M Instruct Q8_0
   weights, pinned source/checksum, and required terms and notices.

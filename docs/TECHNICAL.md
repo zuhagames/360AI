@@ -126,7 +126,9 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch the pinned bundled model with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify release archives with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. The model's source, size and hash are recorded in `release/model.json`; weights are stored under the ignored `build/models` directory. Output is written to `build/releases/v1.0`, including the USB ZIP with weights and required notices, optional PC bridge ZIP, executable and SHA-256 checksums. Packaging verifies the GGUF checksum both before and after ZIP creation.
+Fetch the pinned bundled model with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. The model's source, size and hash are recorded in `release/model.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.0`, with weights and required notices. Packaging verifies the executable and GGUF inside the ZIP and prints its SHA-256 for the release notes. The optional PC bridge remains available as source in `bridge/`.
+
+Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
 ## Verification
 

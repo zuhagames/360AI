@@ -2,6 +2,7 @@
 #include "platform.h"
 #include "gpu.h"
 #include <math.h>
+#include <algorithm>
 
 #ifndef GX_NO_VMX
 #define GX_VMX 1
@@ -123,6 +124,26 @@ void gx_softmax_temp(f32* x, size_t n, f32 temp){
 void gx_softcap(f32* x, size_t n, f32 cap){
   if(cap <= 0.0f) return;
   for(size_t i = 0; i < n; ++i) x[i] = cap * tanhf(x[i] / cap);
+}
+
+struct gx_logit_order{
+  const f32* logits;
+  explicit gx_logit_order(const f32* values): logits(values){}
+  bool operator()(u32 a, u32 b) const{
+    f32 x=logits[a], y=logits[b];
+    // Keep the ordering strict even if a model produces a NaN.
+    if(x!=x) return y!=y && a<b;
+    if(y!=y) return true;
+    return x==y ? a<b : x>y;
+  }
+};
+
+void gx_top_k(const f32* logits, u32 n, u32 k, u32* indices){
+  if(!n) return;
+  if(!k || k>n) k=n;
+  for(u32 i=0;i<n;++i) indices[i]=i;
+  // Heap selection scans the vocabulary once instead of once per candidate.
+  std::partial_sort(indices,indices+k,indices+n,gx_logit_order(logits));
 }
 
 void gx_gelu_mul(f32* c1, const f32* c2, size_t n){

@@ -46,9 +46,9 @@ OpenAI client base URL: http://CONSOLE-IP:PORT/v1
 Generation endpoints require POST with JSON, not browser navigation.
 The server is for your private LAN; it has no authentication.
 
-External MCP stdio/HTTPS servers use the separate PC-Bridge ZIP on a PC.
-Do not copy or run that bridge on the Xbox. Local console chat does not
-need the bridge or any PC software.
+External MCP stdio/HTTPS servers use the bridge source from the project's
+GitHub repository on a PC. See docs/TECHNICAL.md in the repository for setup.
+Local console chat does not need the bridge or any PC software.
 
 PROJECT
 https://github.com/zuhagames/360AI

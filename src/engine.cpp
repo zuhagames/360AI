@@ -256,18 +256,20 @@ int Engine::sample(const EngineCfg& ecfg){
     for(u32 i = 1; i < n; ++i) if(sc_.logits[i] > bv){ bv = sc_.logits[i]; best = i; }
     return (int)best;
   }
-  gx_softmax_temp(sc_.logits, n, ecfg.temperature);
   u32 k = ecfg.top_k;
   if(k == 0 || k > n) k = n;
   u32* idx = sc_.top_idx;
-  for(u32 i = 0; i < n; ++i) idx[i] = i;
-  for(u32 i = 0; i < k; ++i){
-    u32 mx = i;
-    for(u32 j = i+1; j < n; ++j) if(sc_.logits[idx[j]] > sc_.logits[idx[mx]]) mx = j;
-    u32 tmp = idx[i]; idx[i] = idx[mx]; idx[mx] = tmp;
-  }
+  gx_top_k(sc_.logits,n,k,idx);
+  if(k == 1) return (int)idx[0];
+  // Top-k order is unchanged by temperature or softmax. Evaluate exponentials
+  // only for retained candidates, then sample their conditional distribution.
+  f32 maximum = sc_.logits[idx[0]];
   f64 total = 0.0;
-  for(u32 i = 0; i < k; ++i) total += sc_.logits[idx[i]];
+  for(u32 i = 0; i < k; ++i){
+    f32 weight=expf((sc_.logits[idx[i]]-maximum)/ecfg.temperature);
+    sc_.logits[idx[i]]=weight;
+    total+=weight;
+  }
   if(total <= 0.0) return (int)idx[0];
   f64 r = ((f64)rand() / (f64)RAND_MAX) * total;
   f64 acc = 0.0;
@@ -309,7 +311,7 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
   }
   if(ecfg.stop && *ecfg.stop){ out_tokens.clear(); return 0; }
   forward(pr, pr.size() - 1, pr.size() - 1, true, kv);
-  {
+  if(gx_get_debug_level() == GX_DEBUG_ALL){
     u32 n = weights_.cfg.vocab_size;
     u32 best = 0;
     f32 bv = sc_.logits[0];
@@ -321,14 +323,14 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
   size_t pos = pr.size();
   for(int g = 0; g < max_new; ++g){
     if(ecfg.stop && *ecfg.stop) break;
-    if(g < 24){
+    if(g < 24 && gx_get_debug_level() == GX_DEBUG_ALL){
       std::string t = tok_.decode_token(next);
       GX_LOG_ALL("gen: tok %d %s%s", next, t.c_str(), tok_.is_stop(next) ? " [stop]" : "");
     }
     if(tok_.is_stop(next)) break;
     out_tokens.push_back(next);
     if(on_token) on_token(next, tok_.decode_token(next).c_str(), user);
-    if(pos >= kv.seq_len) break;
+    if(g + 1 >= max_new || pos >= kv.seq_len || (ecfg.stop && *ecfg.stop)) break;
     std::vector<int> one(1, next);
     forward(one, 0, pos, true, kv);
     pos++;

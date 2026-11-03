@@ -16,7 +16,7 @@ AppSettings::AppSettings(){
   ctx_size = 2048;
   temperature = 0.8f;
   topk = 40;
-  debug_level = DC_ALL;
+  debug_level = DC_WARN;
   server_on = false;
   chat_on = true;
   gpu_on = true;

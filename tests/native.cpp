@@ -6,14 +6,53 @@
 #include "app.h"
 #include <assert.h>
 #include <iostream>
+#include <algorithm>
 #include "quant_checks.h"
 
 static std::string path(const char* name){ return std::string("build/tests/")+name+".gguf"; }
 static std::string completion(const std::string& prompt,int n,void*){
   assert(n==2); return "reply: "+prompt;
 }
+static void sampling_checks(){
+  const u32 counts[]={1,17,257};
+  for(size_t c=0;c<sizeof(counts)/sizeof(counts[0]);++c){
+    u32 n=counts[c];
+    std::vector<f32> logits(n);
+    for(u32 i=0;i<n;++i) logits[i]=((int)((i*37)%29)-14)*0.25f;
+    const u32 limits[]={1,3,40,0,n+1};
+    for(size_t t=0;t<sizeof(limits)/sizeof(limits[0]);++t){
+      u32 k=limits[t]; if(!k || k>n) k=n;
+      std::vector<u32> actual(n),expected;
+      gx_top_k(&logits[0],n,limits[t],&actual[0]);
+      // Independent exhaustive selection, including duplicate logit values.
+      std::vector<bool> used(n,false);
+      for(u32 j=0;j<k;++j){
+        u32 best=n;
+        for(u32 i=0;i<n;++i) if(!used[i] && (best==n || logits[i]>logits[best])) best=i;
+        used[best]=true; expected.push_back(best);
+        assert(actual[j]==expected[j]);
+      }
+      std::sort(actual.begin(),actual.end());
+      for(u32 i=0;i<n;++i) assert(actual[i]==i);
+    }
+  }
+  // Truncating before softmax must preserve the conditional probabilities.
+  f32 logits[]={-3,0,2,1,-1}; u32 selected[5]; gx_top_k(logits,5,3,selected);
+  const f32 temperatures[]={0.1f,0.8f,2.0f};
+  for(size_t t=0;t<3;++t){
+    f32 full[5]; memcpy(full,logits,sizeof(full)); gx_softmax_temp(full,5,temperatures[t]);
+    double mass=0,weights[3],sum=0;
+    for(int i=0;i<3;++i){ mass+=full[selected[i]]; weights[i]=exp((logits[selected[i]]-logits[selected[0]])/temperatures[t]); sum+=weights[i]; }
+    for(int i=0;i<3;++i) assert(fabs(weights[i]/sum-full[selected[i]]/mass)<0.000001);
+  }
+}
+struct CancelAfterToken{ volatile bool stop; int calls; };
+static void cancel_after_token(int,const char*,void* user){
+  CancelAfterToken* state=(CancelAfterToken*)user; ++state->calls; state->stop=true;
+}
 static void checks(){
   quant_checks();
+  sampling_checks();
   Json j;
   assert(Json::parse("{\"id\":\"x\",\"params\":{\"id\":9},\"x\":\"\\uD83D\\uDE00\\n\"}",j));
   assert(j.get("id").text=="x" && j.get("x").text=="\xF0\x9F\x98\x80\n");
@@ -47,6 +86,17 @@ static void checks(){
     Engine engine; assert(engine.load(path(name).c_str()));
     KVCache kv; kv.init(32,1,2,1); EngineCfg ec={0,1,true,0}; std::vector<int> out,prompt(1,4);
     assert(engine.generate(prompt,out,1,kv,ec)==1 && out[0]==4);
+    // A one-token response must not evaluate an unused second token.
+    for(int d=0;d<2;++d) assert(kv.k_row(0,1)[d]==0 && kv.v_row(0,1)[d]==0);
+    EngineCfg sampled={0.8f,2,false,0};
+    // Fixture logits put token 4 first and token 0 second. Exercise both the
+    // probabilistic path and the top-k=1 shortcut through the actual engine.
+    for(int trial=0;trial<16;++trial){
+      assert(engine.generate(prompt,out,1,kv,sampled)==1);
+      assert(out[0]==4 || out[0]==0);
+    }
+    sampled.top_k=1;
+    assert(engine.generate(prompt,out,1,kv,sampled)==1 && out[0]==4);
     // At position zero RoPE is identity: inspect the cache against an independent
     // projection calculation, including the Qwen key/value biases.
     const f32 embedding[]={0.3f,-0.4f,0.2f,0.1f};
@@ -58,6 +108,10 @@ static void checks(){
       assert(fabs(kv.k_row(0,0)[row]-(projected+(arch ? row*0.2 : 0)))<0.00001);
       assert(fabs(kv.v_row(0,0)[row]-(projected+(arch ? row*0.3 : 0)))<0.00001);
     }
+    CancelAfterToken cancelled={false,0}; EngineCfg cancel_cfg=ec; cancel_cfg.stop=&cancelled.stop;
+    assert(engine.generate(prompt,out,5,kv,cancel_cfg,cancel_after_token,&cancelled)==1);
+    assert(cancelled.calls==1);
+    for(int d=0;d<2;++d) assert(kv.k_row(0,1)[d]==0 && kv.v_row(0,1)[d]==0);
     KVCache empty; assert(engine.generate(prompt,out,1,empty,ec)==0);
     prompt[0]=-1; assert(engine.generate(prompt,out,1,kv,ec)==0);
     std::string response;
