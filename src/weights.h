@@ -6,6 +6,19 @@
 #include "model.h"
 #include "quant.h"
 
+struct WeightCache{
+  u8* data;
+  size_t capacity, length;
+  GGUF* file;
+  u64 offset, streamed_bytes;
+  bool failed;
+  WeightCache();
+  ~WeightCache();
+  bool init();
+  void reset();
+  const u8* read(GGUF* source,u64 position,size_t bytes);
+};
+
 struct TensorView{
   const u8* data;
   int type;
@@ -13,17 +26,14 @@ struct TensorView{
   u32 cols;
   u32 row_stride;
   bool ok;
+  GGUF* source;
+  WeightCache* cache;
+  u64 offset;
 
-  TensorView(){ data=0; type=GXQ_F32; rows=0; cols=0; row_stride=0; ok=false; }
+  TensorView(){ data=0; type=GXQ_F32; rows=0; cols=0; row_stride=0; ok=false; source=0; cache=0; offset=0; }
 
-  void row_dequant(u32 r, f32* out) const {
-    gxq_dequant_row(type, data + (size_t)r * row_stride, out, cols);
-  }
-  f32 at_f32(u32 r, u32 c) const {
-    f32 buf[1024];
-    row_dequant(r, buf);
-    return buf[c];
-  }
+  bool row_dequant(u32 r, f32* out) const;
+  bool matvec(const f32* x,f32* out,size_t count,f32* scratch) const;
 };
 
 struct LayerWeights{
@@ -49,10 +59,11 @@ struct Weights{
   std::vector<LayerWeights> layers;
   std::vector<u8*> owned;
   size_t total_bytes;
+  WeightCache disk;
 
   Weights();
   ~Weights();
-  bool load(GGUF& g, const ModelCfg& cfg, void (*progress)(const char*, int, int)=0);
+  bool load(GGUF& g, const ModelCfg& cfg, void (*progress)(const char*, int, int)=0,bool stream=false);
   void free_all();
 };
 

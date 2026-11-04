@@ -31,7 +31,7 @@ static char ascii_lower(char c){ return c >= 'A' && c <= 'Z' ? c+32 : c; }
 
 Tokenizer::Tokenizer(){
   bos_=eos_=unk_=-1; bpe_=false; add_bos_=true; add_space_prefix_=true;
-  llama3_=qwen_=false;
+  llama3_=qwen_=smollm_=false;
   for(int b=0, extra=0; b<256; ++b){
     bool direct = (b>=33 && b<=126)||(b>=161 && b<=172)||(b>=174);
     byte_chars_[b]=utf8_cp(direct ? b : 256+extra++);
@@ -53,7 +53,8 @@ bool Tokenizer::load(GGUF& g){
     GX_LOG_ERROR("tokenizer: unsupported model %s", model.c_str()); return false;
   }
   llama3_=bpe_ && (pre=="llama-bpe" || pre=="llama3");
-  if(bpe_ && !llama3_ && pre!="qwen2"){
+  smollm_=bpe_ && pre=="smollm";
+  if(bpe_ && !llama3_ && !smollm_ && pre!="qwen2"){
     GX_LOG_ERROR("tokenizer: unsupported BPE pre-tokenizer %s", pre.c_str()); return false;
   }
   toks_.resize(tk->arr_s.size());
@@ -88,7 +89,9 @@ bool Tokenizer::load(GGUF& g){
     char name[9]; snprintf(name,sizeof(name),"<0x%02X>",b);
     std::map<std::string,int>::const_iterator it=ids_.find(bpe_ ? byte_chars_[b] : std::string(name));
     byte_ids_[b]=it==ids_.end() ? -1 : it->second;
-    if(bpe_ && byte_ids_[b]<0){ GX_LOG_ERROR("tokenizer: missing byte %d", b); return false; }
+    // SmolLM2 intentionally omits some unused byte symbols and has no unknown
+    // token. Its BPE drops unmatched symbols, as in the original tokenizer.
+    if(bpe_ && !smollm_ && byte_ids_[b]<0){ GX_LOG_ERROR("tokenizer: missing byte %d", b); return false; }
   }
   return true;
 }
@@ -127,7 +130,9 @@ void Tokenizer::merge_piece(const std::string& text, std::vector<int>& out) cons
       for(size_t p=0;p<symbols[i].size();){
         size_t start=p; next_cp(symbols[i],p);
         std::map<std::string,int>::const_iterator byte=byte_values_.find(symbols[i].substr(start,p-start));
-        out.push_back(byte==byte_values_.end() ? unk_ : byte_ids_[byte->second]);
+        int id=byte==byte_values_.end() ? unk_ : byte_ids_[byte->second];
+        if(id>=0) out.push_back(id);
+        else if(!smollm_) out.push_back(unk_);
       }
     } else for(size_t j=0; j<symbols[i].size(); ++j){
       int id=byte_ids_[(u8)symbols[i][j]]; out.push_back(id<0 ? unk_ : id);
@@ -152,13 +157,13 @@ void Tokenizer::encode_plain(const std::string& text, std::vector<int>& out, boo
       for(int k=0; k<7 && end==i; ++k){
         size_t len=strlen(suffix[k]); bool match=i+1+len<=n;
         for(size_t j=0; match && j<len; ++j)
-          match=cp[i+1+j]<128 && ascii_lower((char)cp[i+1+j])==suffix[k][j];
+          match=cp[i+1+j]<128 && (smollm_ ? (char)cp[i+1+j] : ascii_lower((char)cp[i+1+j]))==suffix[k][j];
         if(match) end=i+1+len;
       }
     }
     if(end==i){
       size_t l=i;
-      if(cp_kind(cp[l])!=1 && cp_kind(cp[l])!=2 && cp[l]!='\r' && cp[l]!='\n') ++l;
+      if(smollm_ ? cp[l]==' ' : (cp_kind(cp[l])!=1 && cp_kind(cp[l])!=2 && cp[l]!='\r' && cp[l]!='\n')) ++l;
       if(l<n && cp_kind(cp[l])==1){ end=l+1; while(end<n && cp_kind(cp[end])==1) ++end; }
     }
     if(end==i && cp_kind(cp[i])==2){
@@ -168,13 +173,13 @@ void Tokenizer::encode_plain(const std::string& text, std::vector<int>& out, boo
       size_t l=i; if(cp[l]==' ') ++l;
       if(l<n && cp_kind(cp[l])==0){
         end=l+1; while(end<n && cp_kind(cp[end])==0) ++end;
-        while(end<n && (cp[end]=='\r'||cp[end]=='\n')) ++end;
+        while(!smollm_ && end<n && (cp[end]=='\r'||cp[end]=='\n')) ++end;
       }
     }
     if(end==i && cp_kind(cp[i])==3){
       size_t ws=i; while(ws<n && cp_kind(cp[ws])==3) ++ws;
       size_t nl=ws; while(nl>i && cp[nl-1]!='\r' && cp[nl-1]!='\n') --nl;
-      if(nl>i) end=nl;
+      if(!smollm_ && nl>i) end=nl;
       else end=(ws<n && ws>i+1) ? ws-1 : ws;
     }
     if(end==i) end=i+1;

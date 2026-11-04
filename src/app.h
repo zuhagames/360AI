@@ -28,6 +28,7 @@ struct AppSettings{
   bool server_on;
   bool chat_on;
   bool gpu_on;
+  bool disk_on;
 
   AppSettings();
 };

@@ -49,11 +49,13 @@ public:
   Engine();
   ~Engine();
 
-  bool load(const char* gguf_path, void (*progress)(const char*,int,int)=0);
+  bool load(const char* gguf_path, void (*progress)(const char*,int,int)=0,bool stream=false);
   bool ready() const { return loaded_; }
   const ModelCfg& cfg() const { return weights_.cfg; }
   Tokenizer& tok() { return tok_; }
   const Tokenizer& tok() const { return tok_; }
+  bool disk_streaming() const { return weights_.disk.data!=0; }
+  bool storage_ok() const { return !weights_.disk.failed; }
 
   void reset();
   int generate(const std::vector<int>& prompt, std::vector<int>& out_tokens,
@@ -80,7 +82,7 @@ private:
   void free_scratch();
   Scratch sc_;
 
-  void forward(const std::vector<int>& tokens, size_t tok_index, size_t pos, bool want_logits, KVCache& kv);
+  bool forward(const std::vector<int>& tokens, size_t tok_index, size_t pos, bool want_logits, KVCache& kv);
   void attention(size_t layer, const f32* xn, KVCache& kv, u32 pos, f32* q, f32* out);
   void ffn(size_t layer, const f32* xn);
   int sample(const EngineCfg& ecfg);

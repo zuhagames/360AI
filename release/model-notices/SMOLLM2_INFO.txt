@@ -1,0 +1,14 @@
+SmolLM2 135M Instruct Q8_0
+
+Original model: HuggingFaceTB/SmolLM2-135M-Instruct
+https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct
+Created by Hugging Face. License: Apache License 2.0 (APACHE-2.0.txt).
+
+GGUF conversion: lmstudio-community/SmolLM2-135M-Instruct-GGUF
+https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF
+Pinned revision: 04f7f8a05a8e4bc208e88d11e8c9122be36c2f9b
+File: SmolLM2-135M-Instruct-Q8_0.gguf
+Bytes: 144811072
+SHA256: 40f7094960b6ede829145d102ca79451b364b27d9d8694d4406e002024cff357
+
+The GGUF is redistributed unchanged. 360AI is an independent Xbox runtime.

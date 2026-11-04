@@ -1,39 +1,29 @@
-# 360AI 1.0
+# 360AI 1.1
 
-Download **360AI-1.0-USB.zip** under Assets for the ready-to-copy Xbox package. The automatic Source code archives are for development.
+Download **360AI-1.1-USB.zip** under Assets. Extract it, copy the entire `360AI` folder to your USB drive or HDD, and launch `360AI.xex` on your modded Xbox 360.
 
-1. Extract the ZIP on your PC.
-2. Copy the entire `360AI` folder to your USB drive.
-3. The full `gemma-3-270m-it-Q8_0.gguf` is already included beside `360AI.xex`; no separate weights download is needed.
-4. Connect the USB to your modded Xbox 360 and launch `360AI.xex` with your existing XEX launcher.
+**Gemma 3 270M Instruct Q8_0 and SmolLM2 135M Instruct Q8_0 are included.** Select either model for offline chat; RAM loading is recommended for both. No separate weights, SDK or shader download is needed on the Xbox.
 
-**The updated 1.0 USB ZIP includes Gemma 3 270M Instruct Q8_0 weights (291,545,600 bytes).** It can run local chat offline after extraction. A console capable of running unsigned XEX files is required. No model account, SDK, Visual Studio, Node.js or separate shader download is needed on the Xbox.
+## What's new
 
-The USB ZIP includes the executable, model GGUF, start guide, changelog, credits, model provenance, and required Gemma terms/use-policy notices. The unchanged model is sourced from [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), pinned to revision `5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d`. Model use and redistribution remain subject to the included [Gemma Terms of Use](https://ai.google.dev/gemma/terms).
+- **SmolLM2 135M:** a smaller local chat model, with support for its tokenizer.
+- **HDD/USB weight streaming:** keeps matrix weights on disk with an 8 MB cache, allowing models whose weights exceed available RAM to be loaded.
+- **More local model choices:** optional Qwen2.5 0.5B, 1.5B and 7B downloads, pinned to exact revisions and verified with SHA-256. Interrupted downloads can resume.
+- **Disk-space descriptions:** the model browser shows total model size and recommended free space. The model guide lists 1 GB for Qwen 0.5B, 2 GB for 1.5B and **5 GB for 7B**.
+- **Split GGUF support and 64-bit file access:** standard model shards load together; missing or inconsistent shards are rejected.
+- **Storage diagnostics:** disk read failures stop generation and appear in the console UI, `/health`, OpenAI-compatible endpoints and MCP responses.
+- Default context reduced to **512 tokens** to leave more memory available.
 
-**The USB ZIP is the only packaged release download.** It contains the rebuilt `360AI.xex` and the model weights. This refresh updates the existing **1.0** release.
+## Using larger models
 
-Optional PC bridge source remains available in the repository's [`bridge` folder](https://github.com/zuhagames/360AI/tree/main/bridge), with setup in the [technical guide](https://github.com/zuhagames/360AI/blob/main/docs/TECHNICAL.md#connect-external-mcp-servers). It requires Node.js 22+ on the PC and does not go on the Xbox.
+The ZIP includes `MODELS.txt` and `Download-Models.ps1`. Run the downloader on a Windows PC, then copy the downloaded GGUF files beside `360AI.xex`. Choose **HDD/USB stream** in Settings before loading a larger model. Keep all shards together and select the first shard.
 
-USB ZIP SHA-256:
+HDD streaming pages model weights; the tokenizer, working buffers and KV cache still need console RAM. The 1.5B and 7B options are **experimental and have not been benchmarked on an Xbox 360**. Large models can be extremely slow. Start with a context of 256-512 tokens. The experimental GPU path is unchanged; this release makes no GPU speedup claim.
 
-```text
-996c844139a5b2d9d804f3fdf30d78946a1468ee69b204afc0b73b5cc9020b0e
-```
+## Validation
 
-## Features and fixes
+Built with the Xbox 360 SDK. Native checks and all eight protocol/tokenizer/package test groups pass, including 780 tokenizer reference cases and HTTP generation in RAM and streaming modes. Real Gemma, SmolLM2 and Qwen2.5 0.5B models produce identical tokens and KV-cache values in host RAM and streaming tests. Cache-boundary reads, disk failures and split-model loading are covered. These checks do not replace physical-console testing.
 
-- Faster top-k sampling, calculating probabilities only for retained candidates.
-- Avoid an unused model forward pass after reaching the response token limit or cancelling.
-- Warning-level logging by default to reduce verbose USB log writes.
-- Gemma 2/3, dense Llama and Qwen2/2.5 GGUF execution paths, subject to model compatibility and console RAM.
-- Experimental Xenos pixel-shader matrix calculations with startup numerical validation and CPU fallback.
-- Tiled R32F GPU resolve/readback and pixel-center sampling fixes, with detailed failure diagnostics.
-- Corrected packed quantized-weight decoding.
-- OpenAI-compatible completions/chat endpoints, streaming, and `/health`.
-- Xbox LAN socket privilege/configuration and support for local browser clients.
-- MCP endpoint and optional external-server PC bridge.
+The ZIP is the only uploaded release asset. It includes the executable, both models, guides, model catalog/downloader, credits and required model licenses/notices. Model files are pinned to the sources recorded in the ZIP; Gemma use remains subject to the included Gemma Terms of Use.
 
-The Xbox SDK build and seven native/protocol/package test groups pass. The bundled full GGUF was loaded with this engine's host build and generated `Hello!`; its source checksum and the model extracted from the ZIP are verified. **GPU correctness and speed still need physical-console validation.** The GPU path remains experimental; no speedup is claimed. More compatibility details are in the repository README.
-
-360AI is a fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma. Credit for the original Xbox 360 port belongs to Canyons and the original contributors.
+Made by **ZuhaGames & Canyons**. A fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma. AI tools assisted with development, debugging and documentation.

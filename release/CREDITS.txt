@@ -15,4 +15,9 @@ Implementation references and compatibility documentation are linked in
 the 360AI repository README. The USB ZIP includes Google's Gemma 3 270M
 Instruct weights in a Q8_0 GGUF published by Second State, redistributed
 unchanged. Its model terms, notice, provenance and checksum are included
-in the USB ZIP. The optional PC bridge ZIP does not contain model weights.
+in the USB ZIP.
+
+SmolLM2 135M Instruct by Hugging Face, with the lmstudio-community Q8_0 GGUF
+conversion, is also included unchanged. See SMOLLM2_INFO.txt and APACHE-2.0.txt.
+Optional Qwen2.5 model sources/checksums are in models.json (Apache 2.0).
+AI tools assisted with development, debugging and documentation.

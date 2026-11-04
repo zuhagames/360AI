@@ -1,0 +1,32 @@
+{
+  "models": [
+    {
+      "id": "gemma3-270m", "name": "Gemma 3 270M Instruct", "bundled": true,
+      "description": "General chat. RAM loading recommended.", "recommended_free_gb": 0.4, "mode": "RAM", "license": "Gemma Terms of Use",
+      "files": [{"filename":"gemma-3-270m-it-Q8_0.gguf","url":"https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d/gemma-3-270m-it-Q8_0.gguf?download=true","size":291545600,"sha256":"0ef57d2c838458a1952664260dcba38e5bdda37494f3af732f06e4add24068e3"}]
+    },
+    {
+      "id": "smollm2-135m", "name": "SmolLM2 135M Instruct Q8_0", "bundled": true,
+      "description": "Small English chat model. RAM loading recommended.", "recommended_free_gb": 0.2, "mode": "RAM", "license": "Apache-2.0",
+      "files": [{"filename":"SmolLM2-135M-Instruct-Q8_0.gguf","url":"https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF/resolve/04f7f8a05a8e4bc208e88d11e8c9122be36c2f9b/SmolLM2-135M-Instruct-Q8_0.gguf?download=true","size":144811072,"sha256":"40f7094960b6ede829145d102ca79451b364b27d9d8694d4406e002024cff357"}]
+    },
+    {
+      "id": "qwen25-05b", "name": "Qwen2.5 0.5B Instruct Q4_K_M", "bundled": false,
+      "description": "Additional local chat model. Use HDD streaming and a short context.", "recommended_free_gb": 1, "mode": "HDD stream", "license": "Apache-2.0",
+      "files": [{"filename":"qwen2.5-0.5b-instruct-q4_k_m.gguf","url":"https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/9217f5db79a29953eb74d5343926648285ec7e67/qwen2.5-0.5b-instruct-q4_k_m.gguf?download=true","size":491400032,"sha256":"74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"}]
+    },
+    {
+      "id": "qwen25-15b", "name": "Qwen2.5 1.5B Instruct Q4_K_M", "bundled": false,
+      "description": "Larger experimental HDD model. Slow generation; start at context 256.", "recommended_free_gb": 2, "mode": "HDD stream", "license": "Apache-2.0",
+      "files": [{"filename":"qwen2.5-1.5b-instruct-q4_k_m.gguf","url":"https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/91cad51170dc346986eccefdc2dd33a9da36ead9/qwen2.5-1.5b-instruct-q4_k_m.gguf?download=true","size":1117320736,"sha256":"6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e"}]
+    },
+    {
+      "id": "qwen25-7b", "name": "Qwen2.5 7B Instruct Q4_K_M", "bundled": false,
+      "description": "Needs 5 GB free on HDD. Two shards; experimental and extremely slow on Xbox 360. Not console-benchmarked.", "recommended_free_gb": 5, "mode": "HDD stream", "license": "Apache-2.0",
+      "files": [
+        {"filename":"qwen2.5-7b-q4-00001-of-00002.gguf","url":"https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/bb5d59e06d9551d752d08b292a50eb208b07ab1f/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf?download=true","size":3993201344,"sha256":"dfce12e3862a5283ccfb88221b48480e58745165de856439950d0f22590580db"},
+        {"filename":"qwen2.5-7b-q4-00002-of-00002.gguf","url":"https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/bb5d59e06d9551d752d08b292a50eb208b07ab1f/qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf?download=true","size":689872288,"sha256":"539cf93f78e887edea1c04e2d7d8cdaca9d01dae9c9025bcb8accbe29df3d72a"}
+      ]
+    }
+  ]
+}

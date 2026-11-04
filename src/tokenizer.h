@@ -31,7 +31,7 @@ private:
   std::map<std::string,int> byte_values_;
   int byte_ids_[256];
   int bos_, eos_, unk_;
-  bool bpe_, add_bos_, add_space_prefix_, llama3_, qwen_;
+  bool bpe_, add_bos_, add_space_prefix_, llama3_, qwen_, smollm_;
   void encode_plain(const std::string& text, std::vector<int>& out, bool prefix) const;
   void merge_piece(const std::string& text, std::vector<int>& out) const;
 };

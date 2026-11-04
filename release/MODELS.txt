@@ -1,0 +1,48 @@
+360AI 1.1 - local model choices
+==============================
+
+Model                              Model files   Reserve free   Mode
+SmolLM2 135M Instruct Q8_0           145 MB        0.2 GB         RAM
+Gemma 3 270M Instruct Q8_0           292 MB        0.4 GB         RAM
+Qwen2.5 0.5B Instruct Q4_K_M         491 MB        1 GB           HDD stream
+Qwen2.5 1.5B Instruct Q4_K_M         1.12 GB       2 GB           HDD stream
+Qwen2.5 7B Instruct Q4_K_M           4.68 GB       5 GB           HDD stream
+
+SmolLM2 and Gemma weights are included. Qwen models are optional downloads.
+The reserve column is for the extracted model, not extra RAM. To keep all
+models, add their file sizes together and leave room for the app and logs.
+
+DOWNLOAD OPTIONAL MODELS ON YOUR WINDOWS PC
+Open PowerShell in this 360AI folder and run:
+  powershell -ExecutionPolicy Bypass -File .\Download-Models.ps1 -List
+  powershell -ExecutionPolicy Bypass -File .\Download-Models.ps1 -Model qwen25-05b
+  powershell -ExecutionPolicy Bypass -File .\Download-Models.ps1 -Model qwen25-15b
+  powershell -ExecutionPolicy Bypass -File .\Download-Models.ps1 -Model qwen25-7b
+
+Downloads are pinned and checked against SHA-256 in models.json. The script
+places files beside 360AI.xex. Copy the whole folder to your console HDD/USB.
+Download only the models you want. Local inference needs no network or PC.
+
+USE THE HDD FOR MODEL WEIGHTS
+Launch the app from the folder containing the GGUF files. In Settings select
+Weight storage: HDD/USB stream. Only an 8 MB weight cache is allocated; the
+tokenizer, scratch buffers, small norm/bias tensors and KV cache stay in RAM.
+Start at context 256-512. Larger contexts still need more real RAM.
+
+Streaming reads model weights repeatedly. The 1.5B and especially 7B options
+are experimental and can take a very long time per token. Their inclusion in
+the catalog is not an Xbox benchmark or a performance guarantee. The HDD is
+not general-purpose swap RAM. CPU/GPU math and attention still use RAM.
+
+SPLIT MODELS
+Keep every shard together with matching names. Select only the first shard.
+The 7B download uses two files under 4 GB each and short console-friendly
+names. The browser shows their combined storage requirement. Missing shards
+cause loading to fail. GGUF shards are not ZIP or arbitrary file fragments.
+
+LICENSES AND SOURCES
+Gemma: see NOTICE, GEMMA_TERMS.txt, GEMMA_POLICY.txt and MODEL_INFO.txt.
+SmolLM2 by Hugging Face, GGUF conversion by lmstudio-community: Apache 2.0.
+Qwen2.5 models by the Qwen team: Apache 2.0.
+See APACHE-2.0.txt and SMOLLM2_INFO.txt. models.json pins all source revisions,
+download URLs, exact file lengths and SHA-256 checksums.

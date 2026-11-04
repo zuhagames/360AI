@@ -53,6 +53,38 @@ static void cancel_after_token(int,const char*,void* user){
 static void checks(){
   quant_checks();
   sampling_checks();
+  {GGUF g;assert(g.load(path("smollm-missing-byte").c_str()));Tokenizer tok;assert(tok.load(g));
+    std::vector<int> ids;tok.encode(std::string(1,'\x04')+"abc",ids);assert(ids.size()==1 && ids[0]==258);}
+  {
+    GGUF g; assert(g.load(path("stream-cache").c_str()));
+    const gguf_tensor* t=g.tensor("cache.matrix"); assert(t);
+    WeightCache cache; assert(cache.init());
+    TensorView matrix; matrix.type=GXQ_F32;matrix.rows=10000;matrix.cols=256;matrix.row_stride=1024;
+    matrix.source=t->source;matrix.offset=t->data_off;matrix.cache=&cache;matrix.ok=true;
+    f32 input[256],row[256];for(int c=0;c<256;++c) input[c]=(c%7-3)*0.125f;
+    std::vector<f32> out(10000);assert(matrix.matvec(input,&out[0],out.size(),row));
+    for(int r=0;r<10000;++r){
+      double expected=0;for(int c=0;c<256;++c) expected+=((r+c)%13-6)*0.0625*input[c];
+      assert(fabs(out[r]-expected)<0.00001);
+    }
+    assert(matrix.row_dequant(9999,row));assert(row[0]==((9999%13)-6)*0.0625f);
+    g.close();cache.file=0;cache.length=0;
+    assert(!matrix.row_dequant(0,row) && cache.failed);
+  }
+  {
+    const char* invalid_shards[]={"missing-split-00001-of-00002","bad-split-00001-of-00002","split-qwen2-00002-of-00002"};
+    for(int i=0;i<3;++i){GGUF g;assert(!g.load(path(invalid_shards[i]).c_str()));}
+    Engine ram,disk,split;
+    assert(ram.load(path("qwen2").c_str()));
+    assert(disk.load(path("qwen2").c_str(),0,true) && disk.disk_streaming());
+    assert(split.load(path("split-qwen2-00001-of-00002").c_str(),0,true));
+    KVCache a,b,c;a.init(32,1,2,1);b.init(32,1,2,1);c.init(32,1,2,1);
+    EngineCfg ec={0,1,true,0};std::vector<int> prompt(3,4),x,y,z;
+    assert(ram.generate(prompt,x,4,a,ec)==4);
+    assert(disk.generate(prompt,y,4,b,ec)==4);
+    assert(split.generate(prompt,z,4,c,ec)==4);
+    assert(x==y && x==z && a.k==b.k && a.k==c.k && a.v==b.v && a.v==c.v);
+  }
   Json j;
   assert(Json::parse("{\"id\":\"x\",\"params\":{\"id\":9},\"x\":\"\\uD83D\\uDE00\\n\"}",j));
   assert(j.get("id").text=="x" && j.get("x").text=="\xF0\x9F\x98\x80\n");
@@ -128,9 +160,10 @@ static void checks(){
 }
 int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
-  if(argc>2 && std::string(argv[1])=="--model"){
+  if(argc>2 && (std::string(argv[1])=="--model" || std::string(argv[1])=="--model-stream" || std::string(argv[1])=="--compare-model")){
     gx_set_debug_level(GX_DEBUG_WARN);
-    Engine engine; if(!engine.load(argv[2])) return 1;
+    bool stream=std::string(argv[1])=="--model-stream";
+    Engine engine; if(!engine.load(argv[2],0,stream)) return 1;
     const ModelCfg& c=engine.cfg();
     std::cout<<"Loaded real GGUF: "<<c.name<<" layers="<<c.num_layers<<" dim="<<c.model_dim<<std::endl;
     std::vector<std::pair<std::string,std::string> > messages;
@@ -142,6 +175,13 @@ int main(int argc,char** argv){
     std::string text=engine.tok().decode(out);
     if(text.empty()) return 2;
     std::cout<<"Generated "<<out.size()<<" tokens in "<<gx_time_seconds()-start<<" seconds: "<<text<<std::endl;
+    if(std::string(argv[1])=="--compare-model"){
+      Engine disk;if(!disk.load(argv[2],0,true)) return 3;
+      KVCache streamed;streamed.init(256,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
+      std::vector<int> actual;disk.generate(ids,actual,12,streamed,ec);
+      if(actual!=out || streamed.k!=cache.k || streamed.v!=cache.v || !disk.storage_ok()) return 4;
+      std::cout<<"RAM and 8 MB streamed-cache outputs/KV match exactly\n";
+    }
     return 0;
   }
   if(argc>2 && std::string(argv[1])=="--tokenize"){
@@ -155,8 +195,8 @@ int main(int argc,char** argv){
     }
     return 0;
   }
-  if(argc>1 && std::string(argv[1])=="--serve"){
-    Engine engine; if(!engine.load(path("qwen2").c_str())) return 1;
+  if(argc>1 && (std::string(argv[1])=="--serve" || std::string(argv[1])=="--serve-stream")){
+    Engine engine; if(!engine.load(path("qwen2").c_str(),0,std::string(argv[1])=="--serve-stream")) return 1;
     KVCache kv; kv.init(64,1,2,1); AppSettings settings; settings.temperature=0;
     gx_mutex_t mutex=gx_mutex_create(); if(!server_start(&engine,&kv,&settings,mutex)) return 2;
     std::cout<<server_status_text()<<std::endl;

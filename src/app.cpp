@@ -13,13 +13,14 @@
 static const char* kBrowseDir = "game:";
 
 AppSettings::AppSettings(){
-  ctx_size = 2048;
+  ctx_size = 512;
   temperature = 0.8f;
   topk = 40;
   debug_level = DC_WARN;
   server_on = false;
   chat_on = true;
   gpu_on = true;
+  disk_on = false;
 }
 
 App::App(){
@@ -81,7 +82,21 @@ static void utf8_truncate_scroll(const std::string& s, size_t max_chars,
 int App::run(){
   if(!gxui_init()) return 1;
 
-  gx_list_dir(kBrowseDir, ".gguf", files_);
+  std::vector<gx_file_entry> all_files;
+  gx_list_dir(kBrowseDir, ".gguf", all_files);
+  for(size_t i=0;i<all_files.size();++i){
+    std::string prefix;u32 part=0,count=0;
+    gx_file_entry entry=all_files[i];
+    if(gx_gguf_split_name(entry.name,prefix,part,count)){
+      if(part!=1) continue;
+      for(size_t j=0;j<all_files.size();++j){
+        std::string other;u32 p=0,n=0;
+        if(j!=i && gx_gguf_split_name(all_files[j].name,other,p,n) && other==prefix && n==count)
+          entry.size+=all_files[j].size;
+      }
+    }
+    files_.push_back(entry);
+  }
   for(size_t i = 0; i + 1 < files_.size(); ++i){
     for(size_t j = 0; j + 1 - i < files_.size(); ++j){
       if(files_[j].name > files_[j+1].name){
@@ -151,7 +166,7 @@ void App::browse_frame(){
   f32 cw = gxui_char_w(), lh = gxui_line_h();
   gxui_text_shadow(40, 30, GX_ACCENT, "360AI %s", GX_VERSION);
   gxui_text_shadow(40, 30 + lh, GXRGB(180,180,190),
-                   "Gemma 2/3, Llama, Qwen2/2.5 GGUF from %s", kBrowseDir);
+                   "Gemma, SmolLM2, Llama, Qwen2/2.5 from %s", kBrowseDir);
 
   if(files_.empty()){
     gxui_text_shadow(40, 30 + lh*3, GXRGB(220,120,120),
@@ -164,7 +179,7 @@ void App::browse_frame(){
   if(file_sel_ >= (int)files_.size()) file_sel_ = (int)files_.size() - 1;
   if(file_sel_ < 0) file_sel_ = 0;
 
-  int visible = 18;
+  int visible = 12;
   if(file_sel_ < file_scroll_) file_scroll_ = file_sel_;
   if(file_sel_ >= file_scroll_ + visible) file_scroll_ = file_sel_ - visible + 1;
 
@@ -178,9 +193,17 @@ void App::browse_frame(){
       gxui_text_shadow(40, y, col, "  %s", files_[i].name.c_str());
     }
     f32 mb = (f32)files_[i].size / (1024.0f*1024.0f);
-    gxui_text_shadow(360*cw/12, y, GXRGB(120,140,120), "%.1f MB", mb);
+    gxui_text_shadow(1030, y, GXRGB(120,140,120), "%.0f MB", mb);
     y += lh;
   }
+
+  const gx_file_entry& selected=files_[file_sel_];
+  double gb=(double)selected.size/1000000000.0;
+  double reserve=gb>=1.0 ? ceil(gb) : ceil(gb*10.0)/10.0;
+  gxui_text_shadow(40,720-lh*4,GXRGB(180,200,160),"Needs %.1f GB free on HDD/USB (%.2f GB of model files)",reserve,gb);
+  gxui_text_shadow(40,720-lh*3,GXRGB(150,150,160),selected.size>320u*1024u*1024u ?
+    "Large model: HDD streaming recommended; generation can be very slow." :
+    "Small model: RAM loading recommended. HDD streaming is optional.");
 
   u32 p = gxui_buttons_pressed();
   if(p & GX_BTN_DUP) file_sel_--;
@@ -188,6 +211,8 @@ void App::browse_frame(){
   if(p & GX_BTN_A){
     model_path_ = std::string(kBrowseDir) + "\\" + files_[file_sel_].name;
     model_name_ = files_[file_sel_].name;
+    settings_.disk_on=files_[file_sel_].size>320u*1024u*1024u;
+    if(settings_.disk_on) settings_.ctx_size=512;
     screen_ = AS_SETTINGS;
   }
 }
@@ -201,7 +226,7 @@ void App::settings_frame(){
     "everything", "warning", "error", "nothing"
   };
 
-  char line[8][192];
+  char line[9][192];
   snprintf(line[0], 192, "Context size        %d", settings_.ctx_size);
   snprintf(line[1], 192, "Temperature         %.2f", (double)settings_.temperature);
   snprintf(line[2], 192, "Top-K               %d", settings_.topk);
@@ -209,10 +234,11 @@ void App::settings_frame(){
   snprintf(line[4], 192, "OpenAI / MCP server %s", settings_.server_on ? "ON" : "OFF");
   snprintf(line[5], 192, "Chat on Xbox        %s", settings_.chat_on ? "ON" : "OFF");
   snprintf(line[6], 192, "GPU matrix math     %s", gx_gpu_ready() ? (settings_.gpu_on ? "ON (experimental)" : "OFF") : "unavailable (CPU)");
-  snprintf(line[7], 192, "Load model");
+  snprintf(line[7], 192, "Weight storage      %s",settings_.disk_on ? "HDD/USB stream (8 MB cache)" : "RAM");
+  snprintf(line[8], 192, "Load model");
 
   f32 y = 30 + lh*3;
-  for(int i = 0; i < 8; ++i){
+  for(int i = 0; i < 9; ++i){
     if(i == set_sel_){
       gxui_fill(36, y - 2, 700, lh + 2, GX_ACCENT_A(60));
       gxui_text_shadow(40, y, GXRGB(255,255,255), "> %s", line[i]);
@@ -236,7 +262,7 @@ void App::settings_frame(){
   if(p & GX_BTN_DUP) set_sel_--;
   if(p & GX_BTN_DDOWN) set_sel_++;
   if(set_sel_ < 0) set_sel_ = 0;
-  if(set_sel_ > 7) set_sel_ = 7;
+  if(set_sel_ > 8) set_sel_ = 8;
 
   if(p & GX_BTN_A){
     switch(set_sel_){
@@ -272,6 +298,9 @@ void App::settings_frame(){
         settings_.gpu_on = !settings_.gpu_on;
         break;
       case 7:
+        settings_.disk_on=!settings_.disk_on;
+        break;
+      case 8:
         gx_gpu_enable(settings_.gpu_on);
         gx_set_debug_level(settings_.debug_level);
         start_load();
@@ -313,7 +342,7 @@ void App::load_progress_cb(const char* name, int cur, int total){
 void App::do_load(){
   gx_log(GX_DEBUG_ALL, "loading model: %s", model_path_.c_str());
   s_load_app = this;
-  bool ok = engine_.load(model_path_.c_str(), &App::load_progress_cb);
+  bool ok = engine_.load(model_path_.c_str(), &App::load_progress_cb,settings_.disk_on);
   s_load_app = 0;
   if(ok){
     const ModelCfg& c = engine_.cfg();
@@ -471,6 +500,7 @@ void App::chat_frame(){
   } else {
     gxui_text_shadow(40, 720 - lh*2, GXRGB(90,90,100), "idle");
   }
+  if(!engine_.storage_ok()) gxui_text_shadow(40,720-lh*3,GXRGB(240,130,120),"Disk read failed. Check HDD/USB and reload the model.");
 
   if(kb_mode_){
     kb_draw();

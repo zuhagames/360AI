@@ -48,13 +48,18 @@ int gx_mcp_dispatch(const std::string& body,Engine* engine,u32 context,
       Json info=Json::object(); const ModelCfg& c=engine->cfg();
       info["architecture"]=Json(c.name); info["layers"]=Json((double)c.num_layers);
       info["embedding_length"]=Json((double)c.model_dim); info["context"]=Json((double)context);
-      info["backend"]=Json(gx_gpu_status()); result=text_result(info.dump());
+      info["backend"]=Json(gx_gpu_status());
+      info["weight_storage"]=Json(engine->disk_streaming() ? "HDD/USB stream (8 MB cache)" : "RAM");
+      info["storage_ok"]=Json::boolean(engine->storage_ok());result=text_result(info.dump());
     } else if(name=="generate"){
       const Json& n=args.get("max_tokens");
       if(args.get("prompt").type!=Json::STRING || args.get("prompt").text.empty() ||
          (args.has("max_tokens") && (n.type!=Json::NUMBER || n.number<1 || n.number>512 || floor(n.number)!=n.number)))
         result=text_result("Expected a prompt and max_tokens between 1 and 512",true);
-      else result=text_result(complete(args.get("prompt").text,args.has("max_tokens") ? (int)n.number : 128,user));
+      else {
+        std::string output=complete(args.get("prompt").text,args.has("max_tokens") ? (int)n.number : 128,user);
+        result=text_result(engine->storage_ok() ? output : "Disk read failed. Check HDD/USB and reload the model.",!engine->storage_ok());
+      }
     } else { response=rpc_error(id,-32602,"Unknown tool").dump(); return 200; }
   } else { response=rpc_error(id,-32601,"Method not found").dump(); return 200; }
   Json r=Json::object(); r["jsonrpc"]=Json("2.0"); r["id"]=id; r["result"]=result;

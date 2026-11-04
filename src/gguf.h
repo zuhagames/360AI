@@ -10,6 +10,9 @@ enum gguf_type{
   GGUF_TYPE_FLOAT64
 };
 
+class GGUF;
+bool gx_gguf_split_name(const std::string& name, std::string& prefix, u32& part, u32& count);
+
 struct gguf_tensor{
   std::string name;
   int n_dims;
@@ -17,7 +20,8 @@ struct gguf_tensor{
   int type;
   u64 offset;
   u64 data_off;
-  size_t nelem;
+  u64 nelem;
+  GGUF* source;
 };
 
 struct gguf_kv{
@@ -48,11 +52,13 @@ public:
   std::string str_val(const char* key, const char* def="") const;
 
   const gguf_tensor* tensor(const char* name) const;
-  size_t num_tensors() const { return tensors_.size(); }
-  const gguf_tensor* tensor_at(size_t i) const { return i < tensors_.size() ? &tensors_[i] : 0; }
+  size_t num_tensors() const;
+  const gguf_tensor* tensor_at(size_t i) const;
 
   bool read_tensor_data(const gguf_tensor* t, void* dst, size_t dst_bytes);
   void* map_data(const gguf_tensor* t, size_t* out_bytes);
+  bool read_at(u64 offset, void* dst, size_t bytes);
+  u64 file_size() const { return file_size_; }
 
   u32 version() const { return version_; }
   u64 alignment() const { return alignment_; }
@@ -61,6 +67,7 @@ public:
   u64 data_start() const { return data_start_; }
 
 private:
+  bool load_single(const char* path);
   bool read_raw(void* dst, size_t n);
   bool read_u32(u32* v);
   bool read_u64(u64* v);
@@ -75,6 +82,7 @@ private:
   u64 file_size_;
   std::vector<gguf_kv> kv_;
   std::vector<gguf_tensor> tensors_;
+  std::vector<GGUF*> shards_;
 };
 
 #endif

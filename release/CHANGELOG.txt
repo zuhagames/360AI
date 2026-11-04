@@ -1,3 +1,34 @@
+360AI 1.1
+==========
+
+- Bundled SmolLM2 135M Instruct Q8_0 alongside Gemma 3 270M Instruct Q8_0.
+- Added SmolLM tokenization, including its incomplete byte vocabulary.
+- HDD/USB streaming loads matrix weights through a fixed 8 MB cache.
+  Tokenizer, working buffers and KV cache still require console RAM.
+- Added 64-bit file access and standard split-GGUF loading/validation.
+- Added optional, checksum-verified Qwen2.5 0.5B, 1.5B and 7B downloads.
+  Interrupted downloads resume. Larger models remain experimental.
+- Model browser shows model size and recommended free HDD/USB space.
+  Qwen 7B needs 5 GB free for its two model shards.
+- Storage read errors stop generation and appear in UI, health, API and MCP.
+- Default context is now 512 tokens.
+- One complete USB ZIP includes both models, model guide, downloader,
+  required licenses/notices and the rebuilt 360AI.xex.
+
+VALIDATION
+Xbox 360 SDK build passed. Native checks and eight protocol/tokenizer/
+package test groups passed, including 780 tokenizer reference cases.
+Real Gemma and SmolLM2 host runs produced identical tokens and KV caches
+in RAM and streamed modes. Cache-boundary, disk-failure and split-model
+tests passed. Physical-console HDD performance remains unverified.
+The GPU path is unchanged; no GPU speed improvement is claimed.
+
+KNOWN LIMITS
+Disk streaming does not replace RAM for attention, tokenizer or UI data.
+Qwen 1.5B and 7B are experimental and not console-benchmarked; large
+models can be extremely slow. Start with context 256-512. See MODELS.txt.
+
+
 360AI 1.0
 ==========
 

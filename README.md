@@ -14,12 +14,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v1.0/360AI-1.0-USB.zip"><strong>Download 360AI 1.0</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v1.1/360AI-1.1-USB.zip"><strong>Download 360AI 1.1</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
 
-<p align="center"><sub>USB bundle includes Gemma 3 270M Instruct Q8_0 weights.</sub></p>
+<p align="center"><sub>Includes Gemma 3 270M and SmolLM2 135M weights.</sub></p>
 
 ---
 
@@ -33,17 +33,30 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-1.0-USB.zip](https://github.com/zuhagames/360AI/releases/download/v1.0/360AI-1.0-USB.zip)**.
+1. Download and extract **[360AI-1.1-USB.zip](https://github.com/zuhagames/360AI/releases/download/v1.1/360AI-1.1-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
-4. Select the included model and choose **Load model**.
+4. Select a model, choose **RAM** or **HDD/USB stream** in Settings, and select **Load model**.
 
 Requires a console capable of running unsigned XEX files. No separate model download is needed.
+
+## Models
+
+| Model | Free disk space to reserve | Loading |
+| --- | --- | --- |
+| SmolLM2 135M Q8_0 — included | 0.2 GB | RAM recommended |
+| Gemma 3 270M Q8_0 — included | 0.4 GB | RAM recommended |
+| Qwen2.5 0.5B Q4_K_M — optional | 1 GB | HDD stream |
+| Qwen2.5 1.5B Q4_K_M — experimental | 2 GB | HDD stream |
+| Qwen2.5 7B Q4_K_M — experimental | **5 GB on HDD** | HDD stream, extremely slow |
+
+HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still need RAM. Larger models are experimental and have not been benchmarked on an Xbox. See [model downloads and HDD setup](docs/TECHNICAL.md#hdd-streaming-and-model-downloads), or `MODELS.txt` in the ZIP.
 
 ## Features
 
 - Console chat with controller and on-screen keyboard support.
-- Compatible Gemma 2/3, dense Llama, and Qwen2/2.5 GGUF models, within available RAM.
+- Compatible Gemma 2/3, SmolLM2, dense Llama, and Qwen2/2.5 GGUF models.
+- HDD/USB weight streaming, split GGUF support, and model disk-space descriptions.
 - Adjustable context size, temperature, and top-k sampling.
 - OpenAI-compatible chat/completions API with streaming.
 - MCP endpoint and an optional PC bridge for external MCP servers.

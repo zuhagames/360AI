@@ -134,9 +134,9 @@ void Engine::attention(size_t layer, const f32* xn, KVCache& kv, u32 pos,
   bool global = c.is_global_layer(layer);
   u32 window = lc.use_sliding ? lc.window : c.max_seq_len;
 
-  gx_matvec_rows(L.q_w.data, L.q_w.type, L.q_w.cols, L.q_w.row_stride, xn, q, (size_t)heads*qd, sc_.deq);
-  gx_matvec_rows(L.k_w.data, L.k_w.type, L.k_w.cols, L.k_w.row_stride, xn, kv.k_row(layer,pos), (size_t)kvh*qd, sc_.deq);
-  gx_matvec_rows(L.v_w.data, L.v_w.type, L.v_w.cols, L.v_w.row_stride, xn, kv.v_row(layer,pos), (size_t)kvh*qd, sc_.deq);
+  L.q_w.matvec(xn, q, (size_t)heads*qd, sc_.deq);
+  L.k_w.matvec(xn, kv.k_row(layer,pos), (size_t)kvh*qd, sc_.deq);
+  L.v_w.matvec(xn, kv.v_row(layer,pos), (size_t)kvh*qd, sc_.deq);
   add_bias(q, L.q_b, (size_t)heads*qd, sc_.deq);
   add_bias(kv.k_row(layer,pos), L.k_b, (size_t)kvh*qd, sc_.deq);
   add_bias(kv.v_row(layer,pos), L.v_b, (size_t)kvh*qd, sc_.deq);
@@ -195,22 +195,22 @@ void Engine::ffn(size_t layer, const f32* xn){
   const LayerWeights& L = weights_.layers[layer];
   const LayerCfg& lc = weights_.cfg.layers[layer];
   u32 fid = lc.ff_hidden_dim;
-  gx_matvec_rows(L.ffn_gate.data, L.ffn_gate.type, L.ffn_gate.cols, L.ffn_gate.row_stride, xn, sc_.gate, fid, sc_.deq);
-  gx_matvec_rows(L.ffn_up.data, L.ffn_up.type, L.ffn_up.cols, L.ffn_up.row_stride, xn, sc_.hbuf, fid, sc_.deq);
+  L.ffn_gate.matvec(xn, sc_.gate, fid, sc_.deq);
+  L.ffn_up.matvec(xn, sc_.hbuf, fid, sc_.deq);
   add_bias(sc_.gate,L.ffn_gate_b,fid,sc_.deq);
   add_bias(sc_.hbuf,L.ffn_up_b,fid,sc_.deq);
   if(weights_.cfg.use_silu) gx_silu_mul(sc_.gate, sc_.hbuf, fid);
   else gx_gelu_mul(sc_.gate, sc_.hbuf, fid);
-  gx_matvec_rows(L.ffn_down.data, L.ffn_down.type, L.ffn_down.cols, L.ffn_down.row_stride, sc_.gate, sc_.ffw_out, lc.model_dim, sc_.deq);
+  L.ffn_down.matvec(sc_.gate, sc_.ffw_out, lc.model_dim, sc_.deq);
   add_bias(sc_.ffw_out,L.ffn_down_b,lc.model_dim,sc_.deq);
 }
 
-void Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t pos, bool want_logits, KVCache& kv){
+bool Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t pos, bool want_logits, KVCache& kv){
   const ModelCfg& c = weights_.cfg;
   u32 md = c.model_dim;
   int tok = tokens[tok_index];
 
-  weights_.token_embd.row_dequant((u32)tok, sc_.x);
+  if(!weights_.token_embd.row_dequant((u32)tok, sc_.x)) return false;
   if(c.scale_embeddings) gx_mul_by(sc_.x, sqrtf((f32)md), md);
   if(want_logits) GX_LOG_ALL("fwd: emb %.4f %.4f %.4f", (double)sc_.x[0], (double)sc_.x[1], (double)sc_.x[2]);
 
@@ -220,8 +220,9 @@ void Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t po
     rmsnorm_inplace(sc_.xn, L.attn_norm, md, c.rms_eps, sc_.deq);
 
     attention(layer, sc_.xn, kv, pos, sc_.q, sc_.hbuf);
+    if(!storage_ok()) return false;
 
-    gx_matvec_rows(L.o_w.data, L.o_w.type, L.o_w.cols, L.o_w.row_stride, sc_.hbuf, sc_.att_sum, md, sc_.deq);
+    L.o_w.matvec(sc_.hbuf, sc_.att_sum, md, sc_.deq);
     add_bias(sc_.att_sum,L.o_b,md,sc_.deq);
     if(L.post_attn_norm.ok) rmsnorm_inplace(sc_.att_sum, L.post_attn_norm, md, c.rms_eps, sc_.deq);
     gx_add_to(sc_.x, sc_.att_sum, md);
@@ -229,6 +230,7 @@ void Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t po
     for(u32 d = 0; d < md; ++d) sc_.xn[d] = sc_.x[d];
     rmsnorm_inplace(sc_.xn, L.ffn_norm, md, c.rms_eps, sc_.deq);
     ffn(layer, sc_.xn);
+    if(!storage_ok()) return false;
     if(L.post_ffw_norm.ok) rmsnorm_inplace(sc_.ffw_out, L.post_ffw_norm, md, c.rms_eps, sc_.deq);
     gx_add_to(sc_.x, sc_.ffw_out, md);
     if(want_logits) GX_LOG_ALL("fwd: L%02d %.4f %.4f %.4f", (int)layer,
@@ -239,13 +241,12 @@ void Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t po
     for(u32 d = 0; d < md; ++d) sc_.xn[d] = sc_.x[d];
     rmsnorm_inplace(sc_.xn, weights_.output_norm, md, c.rms_eps, sc_.deq);
     GX_LOG_ALL("fwd: outn %.4f %.4f %.4f", (double)sc_.xn[0], (double)sc_.xn[1], (double)sc_.xn[2]);
-    gx_matvec_rows(weights_.output.data, weights_.output.type,
-                   weights_.output.cols, weights_.output.row_stride,
-                   sc_.xn, sc_.logits, c.vocab_size, sc_.deq);
+    weights_.output.matvec(sc_.xn, sc_.logits, c.vocab_size, sc_.deq);
     add_bias(sc_.logits, weights_.output_bias, c.vocab_size, sc_.deq);
     if(c.final_logit_softcapping > 0.0f)
       gx_softcap(sc_.logits, c.vocab_size, c.final_logit_softcapping);
   }
+  return storage_ok();
 }
 
 int Engine::sample(const EngineCfg& ecfg){
@@ -307,10 +308,10 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
 
   for(size_t i = 0; i + 1 < pr.size(); ++i){
     if(ecfg.stop && *ecfg.stop){ out_tokens.clear(); return 0; }
-    forward(pr, i, i, false, kv);
+    if(!forward(pr, i, i, false, kv)){out_tokens.clear();return 0;}
   }
   if(ecfg.stop && *ecfg.stop){ out_tokens.clear(); return 0; }
-  forward(pr, pr.size() - 1, pr.size() - 1, true, kv);
+  if(!forward(pr, pr.size() - 1, pr.size() - 1, true, kv)){out_tokens.clear();return 0;}
   if(gx_get_debug_level() == GX_DEBUG_ALL){
     u32 n = weights_.cfg.vocab_size;
     u32 best = 0;
@@ -332,14 +333,14 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
     if(on_token) on_token(next, tok_.decode_token(next).c_str(), user);
     if(g + 1 >= max_new || pos >= kv.seq_len || (ecfg.stop && *ecfg.stop)) break;
     std::vector<int> one(1, next);
-    forward(one, 0, pos, true, kv);
+    if(!forward(one, 0, pos, true, kv)){out_tokens.clear();return 0;}
     pos++;
     next = sample(ecfg);
   }
   return (int)out_tokens.size();
 }
 
-bool Engine::load(const char* gguf_path, void (*progress)(const char*,int,int)){
+bool Engine::load(const char* gguf_path, void (*progress)(const char*,int,int),bool stream){
   reset();
   if(progress_ == 0) progress_ = progress;
   if(!gguf_.load(gguf_path)){ GX_LOG_ERROR("load: gguf parse fail"); reset(); return false; }
@@ -348,10 +349,10 @@ bool Engine::load(const char* gguf_path, void (*progress)(const char*,int,int)){
   if((u32)tok_.n_tokens()!=weights_.cfg.vocab_size){ reset(); return false; }
   // Do not retain duplicate vocabulary and merge strings while loading weights.
   gguf_.release_tokenizer_metadata();
-  if(!weights_.load(gguf_, weights_.cfg, progress_)){ GX_LOG_ERROR("load: weights fail"); reset(); return false; }
+  if(!weights_.load(gguf_, weights_.cfg, progress_,stream)){ GX_LOG_ERROR("load: weights fail"); reset(); return false; }
   build_timescales();
   if(!alloc_scratch()){ GX_LOG_ERROR("load: scratch fail"); reset(); return false; }
-  gguf_.close();
+  if(!stream) gguf_.close();
   seq_cache_len_ = weights_.cfg.max_seq_len;
   loaded_ = true;
   return true;

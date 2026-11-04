@@ -79,8 +79,8 @@ test('tool chat feeds MCP results to Xbox inference and enforces the allowlist',
   } finally {await server.close();}
 });
 
-test('native Xbox HTTP routes: MCP, completion streaming, nested JSON and shutdown',{skip:process.platform!=='win32'},async()=>{
-  const child=spawn(fileURLToPath(new URL('../build/tests/native.exe',import.meta.url)),['--serve'],{cwd:fileURLToPath(new URL('../',import.meta.url)),windowsHide:true});
+for(const streamed of [false,true]) test(`native Xbox HTTP routes (${streamed?'disk streaming':'RAM'}): MCP, completions and shutdown`,{skip:process.platform!=='win32'},async()=>{
+  const child=spawn(fileURLToPath(new URL('../build/tests/native.exe',import.meta.url)),[streamed?'--serve-stream':'--serve'],{cwd:fileURLToPath(new URL('../',import.meta.url)),windowsHide:true});
   const exited=once(child,'exit'); let output='';
   const url=await new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>reject(new Error('native server startup timed out: '+output)),5000);
@@ -95,6 +95,8 @@ test('native Xbox HTTP routes: MCP, completion streaming, nested JSON and shutdo
     const health=await (await fetch(url+'/health')).json();
     assert.equal(health.application,'360AI'); assert.equal(health.status,'ok');
     assert.equal(health.api_base,'/v1'); assert.equal(health.backend,'CPU');
+    assert.equal(health.weight_storage,streamed?'HDD/USB stream (8 MB cache)':'RAM');
+    assert.equal(health.storage_ok,true);
     const getCompletion=await fetch(url+'/v1/completions');
     assert.equal(getCompletion.status,405); assert.equal(getCompletion.headers.get('allow'),'POST');
     assert.match((await getCompletion.json()).error.message,/Use POST/);

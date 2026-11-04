@@ -14,12 +14,13 @@ function meta(k,v) {
   }
   return Buffer.concat([str(k),u32(Number.isInteger(v)?4:6),Number.isInteger(v)?u32(v):f32(v)]);
 }
-export function fixture(name, arch, extras={}, tensors=true) {
+export function fixture(name, arch, extras={}, tensors=true,options={}) {
   const byteChars=[]; let extra=0;
   for(let b=0;b<256;++b) byteChars.push(String.fromCodePoint((b>=33&&b<=126)||(b>=161&&b<=172)||b>=174 ? b : 256+extra++));
   const sp=['<unk>','<s>','</s>','▁','h','i','▁h','▁hi','a','b','c','ab','bc','<start_of_turn>','<end_of_turn>'];
   const bpe=[...byteChars,'ab','bc','abc','<|im_start|>','<|im_end|>','<|endoftext|>','<|start_header_id|>','<|end_header_id|>','<|eot_id|>','12','123',byteChars[32]+'a',byteChars[32]+byteChars[32],byteChars[10]+byteChars[10]];
   const tokens=arch==='llama' ? sp : bpe;
+  if(options.missingByte) tokens[4]='<unused_byte_4>';
   const metadata={
     'general.architecture':arch,[`${arch}.block_count`]:1,[`${arch}.embedding_length`]:4,
     [`${arch}.feed_forward_length`]:8,[`${arch}.context_length`]:64,
@@ -46,18 +47,36 @@ export function fixture(name, arch, extras={}, tensors=true) {
       tensor('blk.0.attn_v.bias',2,1,i=>i*0.3);
     }
   }
+  if(options.cache){
+    const cols=256,rows=10000,data=Buffer.alloc(cols*rows*4);
+    for(let r=0;r<rows;++r) for(let c=0;c<cols;++c) data.writeFloatLE(((r+c)%13-6)*0.0625,(r*cols+c)*4);
+    values.push({name:'cache.matrix',cols,rows,data});
+  }
+  function write(target,chosen,fields){
   let offset=0;
-  const infos=values.map(t=>{
+  const infos=chosen.map(t=>{
     const info=Buffer.concat([str(t.name),u32(t.rows===1?1:2),u64(t.cols),...(t.rows===1?[]:[u64(t.rows)]),u32(0),u64(offset)]);
     offset+=(t.data.length+31)&~31; return info;
   });
-  const header=Buffer.concat([Buffer.from('GGUF'),u32(3),u64(values.length),u64(Object.keys(metadata).length),...Object.entries(metadata).map(([k,v])=>meta(k,v)),...infos]);
+  const header=Buffer.concat([Buffer.from('GGUF'),u32(3),u64(chosen.length),u64(Object.keys(fields).length),...Object.entries(fields).map(([k,v])=>meta(k,v)),...infos]);
   const aligned=b=>Buffer.concat([b,Buffer.alloc((-b.length)&31)]);
-  writeFileSync(new URL(name+'.gguf',root),Buffer.concat([aligned(header),...values.map(t=>aligned(t.data))]));
+  writeFileSync(new URL(target+'.gguf',root),Buffer.concat([aligned(header),...chosen.map(t=>aligned(t.data))]));
+  }
+  if(options.split){
+    const mid=Math.floor(values.length/2), shared={'split.count':2,'split.tensors.count':values.length};
+    write(name+'-00001-of-00002',values.slice(0,mid),{...metadata,...shared,'split.no':0});
+    if(!options.missing) write(name+'-00002-of-00002',values.slice(mid),{...shared,'split.no':options.badIndex?3:1});
+  }else write(name,values,metadata);
 }
 fixture('llama','llama'); fixture('qwen2','qwen2');
 fixture('bad-arch','qwen3',{},false);
 fixture('bad-heads','llama',{'llama.attention.head_count_kv':3},false);
 fixture('bad-rope','llama',{'llama.rope.scaling.type':'yarn'},false);
 fixture('llama3-tokenizer','qwen2',{'tokenizer.ggml.pre':'llama-bpe'},false);
+fixture('smollm-tokenizer','qwen2',{'tokenizer.ggml.pre':'smollm'},false);
+fixture('smollm-missing-byte','qwen2',{'tokenizer.ggml.pre':'smollm'},false,{missingByte:true});
+fixture('split-qwen2','qwen2',{},true,{split:true});
+fixture('missing-split','qwen2',{},true,{split:true,missing:true});
+fixture('bad-split','qwen2',{},true,{split:true,badIndex:true});
+fixture('stream-cache','qwen2',{},true,{cache:true});
 console.log('GGUF fixtures: '+fileURLToPath(root));

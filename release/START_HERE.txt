@@ -1,18 +1,20 @@
-360AI 1.0 - Xbox 360 USB package
+360AI 1.1 - Xbox 360 USB package
 ================================
 
 INSTALL
 1. Extract the ZIP on your PC.
 2. Copy the entire 360AI folder to your USB drive.
-3. The Gemma 3 270M Q8_0 model is already included beside 360AI.xex.
-   No separate model download is needed.
+3. Gemma 3 270M and SmolLM2 135M Q8_0 models are included beside 360AI.xex.
+   No separate download is needed for these models.
 4. Safely eject the USB, connect it to your modded Xbox 360, and open
    the 360AI folder with your existing XEX launcher (Aurora/XEXMenu).
-5. Launch 360AI.xex, select gemma-3-270m-it-Q8_0.gguf and choose Load model.
+5. Launch 360AI.xex, select either included GGUF and choose Load model.
+   RAM loading is recommended for the included models.
 
 Example USB layout:
   USB:/360AI/360AI.xex
   USB:/360AI/gemma-3-270m-it-Q8_0.gguf
+  USB:/360AI/SmolLM2-135M-Instruct-Q8_0.gguf
   USB:/360AI/START_HERE.txt
   USB:/360AI/CHANGELOG.txt
   USB:/360AI/CREDITS.txt
@@ -21,16 +23,21 @@ The folder can also be copied to your Xbox HDD. Keep the GGUF beside
 the executable. No SDK, Visual Studio, Node.js or separate shader files
 are needed on the console. The app does not install or replace a dashboard.
 
-BUNDLED MODEL
+BUNDLED MODELS
 The full Gemma 3 270M Instruct Q8_0 GGUF is included (about 292 MB).
 Read NOTICE, GEMMA_TERMS.txt and GEMMA_POLICY.txt for its terms, and
 MODEL_INFO.txt for its source and checksum. No account or network is
 needed for local console chat once this ZIP is downloaded.
+SmolLM2 135M Instruct Q8_0 is also included (about 145 MB). It uses less
+weight memory. See SMOLLM2_INFO.txt and APACHE-2.0.txt for its source/license.
 
-Additional supported GGUFs can be placed beside the bundled model.
-Supported families include Gemma 2/3, dense Llama and Qwen2/2.5. Models
-must fit the Xbox's shared 512 MB RAM. Start with context 256-512 if you
-run out of memory. This app requires a console that can run unsigned XEXs.
+Read MODELS.txt for optional Qwen models and their HDD space requirements.
+Download-Models.ps1 runs on your Windows PC and verifies pinned checksums.
+For larger models choose Weight storage: HDD/USB stream. Matrix weights stay
+on disk with an 8 MB cache; tokenizer/scratch/KV buffers still use RAM.
+Keep all split GGUF files together and select the first shard. The browser
+shows their total storage requirement. Large models can be extremely slow.
+Start with context 256-512. This app requires unsigned-XEX support.
 
 GPU OPTION
 GPU matrix math uses Xenos pixel shaders. It is experimental and is

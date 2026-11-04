@@ -249,8 +249,10 @@ static void handle_client(SOCKET s){
     if(method!="GET"){ reply(s,405,"{\"error\":\"use GET\"}"); return; }
     Json health=Json::object(); health["application"]=Json("360AI");
     health["version"]=Json(GX_VERSION);
-    health["status"]=Json(engine && engine->ready() ? "ok" : "no model");
+    health["status"]=Json(engine && engine->ready() ? (engine->storage_ok() ? "ok" : "storage_error") : "no model");
     health["backend"]=Json(gx_gpu_status()); health["gpu_diagnostic"]=Json(gx_gpu_diagnostic());
+    health["weight_storage"]=Json(engine && engine->disk_streaming() ? "HDD/USB stream (8 MB cache)" : "RAM");
+    health["storage_ok"]=Json::boolean(engine && engine->storage_ok());
     health["api_base"]=Json("/v1"); health["completions"]=Json("POST /v1/completions with a JSON prompt");
     reply(s,200,health.dump()); return;
   }
@@ -299,10 +301,16 @@ static void handle_client(SOCKET s){
   }
   int limit=token_limit(input);
   if(limit<0 || prompt.empty()){ reply(s,400,"{\"error\":\"invalid prompt or max_tokens (1-512)\"}"); return; }
+  if(!engine->storage_ok()){reply(s,503,"{\"error\":{\"message\":\"Disk read failed. Check HDD/USB and reload the model.\",\"type\":\"storage_error\"}}");return;}
   Generation gen; gen.socket=s; gen.chat=chat; gen.streaming=input.get("stream").type==Json::BOOL && input.get("stream").flag;
   gen.disconnected=false;
   if(gen.streaming) send_all(s,"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n"+cors_headers+"\r\n");
   std::string output=complete(prompt,limit,&gen);
+  if(!engine->storage_ok()){
+    const std::string error="{\"error\":{\"message\":\"Disk read failed. Check HDD/USB and reload the model.\",\"type\":\"storage_error\"}}";
+    if(gen.streaming) send_all(s,"data: "+error+"\n\ndata: [DONE]\n\n"); else reply(s,503,error);
+    return;
+  }
   Json r=Json::object(), choice=Json::object();
   r["id"]=Json("xex-completion"); r["created"]=Json(0.0); r["model"]=Json(model_name());
   r["object"]=Json(chat ? (gen.streaming ? "chat.completion.chunk" : "chat.completion") : "text_completion");

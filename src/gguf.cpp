@@ -1,12 +1,43 @@
 #include "gguf.h"
 #include "quant.h"
 
+static int seek64(FILE* fp,i64 offset,int origin){
+#if defined(_WIN32) || defined(_XBOX)
+  return _fseeki64(fp,offset,origin);
+#else
+  return fseeko(fp,offset,origin);
+#endif
+}
+static i64 tell64(FILE* fp){
+#if defined(_WIN32) || defined(_XBOX)
+  return _ftelli64(fp);
+#else
+  return ftello(fp);
+#endif
+}
+bool gx_gguf_split_name(const std::string& name,std::string& prefix,u32& part,u32& count){
+  // The standard split suffix is 20 characters including its leading dash.
+  const size_t length=20;
+  if(name.size()<length) return false;
+  size_t at=name.size()-length;
+  if(name[at]!='-' || name.compare(at+6,4,"-of-") || name.compare(at+15,5,".gguf")) return false;
+  part=count=0;
+  for(size_t i=0;i<5;++i){
+    char p=name[at+1+i],c=name[at+10+i];
+    if(p<'0'||p>'9'||c<'0'||c>'9') return false;
+    part=part*10+p-'0'; count=count*10+c-'0';
+  }
+  prefix=name.substr(0,at); return part>0 && part<=count;
+}
+
 GGUF::GGUF(){
   fp_ = 0; version_ = 0; alignment_ = 32; data_start_ = 0; file_size_ = 0;
 }
 GGUF::~GGUF(){ close(); }
 
 void GGUF::close(){
+  for(size_t i=0;i<shards_.size();++i) delete shards_[i];
+  shards_.clear();
   if(fp_){ fclose(fp_); fp_ = 0; }
   kv_.clear();
   tensors_.clear();
@@ -63,15 +94,40 @@ static size_t type_size(int t){
 }
 
 bool GGUF::load(const char* path){
+  if(!load_single(path)) return false;
+  u64 count=u64_val("split.count",1);
+  if(count==1) return true;
+  std::string prefix; u32 part=0,names=0;
+  if(count<2 || count>64 || !gx_gguf_split_name(path,prefix,part,names) ||
+     part!=1 || names!=count || u64_val("split.no",0)!=0){
+    GX_LOG_ERROR("gguf: open the first shard of a valid split model"); close(); return false;
+  }
+  for(u32 i=2;i<=count;++i){
+    char suffix[32]; snprintf(suffix,sizeof(suffix),"-%05u-of-%05u.gguf",i,(unsigned)count);
+    GGUF* shard=new GGUF();
+    if(!shard->load_single((prefix+suffix).c_str()) || shard->u64_val("split.no",~0ull)!=i-1 ||
+       shard->u64_val("split.count",0)!=count){
+      GX_LOG_ERROR("gguf: missing or invalid shard %u",i); delete shard; close(); return false;
+    }
+    shard->release_tokenizer_metadata();
+    shards_.push_back(shard);
+  }
+  if(u64_val("split.tensors.count",num_tensors())!=num_tensors()){
+    GX_LOG_ERROR("gguf: split tensor count mismatch"); close(); return false;
+  }
+  return true;
+}
+
+bool GGUF::load_single(const char* path){
   close();
   fp_ = fopen(path, "rb");
   if(!fp_){
     GX_LOG_ERROR("gguf: cannot open %s", path);
     return false;
   }
-  fseek(fp_, 0, SEEK_END);
-  file_size_ = (u64)ftell(fp_);
-  fseek(fp_, 0, SEEK_SET);
+  if(seek64(fp_,0,SEEK_END) || tell64(fp_)<0){ close(); return false; }
+  file_size_=(u64)tell64(fp_);
+  if(seek64(fp_,0,SEEK_SET)){ close(); return false; }
 
   u32 magic;
   if(!read_raw(&magic, 4) || gx_le32(magic) != 0x46554747u){
@@ -86,6 +142,7 @@ bool GGUF::load(const char* path){
   if(!read_u64(&tensor_count) || !read_u64(&kv_count)){
     close(); return false;
   }
+  if(version_<2 || version_>3 || tensor_count>100000 || kv_count>100000){ close(); return false; }
 
   kv_.reserve((size_t)kv_count);
   for(u64 k = 0; k < kv_count; ++k){
@@ -142,6 +199,7 @@ bool GGUF::load(const char* path){
             GX_LOG_ERROR("gguf: nested array unsupported (%s)", kv.key.c_str());
             close(); return false;
           } else {
+            if(!esz || alen>(size_t)-1/esz){close();return false;}
             std::vector<u8> tmp((size_t)alen * esz);
             if(!read_raw(&tmp[0], tmp.size())){ close(); return false; }
             kv.arr_u.resize(alen);
@@ -182,6 +240,7 @@ bool GGUF::load(const char* path){
   for(u64 t = 0; t < tensor_count; ++t){
     gguf_tensor ts;
     ts.n_dims = 0; ts.type = 0; ts.offset = ts.data_off = 0; ts.nelem = 0;
+    ts.source=this;
     if(!read_string(ts.name)){
       GX_LOG_ERROR("gguf: tensor name fail at %d", (int)t);
       close(); return false;
@@ -203,7 +262,8 @@ bool GGUF::load(const char* path){
           GX_LOG_ERROR("gguf: tensor dims fail at %s", ts.name.c_str());
           close(); return false;
         }
-        ts.nelem *= (size_t)ts.dims[d];
+        if(!ts.dims[d] || ts.nelem>~0ull/ts.dims[d]){ close(); return false; }
+        ts.nelem *= ts.dims[d];
       } else {
         ts.dims[d] = 1;
       }
@@ -228,11 +288,14 @@ bool GGUF::load(const char* path){
     else if(akv->type == GGUF_TYPE_INT32 || akv->type == GGUF_TYPE_INT64) align = (u64)akv->i;
   }
   alignment_ = align;
+  if(!alignment_ || (alignment_&(alignment_-1)) || alignment_>65536){ close(); return false; }
 
-  data_start_ = (u64)ftell(fp_);
+  if(tell64(fp_)<0){ close(); return false; }
+  data_start_ = (u64)tell64(fp_);
   data_start_ = (data_start_ + alignment_ - 1) & ~(alignment_ - 1);
 
   for(size_t i = 0; i < tensors_.size(); ++i){
+    if(data_start_>file_size_ || tensors_[i].offset>file_size_-data_start_){ close(); return false; }
     tensors_[i].data_off = data_start_ + tensors_[i].offset;
   }
 
@@ -286,7 +349,22 @@ const gguf_tensor* GGUF::tensor(const char* name) const {
   for(size_t i = 0; i < tensors_.size(); ++i){
     if(tensors_[i].name == name) return &tensors_[i];
   }
+  for(size_t i=0;i<shards_.size();++i){ const gguf_tensor* t=shards_[i]->tensor(name); if(t) return t; }
   return 0;
+}
+size_t GGUF::num_tensors() const{
+  size_t n=tensors_.size(); for(size_t i=0;i<shards_.size();++i) n+=shards_[i]->num_tensors(); return n;
+}
+const gguf_tensor* GGUF::tensor_at(size_t i) const{
+  if(i<tensors_.size()) return &tensors_[i]; i-=tensors_.size();
+  for(size_t s=0;s<shards_.size();++s){
+    size_t n=shards_[s]->num_tensors(); if(i<n) return shards_[s]->tensor_at(i); i-=n;
+  }
+  return 0;
+}
+bool GGUF::read_at(u64 offset,void* dst,size_t bytes){
+  if(!fp_ || offset>file_size_ || bytes>file_size_-offset || offset>0x7fffffffffffffffull) return false;
+  return seek64(fp_,(i64)offset,SEEK_SET)==0 && read_raw(dst,bytes);
 }
 
 bool GGUF::read_tensor_data(const gguf_tensor* t, void* dst, size_t dst_bytes){
@@ -294,10 +372,10 @@ bool GGUF::read_tensor_data(const gguf_tensor* t, void* dst, size_t dst_bytes){
   size_t tsz = gxq_type_size(t->type);
   if(be == 0 || tsz == 0){ GX_LOG_ERROR("gguf: bad tensor type %d", t->type); return false; }
   if(t->nelem % be){ GX_LOG_ERROR("gguf: bad tensor size %s nelem=%u", t->name.c_str(), (unsigned)t->nelem); return false; }
-  size_t nbytes = (t->nelem / be) * tsz;
+  if(t->nelem/be>~0ull/tsz) return false;
+  u64 nbytes = (t->nelem / be) * tsz;
   if(nbytes > dst_bytes){ GX_LOG_ERROR("gguf: tensor %s too big (%u > %u)", t->name.c_str(), (unsigned)nbytes, (unsigned)dst_bytes); return false; }
-  if(fseek(fp_, (long)t->data_off, SEEK_SET) != 0) return false;
-  return read_raw(dst, nbytes);
+  return t->source->read_at(t->data_off,dst,(size_t)nbytes);
 }
 
 void* GGUF::map_data(const gguf_tensor* t, size_t* out_bytes){

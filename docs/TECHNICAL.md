@@ -12,7 +12,29 @@ After launching the app:
 2. Leave **GPU matrix math** enabled to try the GPU backend, or disable it to use the CPU. If the GPU startup numerical check fails, the menu reports it unavailable and inference uses the CPU.
 3. Enable **OpenAI / MCP server** before loading the model to access the console over your LAN. The chat screen displays its actual address and port (80, or 8080 if 80 cannot be bound).
 
-A console capable of running unsigned XEX files is required. Models, the tokenizer, KV cache, UI and GPU buffers all share 512 MB of RAM. Architecture support does not guarantee a model will fit. Start with a small quantized model and a 256–512 token context; raise the context only when memory allows.
+A console capable of running unsigned XEX files is required. The default context is 512 tokens. RAM mode keeps all weights in memory; HDD/USB streaming keeps matrix weights on disk with an 8 MB cache. The tokenizer, scratch buffers, small norm/bias tensors, KV cache, UI and GPU buffers still share the console's 512 MB RAM. Start at context 256–512 and raise it only when memory allows.
+
+## HDD streaming and model downloads
+
+The 1.1 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
+
+| Model | Exact model file size | Reserve free disk space | Status |
+| --- | --- | --- | --- |
+| SmolLM2 135M Q8_0 | 144,811,072 bytes | 0.2 GB | Bundled; RAM/streaming host output parity verified |
+| Gemma 3 270M Q8_0 | 291,545,600 bytes | 0.4 GB | Bundled; RAM/streaming host output parity verified |
+| Qwen2.5 0.5B Q4_K_M | 491,400,032 bytes | 1 GB | Optional HDD model |
+| Qwen2.5 1.5B Q4_K_M | 1,117,320,736 bytes | 2 GB | Experimental HDD model; not console-benchmarked |
+| Qwen2.5 7B Q4_K_M | 4,683,073,632 bytes across two files | **5 GB on HDD** | Experimental; extremely slow; not console-benchmarked |
+
+Disk sizes use decimal GB. Reservations are for each extracted model, not extra RAM; add file sizes together if keeping several models. Larger models are optional downloads rather than bundled weights.
+
+On a Windows PC, use the included `Download-Models.ps1 -List` to see the catalog, then `Download-Models.ps1 -Model qwen25-05b` (or `qwen25-15b`, `qwen25-7b`). Run it through PowerShell with `-ExecutionPolicy Bypass -File` if needed. In a source checkout, use `tools/fetch-model.ps1` instead. Every download is pinned to a source revision and verified against SHA-256 before activation.
+
+Copy all files to the app folder on HDD/USB and launch `360AI.xex` from that folder. Select **Weight storage: HDD/USB stream** before loading. Models over 320 MiB automatically suggest streaming; you can change the setting. The browser shows combined file size and rounded free-space requirements, and hides non-first GGUF shards. For the 7B model keep both short, console-friendly shard filenames unchanged.
+
+Streaming is weight paging, not operating-system swap. It reads the model repeatedly as tokens are generated, so HDD/USB bandwidth and CPU work can make large models extremely slow. RAM is still required for attention/KV data and the tokenizer; a large HDD does not remove those limits. Physical-console memory fit and speed need validation. The cache is fixed at 8 MB; decoded weights are processed in batches rather than retained as a full float model.
+
+The loader uses 64-bit file positions and standard split-GGUF metadata. Each shard is a complete GGUF file with its own header, not an arbitrary split of raw bytes. Missing/inconsistent shards fail loading. A disk read error stops generation, appears in the UI and `/health`, and returns a storage error to API/MCP clients.
 
 ## Model compatibility
 
@@ -20,13 +42,14 @@ A console capable of running unsigned XEX files is required. Models, the tokeniz
 | --- | --- | --- |
 | `gemma2`, `gemma3` | Gemma embedding scaling, GELU, post norms, existing local/global attention | SentencePiece score merges; Gemma turn markers |
 | `llama` | Dense Llama, grouped-query attention, SiLU, consecutive-pair RoPE, tied or separate output weights | SentencePiece for Llama 2 style vocabularies; byte BPE for Llama 3; corresponding instruction/header markers |
+| `llama` / SmolLM2 | Dense Llama path, tied output weights | SmolLM byte BPE with individual digits, case-sensitive contractions, incomplete byte vocabulary and ChatML |
 | `qwen2` | Dense Qwen2 and Qwen2.5 GGUFs, Q/K/V biases, SiLU, split-half RoPE | Qwen2 byte BPE and ChatML |
 
 The loader validates tensor shapes and rejects unknown architectures, MoE, unequal key/value dimensions, partial RoPE, and unsupported RoPE scaling. Shared Llama 3 frequency-factor tensors are supported. Unscaled models and Llama 3 files carrying their frequency factors are accepted; YaRN, linear scaling and LongRoPE are not implemented. Qwen3, Qwen VL, recurrent/hybrid models, vision and audio are not implemented.
 
 Supported weight formats: F32, F16, Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q8_1, Q2_K, Q3_K, Q4_K, Q5_K, Q6_K and Q8_K. These decoders now handle signed values, packed scales, and every block in a row. IQ, BF16 and other unlisted formats are rejected.
 
-Chat formatting selects the built-in format from the vocabulary's control tokens. Arbitrary Jinja `tokenizer.chat_template` programs are not interpreted. Use a model with one of the formats in the table. BPE pre-tokenizers supported here are `qwen2`, `llama-bpe` and `llama3`.
+Chat formatting selects the built-in format from the vocabulary's control tokens. Arbitrary Jinja `tokenizer.chat_template` programs are not interpreted. Use a model with one of the formats in the table. BPE pre-tokenizers supported here are `qwen2`, `llama-bpe`, `llama3` and `smollm`.
 
 ## GPU calculations
 
@@ -126,7 +149,7 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch the pinned bundled model with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. The model's source, size and hash are recorded in `release/model.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.0`, with weights and required notices. Packaging verifies the executable and GGUF inside the ZIP and prints its SHA-256 for the release notes. The optional PC bridge remains available as source in `bridge/`.
+Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.1`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
 
 Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
@@ -140,11 +163,11 @@ node tests/make-fixtures.mjs
 node --test tests/*.test.mjs
 ```
 
-Native tests cover all supported quantized block layouts, dense Llama/Qwen loading and generation, rotary/activation operations, stop/BOS handling, JSON parsing, and MCP dispatch. Protocol tests exercise stdio, JSON/SSE HTTP, sessions, pagination, external tool feedback, allowlists, and the native HTTP server. Tokenizer tests compare 520 inputs against a separate regex/BPE reference.
+Native tests cover all supported quantized block layouts, dense Llama/Qwen loading and generation, rotary/activation operations, stop/BOS handling, JSON parsing, and MCP dispatch. Protocol tests exercise stdio, JSON/SSE HTTP, sessions, pagination, external tool feedback, allowlists, and the native HTTP server. Tokenizer tests compare 780 inputs against a separate regex/BPE reference.
 
 Synthetic fixtures validate execution paths, not output quality of full pretrained models. Console inference and GPU benchmarks remain hardware validation tasks.
 
-The bundled Gemma 3 270M Q8_0 model has also been loaded and used to generate text with the host build. Reproduce this check after fetching the model with `build/tests/native.exe --model build/models/gemma-3-270m-it-Q8_0.gguf`.
+Both bundled models and the optional Qwen2.5 0.5B have generated text with the host build. `build/tests/native.exe --compare-model MODEL.gguf` compares RAM and streamed generation, including the complete KV cache; all three models match exactly. Native tests also cover cache-boundary reads, disk read failure, split-GGUF parity and missing/mismatched shards. Tokenizer reference tests cover 780 randomized/Unicode cases across Qwen2, Llama 3 and SmolLM. HTTP tests run in both RAM and streamed modes. Physical-console performance is not inferred from these host checks.
 
 Implementation references: [GGUF/GGML quantization layouts](https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-common.h), [Llama execution](https://github.com/ggml-org/llama.cpp/blob/master/src/models/llama.cpp), [Qwen2 execution](https://github.com/ggml-org/llama.cpp/blob/master/src/models/qwen2.cpp), and [MCP 2025-06-18 transport](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports).
 
@@ -158,10 +181,10 @@ If you enjoy the project and want to support future development, you can [suppor
 
 Developed by **ZuhaGames & Canyons**. 360AI is a fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex); thanks to Canyons and the original contributors for the Xbox 360 foundation.
 
-The bundled model is **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF). Its attribution, provenance, and terms are included in the download.
+The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), and **SmolLM2 135M Instruct**, created by Hugging Face, using [lmstudio-community's GGUF conversion](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF). Their attribution, provenance, and terms are included in the download.
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.0">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.1">Get 360AI</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>
