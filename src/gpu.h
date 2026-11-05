@@ -9,6 +9,8 @@ void gx_gpu_lock();
 void gx_gpu_unlock();
 void gx_gpu_enable(bool enabled);
 bool gx_gpu_ready();
+bool gx_gpu_enabled();
+bool gx_gpu_prefer(double cpu_seconds,double gpu_seconds,bool parity);
 const char* gx_gpu_status();
 const char* gx_gpu_diagnostic();
 bool gx_gpu_matvec(const u8* data, int type, u32 cols, u32 stride,

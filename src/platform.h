@@ -20,6 +20,7 @@ int gx_list_dir(const char* dir, const char* ext, std::vector<gx_file_entry>& ou
 
 double gx_time_seconds();
 void gx_sleep_ms(int ms);
+void gx_inference_thread();
 
 typedef void* gx_thread_t;
 typedef void* gx_mutex_t;

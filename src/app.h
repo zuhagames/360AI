@@ -17,7 +17,7 @@ enum debug_cycle{
 };
 
 enum kb_kind{
-  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_SYS=0x100
+  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_SYS=0x100
 };
 
 struct AppSettings{
@@ -27,8 +27,9 @@ struct AppSettings{
   int debug_level;
   bool server_on;
   bool chat_on;
-  bool gpu_on;
-  bool disk_on;
+  int backend_mode; // Auto / CPU / forced GPU
+  int weight_mode; // Auto / RAM / HDD stream
+  int reply_tokens;
 
   AppSettings();
 };
@@ -76,6 +77,8 @@ private:
   std::string gen_text_;
   double gen_start_time_;
   double gen_last_time_;
+  double gen_first_time_;
+  u32 gen_prompt_done_,gen_prompt_total_;
   int gen_count_;
   f32 gen_last_ms_;
   f32 gen_tps_;
@@ -106,6 +109,7 @@ private:
   static void gen_thread(void* arg);
   void do_generate(const std::vector<int>& prompt);
   static void on_token(int id, const char* text, void* user);
+  static void on_prefill(u32 done,u32 total,void* user);
 
   void append_chat(const std::string& role, const std::string& text);
   std::string build_prompt() const;

@@ -1,6 +1,7 @@
 #include "gpu.h"
 #include "platform.h"
 #include "quant.h"
+bool gx_gpu_prefer(double cpu,double gpu,bool parity){return parity && cpu>0 && cpu<3600 && gpu>=0 && gpu<cpu*0.8;}
 #ifdef _XBOX
 #include <xtl.h>
 #include <d3d9.h>
@@ -51,6 +52,7 @@ static bool shader(const char* source, const char* profile, ID3DXBuffer** code){
 void gx_gpu_lock(){ if(mutex) gx_mutex_lock(mutex); }
 void gx_gpu_unlock(){ if(mutex) gx_mutex_unlock(mutex); }
 bool gx_gpu_ready(){ return available; }
+bool gx_gpu_enabled(){ return enabled; }
 const char* gx_gpu_status(){ return status; }
 const char* gx_gpu_diagnostic(){ return diagnostic; }
 void gx_gpu_enable(bool on){ enabled=on && available; status=enabled ? "Xenos GPU (experimental)" : "CPU"; }
@@ -213,6 +215,7 @@ bool gx_gpu_matvec(const u8* data,int type,u32 cols,u32 stride,const f32* x,
   gx_gpu_unlock(); return ok;
 }
 #else
+bool gx_gpu_enabled(){return false;}
 bool gx_gpu_init(void*){ return false; }
 void gx_gpu_shutdown(){} void gx_gpu_lock(){} void gx_gpu_unlock(){}
 void gx_gpu_enable(bool){} bool gx_gpu_ready(){ return false; }

@@ -1,9 +1,10 @@
 #include "engine.h"
 #include "ops.h"
 #include "platform.h"
+#include "gpu.h"
 #include <math.h>
 
-KVCache::KVCache(){ seq_len=0; kv_heads=0; qkv_dim=0; num_layers=0; layer_kv=0; }
+KVCache::KVCache(){ seq_len=0; kv_heads=0; qkv_dim=0; num_layers=0; layer_kv=0; owner=0;epoch=0; }
 
 void KVCache::init(u32 sl, u32 kh, u32 qd, u32 nl){
   seq_len = sl; kv_heads = kh; qkv_dim = qd; num_layers = nl;
@@ -11,10 +12,12 @@ void KVCache::init(u32 sl, u32 kh, u32 qd, u32 nl){
   size_t total = (size_t)num_layers * layer_kv;
   k.assign(total, 0.0f);
   v.assign(total, 0.0f);
+  tokens.clear();owner=0;epoch=0;
 }
 void KVCache::clear(){
   std::fill(k.begin(), k.end(), 0.0f);
   std::fill(v.begin(), v.end(), 0.0f);
+  tokens.clear();owner=0;epoch=0;
 }
 f32* KVCache::k_row(u32 layer, u32 pos){
   return &k[(size_t)layer * layer_kv + (size_t)pos * kv_heads * qkv_dim];
@@ -23,7 +26,7 @@ f32* KVCache::v_row(u32 layer, u32 pos){
   return &v[(size_t)layer * layer_kv + (size_t)pos * kv_heads * qkv_dim];
 }
 
-Engine::Engine(){ loaded_ = false; progress_ = 0; memset(&sc_, 0, sizeof(sc_)); }
+Engine::Engine(){ loaded_ = false; epoch_=0;progress_ = 0; memset(&sc_, 0, sizeof(sc_));strcpy(backend_note_,"CPU"); }
 Engine::~Engine(){ free_scratch(); }
 
 void Engine::free_scratch(){
@@ -97,6 +100,8 @@ void Engine::build_timescales(){
 }
 
 void Engine::reset(){
+  ++epoch_;
+  stats_=GenerationStats();
   free_scratch();
   weights_.free_all();
   gguf_.close();
@@ -105,15 +110,11 @@ void Engine::reset(){
 }
 
 static void rmsnorm_inplace(f32* x, const TensorView& w, size_t n, f32 eps, f32* wbuf){
+  if(w.ok && w.cols>=n){w.row_dequant(0,wbuf);gx_rmsnorm(x,wbuf,x,n,eps);return;}
   f64 ss = 0.0;
   for(size_t i = 0; i < n; ++i) ss += (f64)x[i] * x[i];
   f32 scale = (f32)(1.0 / sqrt((f64)ss / (f64)n + (f64)eps));
-  if(w.ok && w.cols >= n){
-    w.row_dequant(0, wbuf);
-    for(size_t i = 0; i < n; ++i) x[i] *= scale * wbuf[i];
-  } else {
-    for(size_t i = 0; i < n; ++i) x[i] *= scale;
-  }
+  gx_mul_by(x,scale,n);
 }
 
 static void add_bias(f32* x, const TensorView& bias, size_t n, f32* buf){
@@ -167,9 +168,7 @@ void Engine::attention(size_t layer, const f32* xn, KVCache& kv, u32 pos,
     f32 mx = -1e30f;
     for(u32 p = start; p <= pos; ++p){
       const f32* kh = kv.k_row(layer,p) + kvh_idx*qd;
-      f64 dot = 0.0;
-      for(u32 d = 0; d < qd; ++d) dot += (f64)qh[d] * kh[d];
-      f32 s = (f32)dot;
+      f32 s = gx_dot_f32(qh,kh,qd);
       if(softcap > 0.0f) s = softcap * tanhf(s / softcap);
       att[p] = s;
       if(s > mx) mx = s;
@@ -186,7 +185,7 @@ void Engine::attention(size_t layer, const f32* xn, KVCache& kv, u32 pos,
     for(u32 p = start; p <= pos; ++p){
       f32 wgt = att[p] * inv;
       const f32* vh = kv.v_row(layer,p) + kvh_idx*qd;
-      for(u32 d = 0; d < qd; ++d) ao[d] += wgt * vh[d];
+      gx_accum_scaled(ao,vh,wgt,qd);
     }
   }
 }
@@ -283,8 +282,10 @@ int Engine::sample(const EngineCfg& ecfg){
 
 int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_tokens,
                      int max_new, KVCache& kv, const EngineCfg& ecfg,
-                     void (*on_token)(int, const char*, void*), void* user){
+                     void (*on_token)(int, const char*, void*), void* user,
+                     void (*on_prefill)(u32,u32,void*)){
   out_tokens.clear();
+  stats_=GenerationStats();
   if(!loaded_ || prompt.empty() || !kv.seq_len || max_new <= 0 ||
      kv.num_layers != cfg().num_layers || kv.kv_heads != cfg().layer.kv_heads ||
      kv.qkv_dim != cfg().layer.qkv_dim) return 0;
@@ -300,18 +301,33 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
                 (int)prompt.size(), (int)kv.seq_len);
   }
   const std::vector<int>& pr = *pp;
-  kv.clear();
+  gx_inference_thread();
+  double started=gx_time_seconds();
+  size_t reused=0;
+  if(kv.owner==this && kv.epoch==epoch_){
+    // Re-evaluate the final prompt token to obtain fresh logits: sampling may
+    // have overwritten the previous logits, and another cache can share Engine.
+    while(reused+1<pr.size() && reused<kv.tokens.size() && kv.tokens[reused]==pr[reused]) ++reused;
+  }
+  kv.tokens.resize(reused);kv.owner=this;kv.epoch=epoch_;
+  stats_.prompt_tokens=(u32)pr.size();stats_.reused_tokens=(u32)reused;
+  if(on_prefill) on_prefill((u32)reused,(u32)pr.size(),user);
   GX_LOG_ALL("gen: prompt %d tokens", (int)pr.size());
   for(size_t i = 0; i < pr.size() && i < 24; ++i){
     GX_LOG_ALL("gen: pin %d = %d", (int)i, pr[i]);
   }
 
-  for(size_t i = 0; i + 1 < pr.size(); ++i){
+  for(size_t i = reused; i + 1 < pr.size(); ++i){
     if(ecfg.stop && *ecfg.stop){ out_tokens.clear(); return 0; }
     if(!forward(pr, i, i, false, kv)){out_tokens.clear();return 0;}
+    kv.tokens.push_back(pr[i]);++stats_.evaluated_tokens;
+    if(on_prefill) on_prefill((u32)(i+1),(u32)pr.size(),user);
   }
   if(ecfg.stop && *ecfg.stop){ out_tokens.clear(); return 0; }
   if(!forward(pr, pr.size() - 1, pr.size() - 1, true, kv)){out_tokens.clear();return 0;}
+  kv.tokens.push_back(pr.back());++stats_.evaluated_tokens;
+  stats_.prefill_seconds=gx_time_seconds()-started;
+  if(on_prefill) on_prefill((u32)pr.size(),(u32)pr.size(),user);
   if(gx_get_debug_level() == GX_DEBUG_ALL){
     u32 n = weights_.cfg.vocab_size;
     u32 best = 0;
@@ -330,17 +346,57 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
     }
     if(tok_.is_stop(next)) break;
     out_tokens.push_back(next);
+    if(out_tokens.size()==1) stats_.first_token_seconds=gx_time_seconds()-started;
     if(on_token) on_token(next, tok_.decode_token(next).c_str(), user);
     if(g + 1 >= max_new || pos >= kv.seq_len || (ecfg.stop && *ecfg.stop)) break;
     std::vector<int> one(1, next);
     if(!forward(one, 0, pos, true, kv)){out_tokens.clear();return 0;}
+    kv.tokens.push_back(next);++stats_.evaluated_tokens;
     pos++;
     next = sample(ecfg);
   }
+  stats_.generated_tokens=(u32)out_tokens.size();
+  stats_.decode_seconds=gx_time_seconds()-started-stats_.prefill_seconds;
+  GX_LOG_WARN("perf: prompt %u (%u cached), first token %.2fs, decode %.2fs / %u tokens; %s; %s",
+    stats_.prompt_tokens,stats_.reused_tokens,stats_.first_token_seconds,stats_.decode_seconds,
+    stats_.generated_tokens,gx_gpu_status(),disk_streaming() ? "disk stream" : "RAM");
   return (int)out_tokens.size();
 }
 
-bool Engine::load(const char* gguf_path, void (*progress)(const char*,int,int),bool stream){
+void Engine::select_backend(int mode){
+  ++epoch_; // Cached activations must not span a backend change.
+  gx_inference_thread();
+  gx_gpu_enable(false);strcpy(backend_note_,"CPU");
+  if(!loaded_ || mode==1 || !gx_gpu_ready()) return;
+  if(mode==2){gx_gpu_enable(true);strcpy(backend_note_,"GPU forced (experimental)");return;}
+  const TensorView& matrix=weights_.layers[0].ffn_gate;
+  size_t rows=GX_MIN((size_t)256,(size_t)matrix.rows);
+  std::vector<f32> reference(rows);
+  for(u32 i=0;i<matrix.cols;++i) sc_.xn[i]=((int)(i%13)-6)*0.03125f;
+  if(!matrix.matvec(sc_.xn,&reference[0],rows,sc_.deq)) return;
+  double cpu=1e30;
+  for(int trial=0;trial<3;++trial){
+    double start=gx_time_seconds();
+    if(!matrix.matvec(sc_.xn,&reference[0],rows,sc_.deq)) return;
+    cpu=GX_MIN(cpu,gx_time_seconds()-start);
+  }
+  gx_gpu_enable(true);
+  double start=gx_time_seconds();
+  bool valid=matrix.matvec(sc_.xn,sc_.gate,rows,sc_.deq);
+  double gpu=gx_time_seconds()-start;
+  valid=valid && gx_gpu_enabled();
+  for(size_t r=0;r<rows && valid;++r){
+    f32 error=fabsf(reference[r]-sc_.gate[r]);
+    valid=error<=0.001f+0.001f*fabsf(reference[r]);
+  }
+  bool choose_gpu=gx_gpu_prefer(cpu,gpu,valid);
+  gx_gpu_enable(choose_gpu);
+  snprintf(backend_note_,sizeof(backend_note_),"Auto: %s (CPU %.2f ms, GPU %.2f ms%s)",
+    choose_gpu ? "GPU" : "CPU",cpu*1000,gpu*1000,valid ? "" : "; GPU parity failed");
+  GX_LOG_WARN("Backend: %s",backend_note_);
+}
+
+bool Engine::load(const char* gguf_path, void (*progress)(const char*,int,int),bool stream,bool auto_storage,u32 context){
   reset();
   if(progress_ == 0) progress_ = progress;
   if(!gguf_.load(gguf_path)){ GX_LOG_ERROR("load: gguf parse fail"); reset(); return false; }
@@ -349,6 +405,19 @@ bool Engine::load(const char* gguf_path, void (*progress)(const char*,int,int),b
   if((u32)tok_.n_tokens()!=weights_.cfg.vocab_size){ reset(); return false; }
   // Do not retain duplicate vocabulary and merge strings while loading weights.
   gguf_.release_tokenizer_metadata();
+  if(auto_storage){
+    u64 bytes=0;
+    for(size_t i=0;i<gguf_.num_tensors();++i){
+      const gguf_tensor* t=gguf_.tensor_at(i);
+      size_t block=gxq_block_elems(t->type),size=gxq_type_size(t->type);
+      if(block && size) bytes+=(t->nelem/block)*size;
+    }
+    u64 reserve=(u64)kv_bytes(GX_MIN(context,weights_.cfg.max_seq_len))+scratch_bytes()+32u*1024u*1024u;
+    u64 available=gx_physical_free();
+    stream=bytes>available || reserve>available-bytes;
+    GX_LOG_WARN("Storage: Auto selected %s (%.0f MB weights, %.0f MB reserve, %.0f MB free)",
+      stream ? "HDD/USB stream" : "RAM",(double)bytes/1048576,(double)reserve/1048576,(double)available/1048576);
+  }
   if(!weights_.load(gguf_, weights_.cfg, progress_,stream)){ GX_LOG_ERROR("load: weights fail"); reset(); return false; }
   build_timescales();
   if(!alloc_scratch()){ GX_LOG_ERROR("load: scratch fail"); reset(); return false; }

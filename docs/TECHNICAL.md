@@ -9,14 +9,14 @@ Build and command examples below run from the repository root.
 After launching the app:
 
 1. Select the model and set the context, sampling, chat and server options before choosing **Load model**.
-2. Leave **GPU matrix math** enabled to try the GPU backend, or disable it to use the CPU. If the GPU startup numerical check fails, the menu reports it unavailable and inference uses the CPU.
+2. Leave **Compute backend: Auto** and **Weight storage: Auto** selected. Auto compares a small real-weight matrix on CPU/GPU and uses the GPU only if its result matches and it is at least 20% faster. Storage Auto keeps the model in RAM when weights, scratch/KV buffers and a memory reserve fit. CPU, forced GPU and explicit RAM/streaming overrides remain available.
 3. Enable **OpenAI / MCP server** before loading the model to access the console over your LAN. The chat screen displays its actual address and port (80, or 8080 if 80 cannot be bound).
 
 A console capable of running unsigned XEX files is required. The default context is 512 tokens. RAM mode keeps all weights in memory; HDD/USB streaming keeps matrix weights on disk with an 8 MB cache. The tokenizer, scratch buffers, small norm/bias tensors, KV cache, UI and GPU buffers still share the console's 512 MB RAM. Start at context 256–512 and raise it only when memory allows.
 
 ## HDD streaming and model downloads
 
-The 1.1 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
+The 1.1.1 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
 
 | Model | Exact model file size | Reserve free disk space | Status |
 | --- | --- | --- | --- |
@@ -30,7 +30,7 @@ Disk sizes use decimal GB. Reservations are for each extracted model, not extra 
 
 On a Windows PC, use the included `Download-Models.ps1 -List` to see the catalog, then `Download-Models.ps1 -Model qwen25-05b` (or `qwen25-15b`, `qwen25-7b`). Run it through PowerShell with `-ExecutionPolicy Bypass -File` if needed. In a source checkout, use `tools/fetch-model.ps1` instead. Every download is pinned to a source revision and verified against SHA-256 before activation.
 
-Copy all files to the app folder on HDD/USB and launch `360AI.xex` from that folder. Select **Weight storage: HDD/USB stream** before loading. Models over 320 MiB automatically suggest streaming; you can change the setting. The browser shows combined file size and rounded free-space requirements, and hides non-first GGUF shards. For the 7B model keep both short, console-friendly shard filenames unchanged.
+Copy all files to the app folder on HDD/USB and launch `360AI.xex` from that folder. Leave **Weight storage: Auto** selected, or explicitly choose **HDD/USB stream** when needed. Auto makes its decision after reading model configuration and loading the tokenizer, reserving memory for the chosen context and scratch buffers plus 32 MiB. The browser shows combined file size and rounded free-space requirements, and hides non-first GGUF shards. For the 7B model keep both short, console-friendly shard filenames unchanged.
 
 Streaming is weight paging, not operating-system swap. It reads the model repeatedly as tokens are generated, so HDD/USB bandwidth and CPU work can make large models extremely slow. RAM is still required for attention/KV data and the tokenizer; a large HDD does not remove those limits. Physical-console memory fit and speed need validation. The cache is fixed at 8 MB; decoded weights are processed in batches rather than retained as a full float model.
 
@@ -59,9 +59,30 @@ This is **partial GPU offload**: CPU work still includes weight unpacking, token
 
 Results are resolved into a tile-aligned, tiled R32F texture and untiled before CPU readback, as required by Xenos. GPU uploads remain linear. Pixel-center sampling keeps each output aligned with its weight row.
 
-At startup, a GPU readback check compares 65 rows × 260 columns against CPU results, exercising both tile boundaries. Initialization or dispatch failure falls back to CPU. The setting defaults to GPU enabled when available. The settings screen and `360AI.log` report the exact failed operation or first mismatching row instead of a generic unavailable message.
+At startup, a GPU readback check compares 65 rows × 260 columns against CPU results, exercising both tile boundaries. Initialization or dispatch failure falls back to CPU. Compute defaults to Auto: after loading, it times 256 rows of the first feed-forward matrix on CPU/GPU, checks real-weight numerical parity and chooses the GPU only for a measured improvement of at least 20%. CPU timing uses the best of three warm runs; GPU timing includes upload, dispatch, synchronization and readback. The chat footer, `/health` and `360AI.log` report the selection. GPU forced remains experimental.
 
-This backend is experimental. Uploads, GPU/CPU synchronization and readbacks may make it slower than the CPU for some models. The startup shader/readback self-test has passed on a user's physical console. Numerical parity on real weights and measured tokens/second comparisons still need hardware validation. No GPU speedup is claimed. For a performance comparison, use the same model and prompt with GPU on/off and set the debug level to **warning** to avoid verbose per-layer file logging.
+This backend is experimental. Uploads, GPU/CPU synchronization and readbacks may make it slower than the CPU for some models. The startup shader/readback self-test has passed on a user's physical console. Numerical parity on real weights and measured tokens/second comparisons still need hardware validation. No GPU speedup is claimed. For a performance comparison, use the same model and prompt with CPU/forced GPU and set the debug level to **warning** to avoid verbose per-layer file logging.
+
+## Performance and response delay
+
+For normal chat, start with **SmolLM2 135M**, context **512**, and compute/storage **Auto**. The included Q8 models normally fit RAM; streaming them unnecessarily adds disk latency to every token. Large HDD models trade memory capacity for speed and can remain extremely slow.
+
+The 1.1.1 CPU Q4/Q5/Q8 kernels multiply signed quantized weights directly, avoiding a full float row conversion and intermediate buffer on every dot product. Xenon uses VMX unpack/conversion operations. Q4_K/Q5_K decoding reuses group scales. Attention dot products, weighted sums and RMS normalization use vector operations. Inference and its two workers run on hardware threads 0, 2 and 4, one per physical core; worker completion uses an event instead of polling/yielding. The old workers inherited their parent's hardware-thread assignment, as described in [Microsoft's Xbox threading guidance](https://learn.microsoft.com/en-us/windows/win32/dxtecharts/coding-for-multiple-cores#creating-threads).
+
+Each KV cache retains the token sequence it has actually evaluated. Subsequent requests reuse the matching prefix and recompute the final prompt token for fresh logits. Changed/truncated prefixes, model reloads, backend changes and explicit cache clearing invalidate the appropriate data. Cancelled generation retains only completed token evaluations. History that no longer fits the context must still be processed again after trimming.
+
+Disk cache misses read the requested matrix batch rounded to 64 KiB, bounded by the 8 MiB cache. A single embedding row no longer causes an 8 MiB read. The chat screen shows prompt tokens processed and elapsed time, followed by decode tokens/second. One `perf:` log line records prompt/cache counts, first-token time, decode time, backend and storage per request. Console replies default to 128 tokens, adjustable from 16 to 512 in Settings; API token limits are unchanged.
+
+Windows host measurements with the same compiler, weights, 16-token prompt and greedy output:
+
+| Model | 1.1 generation | 1.1.1 generation | Output |
+| --- | --- | --- | --- |
+| SmolLM2 135M Q8_0 | 7.10 s | 2.14 s | Same 12 tokens |
+| Gemma 3 270M Q8_0 | 5.49 s | 1.87 s | Same 3 tokens |
+
+A SmolLM2 follow-up reused 27 of 52 prompt tokens and reached its first token in 1.79 s versus 3.69 s fresh. Gemma reused 19 of 41 prompt tokens: 1.76 s versus 3.15 s fresh. Both produced identical output tokens and valid KV entries. Run `build/tests/native.exe --bench-cache MODEL.gguf` to repeat these cache checks. These are host CPU measurements; Xbox VMX speed, core scaling and Auto backend selection still require physical-console validation.
+
+The optional Qwen2.5 0.5B Q4_K_M model uses mostly Q5_0 weights. Its same 10-token host reply (15 prompt tokens) improved from 30.37 s to 17.65 s with the direct Q5 kernel. It remains substantially slower than the bundled models; RAM and streamed results match exactly.
 
 ## HTTP API
 
@@ -149,7 +170,7 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.1`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
+Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.1.1`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
 
 Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
@@ -184,7 +205,7 @@ Developed by **ZuhaGames & Canyons**. 360AI is a fork of [Canyons' gemma.xex](ht
 The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), and **SmolLM2 135M Instruct**, created by Hugging Face, using [lmstudio-community's GGUF conversion](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF). Their attribution, provenance, and terms are included in the download.
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.1">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.1.1">Get 360AI</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>

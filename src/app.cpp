@@ -19,8 +19,9 @@ AppSettings::AppSettings(){
   debug_level = DC_WARN;
   server_on = false;
   chat_on = true;
-  gpu_on = true;
-  disk_on = false;
+  backend_mode = 0;
+  weight_mode = 0;
+  reply_tokens = 128;
 }
 
 App::App(){
@@ -41,6 +42,7 @@ App::App(){
   generating_ = false;
   gen_stop_ = false;
   gen_start_time_ = 0;
+  gen_first_time_=0;gen_prompt_done_=gen_prompt_total_=0;
   gen_last_time_ = 0;
   gen_count_ = 0;
   gen_last_ms_ = 0;
@@ -211,8 +213,7 @@ void App::browse_frame(){
   if(p & GX_BTN_A){
     model_path_ = std::string(kBrowseDir) + "\\" + files_[file_sel_].name;
     model_name_ = files_[file_sel_].name;
-    settings_.disk_on=files_[file_sel_].size>320u*1024u*1024u;
-    if(settings_.disk_on) settings_.ctx_size=512;
+    if(files_[file_sel_].size>320u*1024u*1024u) settings_.ctx_size=512;
     screen_ = AS_SETTINGS;
   }
 }
@@ -226,19 +227,22 @@ void App::settings_frame(){
     "everything", "warning", "error", "nothing"
   };
 
-  char line[9][192];
+  const char* backends[]={"Auto (benchmark)","CPU","GPU forced (experimental)"};
+  const char* storage[]={"Auto (RAM when it fits)","RAM","HDD/USB stream (8 MB cache)"};
+  char line[10][192];
   snprintf(line[0], 192, "Context size        %d", settings_.ctx_size);
   snprintf(line[1], 192, "Temperature         %.2f", (double)settings_.temperature);
   snprintf(line[2], 192, "Top-K               %d", settings_.topk);
   snprintf(line[3], 192, "Debug level         %s", dbg_names[settings_.debug_level]);
   snprintf(line[4], 192, "OpenAI / MCP server %s", settings_.server_on ? "ON" : "OFF");
   snprintf(line[5], 192, "Chat on Xbox        %s", settings_.chat_on ? "ON" : "OFF");
-  snprintf(line[6], 192, "GPU matrix math     %s", gx_gpu_ready() ? (settings_.gpu_on ? "ON (experimental)" : "OFF") : "unavailable (CPU)");
-  snprintf(line[7], 192, "Weight storage      %s",settings_.disk_on ? "HDD/USB stream (8 MB cache)" : "RAM");
-  snprintf(line[8], 192, "Load model");
+  snprintf(line[6], 192, "Compute backend     %s", backends[settings_.backend_mode]);
+  snprintf(line[7], 192, "Weight storage      %s",storage[settings_.weight_mode]);
+  snprintf(line[8], 192, "Reply token limit   %d",settings_.reply_tokens);
+  snprintf(line[9], 192, "Load model");
 
   f32 y = 30 + lh*3;
-  for(int i = 0; i < 9; ++i){
+  for(int i = 0; i < 10; ++i){
     if(i == set_sel_){
       gxui_fill(36, y - 2, 700, lh + 2, GX_ACCENT_A(60));
       gxui_text_shadow(40, y, GXRGB(255,255,255), "> %s", line[i]);
@@ -262,7 +266,7 @@ void App::settings_frame(){
   if(p & GX_BTN_DUP) set_sel_--;
   if(p & GX_BTN_DDOWN) set_sel_++;
   if(set_sel_ < 0) set_sel_ = 0;
-  if(set_sel_ > 8) set_sel_ = 8;
+  if(set_sel_ > 9) set_sel_ = 9;
 
   if(p & GX_BTN_A){
     switch(set_sel_){
@@ -295,13 +299,17 @@ void App::settings_frame(){
         settings_.chat_on = !settings_.chat_on;
         break;
       case 6:
-        settings_.gpu_on = !settings_.gpu_on;
+        settings_.backend_mode=(settings_.backend_mode+1)%3;
         break;
       case 7:
-        settings_.disk_on=!settings_.disk_on;
+        settings_.weight_mode=(settings_.weight_mode+1)%3;
         break;
       case 8:
-        gx_gpu_enable(settings_.gpu_on);
+        {char ib[32];snprintf(ib,sizeof(ib),"%d",settings_.reply_tokens);
+        kb_open(KB_REPLY,"Reply token limit","Maximum reply length (16-512)",ib);}
+        break;
+      case 9:
+        gx_gpu_enable(false);
         gx_set_debug_level(settings_.debug_level);
         start_load();
         screen_ = AS_LOADING;
@@ -342,7 +350,9 @@ void App::load_progress_cb(const char* name, int cur, int total){
 void App::do_load(){
   gx_log(GX_DEBUG_ALL, "loading model: %s", model_path_.c_str());
   s_load_app = this;
-  bool ok = engine_.load(model_path_.c_str(), &App::load_progress_cb,settings_.disk_on);
+  bool ok = engine_.load(model_path_.c_str(), &App::load_progress_cb,settings_.weight_mode==2,settings_.weight_mode==0,(u32)settings_.ctx_size);
+  if(ok){load_progress_cb("comparing CPU/GPU",0,1);engine_.select_backend(settings_.backend_mode);}
+  if(ok && !engine_.storage_ok()) ok=false;
   s_load_app = 0;
   if(ok){
     const ModelCfg& c = engine_.cfg();
@@ -410,8 +420,8 @@ std::string App::build_prompt_impl(size_t from) const {
 std::string App::build_fitted_prompt() const {
   if(turns_.empty()) return build_prompt_impl(0);
   size_t cap = (size_t)kv_.seq_len;
-  if(cap > 512) cap -= 256;
-  else cap /= 2;
+  if(cap>(size_t)settings_.reply_tokens) cap-=settings_.reply_tokens;
+  else cap/=2;
   if(cap > 2048) cap = 2048;
   std::vector<int> ids;
   std::string p;
@@ -491,9 +501,10 @@ void App::chat_frame(){
     f32 tps = gen_tps_;
     f32 lat = gen_last_ms_;
     int cnt = gen_count_;
+    u32 done=gen_prompt_done_,total=gen_prompt_total_;
     if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
     if(cnt == 0){
-      gxui_text_shadow(40, 720 - lh*2, GX_ACCENT, "processing...");
+      gxui_text_shadow(40, 720 - lh*2, GX_ACCENT, "Processing prompt: %u/%u tokens (%.0fs)",done,total,gx_time_seconds()-gen_start_time_);
     } else {
       gxui_text_shadow(40, 720 - lh*2, GX_ACCENT, "generating...   [%.1ft/s %.0fms latency]", (double)tps, (double)lat);
     }
@@ -501,6 +512,7 @@ void App::chat_frame(){
     gxui_text_shadow(40, 720 - lh*2, GXRGB(90,90,100), "idle");
   }
   if(!engine_.storage_ok()) gxui_text_shadow(40,720-lh*3,GXRGB(240,130,120),"Disk read failed. Check HDD/USB and reload the model.");
+  else gxui_text_shadow(40,720-lh*3,GXRGB(140,160,140),"%s | %s",engine_.backend_note(),engine_.disk_streaming() ? "HDD/USB stream" : "RAM weights");
 
   if(kb_mode_){
     kb_draw();
@@ -534,6 +546,7 @@ void App::start_generate(const std::string& prompt){
   gen_start_time_ = gx_time_seconds();
   gen_last_time_ = gen_start_time_;
   gen_count_ = 0;
+  gen_first_time_=0;gen_prompt_done_=gen_prompt_total_=0;
   gen_last_ms_ = 0;
   gen_tps_ = 0;
   if(gen_mutex_) gx_mutex_lock(gen_mutex_);
@@ -558,10 +571,9 @@ void App::do_generate(const std::vector<int>& prompt){
   ec.stop = &gen_stop_;
 
   std::vector<int> out;
-  int maxn = (int)kv_.seq_len;
-  if(maxn > 512) maxn = 512;
+  int maxn = GX_MIN(settings_.reply_tokens,(int)kv_.seq_len);
   if(eng_mutex_) gx_mutex_lock(eng_mutex_);
-  engine_.generate(prompt, out, maxn, kv_, ec, &App::on_token, this);
+  engine_.generate(prompt, out, maxn, kv_, ec, &App::on_token, this,&App::on_prefill);
   if(eng_mutex_) gx_mutex_unlock(eng_mutex_);
 
   std::string reply;
@@ -584,14 +596,22 @@ void App::on_token(int id, const char* text, void* user){
   if(a->gen_mutex_) gx_mutex_lock(a->gen_mutex_);
   a->gen_text_ += text;
   if(a->gen_count_ == 0){
+    a->gen_first_time_=now;
     a->gen_last_ms_ = (f32)((now - a->gen_start_time_) * 1000.0);
     a->gen_tps_ = 0.0f;
   } else {
     a->gen_last_ms_ = (f32)((now - a->gen_last_time_) * 1000.0);
-    a->gen_tps_ = (f32)((double)a->gen_count_ / (now - a->gen_start_time_));
+    a->gen_tps_ = (f32)((double)a->gen_count_ / (now - a->gen_first_time_));
   }
   a->gen_last_time_ = now;
   a->gen_count_++;
+  if(a->gen_mutex_) gx_mutex_unlock(a->gen_mutex_);
+}
+
+void App::on_prefill(u32 done,u32 total,void* user){
+  App* a=(App*)user;
+  if(a->gen_mutex_) gx_mutex_lock(a->gen_mutex_);
+  a->gen_prompt_done_=done;a->gen_prompt_total_=total;
   if(a->gen_mutex_) gx_mutex_unlock(a->gen_mutex_);
 }
 
@@ -725,6 +745,8 @@ void App::kb_commit(){
     if(v < 1) v = 1;
     if(v > 200) v = 200;
     settings_.topk = v;
+  } else if(mode == KB_REPLY){
+    settings_.reply_tokens=GX_CLAMP(atoi(kb_text_.c_str()),16,512);
   } else if(mode == KB_CHAT){
     if(!kb_text_.empty()){
       turns_.push_back(std::make_pair(0, kb_text_));

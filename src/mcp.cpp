@@ -49,6 +49,7 @@ int gx_mcp_dispatch(const std::string& body,Engine* engine,u32 context,
       info["architecture"]=Json(c.name); info["layers"]=Json((double)c.num_layers);
       info["embedding_length"]=Json((double)c.model_dim); info["context"]=Json((double)context);
       info["backend"]=Json(gx_gpu_status());
+      info["backend_selection"]=Json(engine->backend_note());
       info["weight_storage"]=Json(engine->disk_streaming() ? "HDD/USB stream (8 MB cache)" : "RAM");
       info["storage_ok"]=Json::boolean(engine->storage_ok());result=text_result(info.dump());
     } else if(name=="generate"){

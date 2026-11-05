@@ -14,7 +14,10 @@ const u8* WeightCache::read(GGUF* source,u64 position,size_t bytes){
     failed=true; GX_LOG_ERROR("weights: invalid streamed read"); return 0;
   }
   file=source;offset=position;
-  length=(size_t)GX_MIN((u64)capacity,source->file_size()-position);
+  // A single embedding row must not trigger an 8 MB read. Read ahead at most
+  // 64 KB beyond this request; full matrix batches still use the whole cache.
+  size_t wanted=GX_MIN(capacity,(bytes+65535u)&~(size_t)65535u);
+  length=(size_t)GX_MIN((u64)wanted,source->file_size()-position);
   if(!source->read_at(position,data,length)){
     failed=true;length=0;GX_LOG_ERROR("weights: disk read failed; check HDD/USB and reload the model");return 0;
   }

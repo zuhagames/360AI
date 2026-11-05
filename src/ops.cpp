@@ -13,20 +13,36 @@
 #include <vectorintrinsics.h>
 
 static const __vector4 gx_vzero = {{0,0,0,0}};
-static __forceinline __vector4 gx_zero4(){
-  return gx_vzero;
-}
+static __forceinline __vector4 gx_zero4(){ return gx_vzero; }
 static __forceinline f32 gx_hsum4(__vector4 v){
-  __declspec(align(16)) f32 t[4];
-  __stvx(v, t, 0);
-  return t[0] + t[1] + t[2] + t[3];
+  __declspec(align(16)) f32 t[4];__stvx(v,t,0);return t[0]+t[1]+t[2]+t[3];
 }
 static __forceinline __vector4 gx_splat(f32 s){
-  __declspec(align(16)) f32 t[4];
-  t[0] = t[1] = t[2] = t[3] = s;
-  return __lvx(t, 0);
+  __declspec(align(16)) f32 t[4];t[0]=t[1]=t[2]=t[3]=s;return __lvx(t,0);
 }
 #endif
+
+f32 gx_dot_f32(const f32* x,const f32* y,size_t n){
+  size_t i=0;f64 sum=0;
+#ifdef GX_VMX
+  __vector4 acc=gx_zero4();
+  for(;i+4<=n;i+=4) acc=__vmaddfp(__loadunalignedvector(x+i),__loadunalignedvector(y+i),acc);
+  sum=gx_hsum4(acc);
+#endif
+  for(;i<n;++i) sum+=(f64)x[i]*y[i];
+  return (f32)sum;
+}
+void gx_accum_scaled(f32* out,const f32* x,f32 scale,size_t n){
+  size_t i=0;
+#ifdef GX_VMX
+  __vector4 s=gx_splat(scale);
+  for(;i+4<=n;i+=4){
+    __vector4 v=__vmaddfp(__loadunalignedvector(x+i),s,__loadunalignedvector(out+i));
+    __storeunalignedvector(v,out+i);
+  }
+#endif
+  for(;i<n;++i) out[i]+=scale*x[i];
+}
 
 void gx_rmsnorm(const f32* x, const f32* w, f32* out, size_t n, f32 eps){
   f64 ss = 0.0;
@@ -157,7 +173,101 @@ void gx_gelu_mul(f32* c1, const f32* c2, size_t n){
   }
 }
 
+static f32 dot_q8(const u8* row,int type,const f32* x,u32 cols){
+  const u32 stride=type==GXQ_Q8_0 ? 34 : 36,offset=type==GXQ_Q8_0 ? 2 : 4;
+#ifdef GX_VMX
+  __vector4 total=gx_zero4();
+  for(u32 b=0;b<cols/32;++b){
+    const u8* block=row+b*stride;u16 h;memcpy(&h,block,2);
+    __vector4 scale=gx_splat(gx_f16_to_f32(gx_le16(h)));
+    __vector4 a=gx_zero4(),c=gx_zero4();
+    for(u32 half=0;half<2;++half){
+      __vector4 bytes=__loadunalignedvector(block+offset+half*16);
+      __vector4 hi=__vupkhsb(bytes),lo=__vupklsb(bytes);
+      const f32* input=x+b*32+half*16;
+      a=__vmaddfp(__vcfsx(__vupkhsh(hi),0),__loadunalignedvector(input),a);
+      c=__vmaddfp(__vcfsx(__vupklsh(hi),0),__loadunalignedvector(input+4),c);
+      a=__vmaddfp(__vcfsx(__vupkhsh(lo),0),__loadunalignedvector(input+8),a);
+      c=__vmaddfp(__vcfsx(__vupklsh(lo),0),__loadunalignedvector(input+12),c);
+    }
+    total=__vmaddfp(__vaddfp(a,c),scale,total);
+  }
+  return gx_hsum4(total);
+#else
+  f64 total=0;
+  for(u32 b=0;b<cols/32;++b){
+    const u8* block=row+b*stride;u16 h;memcpy(&h,block,2);
+    f32 scale=gx_f16_to_f32(gx_le16(h));const i8* q=(const i8*)(block+offset);
+    f64 a=0,c=0,d=0,e=0;const f32* input=x+b*32;
+    for(u32 i=0;i<32;i+=4){
+      a+=(f64)q[i]*input[i];c+=(f64)q[i+1]*input[i+1];
+      d+=(f64)q[i+2]*input[i+2];e+=(f64)q[i+3]*input[i+3];
+    }
+    total+=(a+c+d+e)*scale;
+  }
+  return (f32)total;
+#endif
+}
+
+static f32 dot_q45(const u8* row,int type,const f32* x,u32 cols){
+  bool affine=type==GXQ_Q4_1 || type==GXQ_Q5_1,five=type==GXQ_Q5_0 || type==GXQ_Q5_1;
+  u32 stride=(affine ? 20 : 18)+(five ? 4 : 0),offset=affine ? 4 : 2;
+#ifdef GX_VMX
+  __vector4 total=gx_zero4(),mask=__vspltisb(15),shift=__vspltisb(4),eight=__vspltisb(8);
+  __vector4 sixteen=__vaddubm(eight,eight);
+  static const __declspec(align(16)) u8 masks[16]={1,2,4,8,16,32,64,128,1,2,4,8,16,32,64,128};
+  static const __declspec(align(16)) u8 permutes[2][16]={{0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1},{2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3}};
+  for(u32 b=0;b<cols/32;++b){
+    const u8* block=row+b*stride;u16 h;memcpy(&h,block,2);
+    __vector4 scale=gx_splat(gx_f16_to_f32(gx_le16(h))),minimum=gx_zero4();
+    if(affine){memcpy(&h,block+2,2);minimum=gx_splat(gx_f16_to_f32(gx_le16(h)));}
+    __vector4 packed=__loadunalignedvector(block+offset+(five ? 4 : 0));
+    for(u32 half=0;half<2;++half){
+      __vector4 q=half ? __vsrb(packed,shift) : __vand(packed,mask);
+      if(five){
+        __vector4 bits=__loadunalignedvector(block+offset);
+        bits=__vperm(bits,bits,__lvx(permutes[half],0));
+        bits=__vand(__vcmpgtub(__vand(bits,__lvx(masks,0)),gx_zero4()),sixteen);
+        q=__vor(q,bits);
+      }
+      if(!affine) q=__vsububm(q,five ? sixteen : eight);
+      __vector4 hi=__vupkhsb(q),lo=__vupklsb(q);
+      const f32* input=x+b*32+half*16;
+      __vector4 w0=__vmaddfp(__vcfsx(__vupkhsh(hi),0),scale,minimum);
+      __vector4 w1=__vmaddfp(__vcfsx(__vupklsh(hi),0),scale,minimum);
+      __vector4 w2=__vmaddfp(__vcfsx(__vupkhsh(lo),0),scale,minimum);
+      __vector4 w3=__vmaddfp(__vcfsx(__vupklsh(lo),0),scale,minimum);
+      total=__vmaddfp(w0,__loadunalignedvector(input),total);
+      total=__vmaddfp(w1,__loadunalignedvector(input+4),total);
+      total=__vmaddfp(w2,__loadunalignedvector(input+8),total);
+      total=__vmaddfp(w3,__loadunalignedvector(input+12),total);
+    }
+  }
+  return gx_hsum4(total);
+#else
+  f64 total=0;
+  for(u32 b=0;b<cols/32;++b){
+    const u8* block=row+b*stride;u16 h;memcpy(&h,block,2);f32 d=gx_f16_to_f32(gx_le16(h)),m=0;
+    if(affine){memcpy(&h,block+2,2);m=gx_f16_to_f32(gx_le16(h));}
+    u32 high=0;if(five){memcpy(&high,block+offset,4);high=gx_le32(high);}
+    const u8* q=block+offset+(five ? 4 : 0);const f32* input=x+b*32;f64 a=0,c=0;
+    for(u32 j=0;j<16;++j){
+      int lo=(q[j]&15)|(((high>>j)&1)<<4),hi=(q[j]>>4)|(((high>>(j+16))&1)<<4);
+      if(!affine){lo-=five ? 16 : 8;hi-=five ? 16 : 8;a+=(f64)lo*input[j];c+=(f64)hi*input[j+16];}
+      else {f32 wl=d*lo+m,wh=d*hi+m;a+=(f64)wl*input[j];c+=(f64)wh*input[j+16];}
+    }
+    total+=affine ? a+c : (a+c)*d;
+  }
+  return (f32)total;
+#endif
+}
+
 static f32 dot_row(const u8* row, int type, const f32* x, u32 cols, f32* buf){
+  if((type==GXQ_Q4_0 || type==GXQ_Q4_1 || type==GXQ_Q5_0 || type==GXQ_Q5_1) && cols%32==0) return dot_q45(row,type,x,cols);
+  if((type==GXQ_Q8_0 || type==GXQ_Q8_1) && cols%32==0) return dot_q8(row,type,x,cols);
+#ifndef GX_BIG_ENDIAN
+  if(type==GXQ_F32) return gx_dot_f32((const f32*)row,x,cols);
+#endif
   gxq_dequant_row(type, row, buf, cols);
   f64 sum = 0.0;
   u32 i = 0;

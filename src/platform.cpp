@@ -205,7 +205,9 @@ static DWORD WINAPI gx_thread_tramp(LPVOID p){
 gx_thread_t gx_thread_begin(void (*fn)(void*), void* arg){
   gx_thread_arg* a = new gx_thread_arg;
   a->fn = fn; a->arg = arg;
-  return (gx_thread_t)CreateThread(0, 0, gx_thread_tramp, a, 0, 0);
+  HANDLE h=CreateThread(0, 0, gx_thread_tramp, a, 0, 0);
+  if(!h) delete a;
+  return (gx_thread_t)h;
 }
 void gx_thread_join(gx_thread_t t){
   HANDLE h = (HANDLE)t;
@@ -229,29 +231,45 @@ struct gx_pf_job{
 };
 static gx_pf_job g_pf;
 static HANDLE g_pf_ev[2] = {0, 0};
+static HANDLE g_pf_done=0;
+static volatile bool g_pf_stop=false;
+static bool g_pf_broken=false;
 
 static void gx_pf_worker(void* arg){
   long id = (long)arg;
+  XSetThreadProcessor(GetCurrentThread(),id==0 ? 2 : 4);
   for(;;){
     WaitForSingleObject(g_pf_ev[id], INFINITE);
+    if(g_pf_stop) return;
     size_t n = g_pf.n;
     size_t chunk = (n + 2) / 3;
     size_t lo = chunk * (size_t)(id + 1);
     size_t hi = lo + chunk;
     if(hi > n) hi = n;
     g_pf.fn((int)(id + 1), lo, hi, g_pf.user);
-    InterlockedDecrement(&g_pf.left);
+    if(InterlockedDecrement(&g_pf.left)==0) SetEvent(g_pf_done);
   }
 }
 
 void gx_parallel_range(size_t n, void (*fn)(int, size_t, size_t, void*), void* user){
   if(n == 0) return;
+  if(g_pf_broken){fn(0,0,n,user);return;}
   if(!g_pf_ev[0]){
     g_pf_ev[0] = CreateEvent(0, FALSE, FALSE, 0);
     g_pf_ev[1] = CreateEvent(0, FALSE, FALSE, 0);
-    gx_thread_begin(gx_pf_worker, (void*)0);
-    gx_thread_begin(gx_pf_worker, (void*)1);
-    gx_sleep_ms(50);
+    g_pf_done=CreateEvent(0,FALSE,FALSE,0);
+    gx_thread_t threads[2]={0,0};
+    if(g_pf_ev[0] && g_pf_ev[1] && g_pf_done){
+      threads[0]=gx_thread_begin(gx_pf_worker,(void*)0);
+      threads[1]=gx_thread_begin(gx_pf_worker,(void*)1);
+    }
+    if(!threads[0] || !threads[1]){
+      g_pf_stop=true;g_pf_broken=true;
+      for(int i=0;i<2;++i){if(g_pf_ev[i]) SetEvent(g_pf_ev[i]);gx_thread_join(threads[i]);if(g_pf_ev[i]) CloseHandle(g_pf_ev[i]);g_pf_ev[i]=0;}
+      if(g_pf_done) CloseHandle(g_pf_done);g_pf_done=0;
+      fn(0,0,n,user);return;
+    }
+    CloseHandle((HANDLE)threads[0]);CloseHandle((HANDLE)threads[1]);
   }
   size_t chunk = (n + 2) / 3;
   size_t mid = chunk;
@@ -263,10 +281,18 @@ void gx_parallel_range(size_t n, void (*fn)(int, size_t, size_t, void*), void* u
   SetEvent(g_pf_ev[0]);
   SetEvent(g_pf_ev[1]);
   fn(0, 0, mid, user);
-  while(InterlockedCompareExchange(&g_pf.left, 0, 0) != 0) gx_sleep_ms(0);
+  WaitForSingleObject(g_pf_done,INFINITE);
 }
 #else
 void gx_parallel_range(size_t n, void (*fn)(int, size_t, size_t, void*), void* user){
   fn(0, 0, n, user);
 }
 #endif
+
+void gx_inference_thread(){
+#ifdef _XBOX
+  // Xenon's SMT pairs are 0/1, 2/3 and 4/5. Keep inference on one hardware
+  // thread of each physical core; the two matrix workers use 2 and 4.
+  XSetThreadProcessor(GetCurrentThread(),0);
+#endif
+}

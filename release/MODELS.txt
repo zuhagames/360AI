@@ -1,4 +1,4 @@
-360AI 1.1 - local model choices
+360AI 1.1.1 - local model choices
 ==============================
 
 Model                              Model files   Reserve free   Mode

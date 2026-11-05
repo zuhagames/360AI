@@ -1,3 +1,24 @@
+360AI 1.1.1 - performance patch
+================================
+
+- Direct Q4/Q5/Q8 CPU/VMX dot products; faster grouped Q4_K/Q5_K decoding.
+- Assigned matrix workers to separate Xenon physical cores, replacing
+  inherited single-hardware-thread execution and polling waits.
+- Compute Auto compares real-weight CPU/GPU timing and numerical parity.
+- Weight storage Auto chooses RAM when weights and working memory fit.
+- Matching conversation prefixes reuse KV data instead of full reprocessing.
+- Single-row disk reads no longer fetch the full 8 MB cache.
+- Prompt progress, elapsed time, actual decode speed and performance logs.
+- Console reply token limit is adjustable, default 128 (previously up to 512).
+
+VALIDATION
+Xbox SDK build and eight protocol/tokenizer/package groups passed. Native
+checks cover kernels, prefix edits, reload/clear, cancellation and trimming.
+Real-model cache tests match output tokens and valid KV entries exactly.
+Same host prompt/output: SmolLM2 7.10 -> 2.14 seconds; Gemma 5.49 -> 1.87.
+These are Windows CPU measurements. Xbox VMX/core/backend performance
+remains a physical-console validation task. Large HDD models stay slow.
+
 360AI 1.1
 ==========
 

@@ -190,21 +190,25 @@ static void k_scale_min(const u8* packed,size_t group,int& scale,int& minimum){
 static void dq_q4_k(const u8* p,f32* out,size_t n){
   for(size_t b=0;b<n/256;++b){
     const u8* block=p+b*144; f32 d=half_at(block), dm=half_at(block+2);
-    for(size_t i=0;i<256;++i){
-      int scale,minimum; k_scale_min(block+4,i/32,scale,minimum);
-      int quant=(block[16+(i/64)*32+i%32]>>(i%64<32 ? 0 : 4))&15;
-      out[b*256+i]=d*scale*quant-dm*minimum;
+    for(size_t group=0;group<8;++group){
+      int scale,minimum;k_scale_min(block+4,group,scale,minimum);
+      f32 ds=d*scale,ms=dm*minimum;
+      const u8* q=block+16+(group/2)*32;u32 shift=(group%2)*4;
+      for(size_t j=0;j<32;++j) out[b*256+group*32+j]=ds*((q[j]>>shift)&15)-ms;
     }
   }
 }
 static void dq_q5_k(const u8* p,f32* out,size_t n){
   for(size_t b=0;b<n/256;++b){
     const u8* block=p+b*176; f32 d=half_at(block), dm=half_at(block+2);
-    for(size_t i=0;i<256;++i){
-      int scale,minimum; k_scale_min(block+4,i/32,scale,minimum);
-      int low=(block[48+(i/64)*32+i%32]>>(i%64<32 ? 0 : 4))&15;
-      int high=(block[16+i%32]>>(i/32))&1;
-      out[b*256+i]=d*scale*(low|(high<<4))-dm*minimum;
+    for(size_t group=0;group<8;++group){
+      int scale,minimum;k_scale_min(block+4,group,scale,minimum);
+      f32 ds=d*scale,ms=dm*minimum;
+      const u8* q=block+48+(group/2)*32;u32 shift=(group%2)*4;
+      for(size_t j=0;j<32;++j){
+        int low=(q[j]>>shift)&15,high=(block[16+j]>>group)&1;
+        out[b*256+group*32+j]=ds*(low|(high<<4))-ms;
+      }
     }
   }
 }

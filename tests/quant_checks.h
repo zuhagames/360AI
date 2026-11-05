@@ -2,6 +2,24 @@
 // three blocks. This catches signed offsets, packed bitplanes and block strides.
 static void put_half(u8* dst,f32 f){ u16 h=gx_le16(gx_f32_to_f16(f)); memcpy(dst,&h,2); }
 static void quant_checks(){
+  const u32 widths[]={32,96,576,640,2048};
+  for(int format=0;format<2;++format) for(size_t w=0;w<5;++w){
+    u32 cols=widths[w],stride=(cols/32)*(format ? 36 : 34),rows=257;
+    std::vector<u8> weights(1+(size_t)stride*rows);std::vector<f32> input(cols),scratch(cols),decoded(cols),out(rows);
+    for(u32 i=0;i<cols;++i) input[i]=((int)((i*31)%47)-23)*0.0625f;
+    for(u32 r=0;r<rows;++r) for(u32 b=0;b<cols/32;++b){
+      u8* p=&weights[1+(size_t)r*stride+b*(format ? 36 : 34)];
+      put_half(p,((int)((r+b)%7)-3)*0.0009765625f);
+      for(u32 j=0;j<32;++j) p[(format ? 4 : 2)+j]=(u8)((r*71+b*13+j*17)%256);
+    }
+    int type=format ? GXQ_Q8_1 : GXQ_Q8_0;
+    gx_matvec_rows(&weights[1],type,cols,stride,&input[0],&out[0],rows,&scratch[0]);
+    for(u32 r=0;r<rows;++r){
+      gxq_dequant_row(type,&weights[1+(size_t)r*stride],&decoded[0],cols);
+      double expected=0;for(u32 c=0;c<cols;++c) expected+=(double)decoded[c]*input[c];
+      assert(fabs(out[r]-expected)<0.0001+fabs(expected)*0.00001);
+    }
+  }
   const int types[]={GXQ_Q4_0,GXQ_Q4_1,GXQ_Q5_0,GXQ_Q5_1,GXQ_Q8_0,GXQ_Q8_1,
     GXQ_Q2_K,GXQ_Q3_K,GXQ_Q4_K,GXQ_Q5_K,GXQ_Q6_K,GXQ_Q8_K};
   for(size_t t=0;t<sizeof(types)/sizeof(types[0]);++t){
@@ -82,5 +100,15 @@ static void quant_checks(){
     gxq_dequant_row(type,&data[0],&actual[0],count*3);
     for(size_t i=0;i<expected.size();++i) assert(actual[i]==expected[i]);
     for(size_t i=expected.size();i<actual.size();++i) assert(actual[i]==12345);
+    // Matrix kernels must agree with independent decoded weights, including
+    // multiple Q8 blocks, signed extrema, odd row alignment and both strides.
+    const size_t rows=3,cols=count*3;
+    std::vector<u8> matrix(data.size()*rows+1,0);
+    for(size_t r=0;r<rows;++r) memcpy(&matrix[1+r*data.size()],&data[0],data.size());
+    std::vector<f32> input(cols),scratch(cols);f32 result[3];
+    for(size_t i=0;i<cols;++i) input[i]=((int)((i*17)%23)-11)*0.03125f;
+    gx_matvec_rows(&matrix[1],type,(u32)cols,(u32)data.size(),&input[0],result,rows,&scratch[0]);
+    double dot=0;for(size_t i=0;i<cols;++i) dot+=(double)expected[i]*input[i];
+    for(size_t r=0;r<rows;++r) assert(fabs(result[r]-dot)<0.0001+fabs(dot)*0.00001);
   }
 }

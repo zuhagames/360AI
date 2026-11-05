@@ -1,4 +1,4 @@
-360AI 1.1 - Xbox 360 USB package
+360AI 1.1.1 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -9,7 +9,9 @@ INSTALL
 4. Safely eject the USB, connect it to your modded Xbox 360, and open
    the 360AI folder with your existing XEX launcher (Aurora/XEXMenu).
 5. Launch 360AI.xex, select either included GGUF and choose Load model.
-   RAM loading is recommended for the included models.
+   Leave Compute backend and Weight storage on Auto. Auto selects RAM
+   when the model and working memory fit, and benchmarks CPU/GPU.
+   SmolLM2 135M is a good starting point for responsive local chat.
 
 Example USB layout:
   USB:/360AI/360AI.xex
@@ -39,11 +41,15 @@ Keep all split GGUF files together and select the first shard. The browser
 shows their total storage requirement. Large models can be extremely slow.
 Start with context 256-512. This app requires unsigned-XEX support.
 
-GPU OPTION
-GPU matrix math uses Xenos pixel shaders. It is experimental and is
-enabled only when the startup numerical check passes. CPU fallback
-remains available. Speedup and full GPU correctness still need console
-testing. Diagnostics appear in settings and in 360AI.log in this folder.
+PERFORMANCE
+Compute backend Auto uses a short CPU/GPU numerical and timing comparison.
+GPU math uses Xenos pixel shaders; Auto keeps it only when the sample is
+correct and at least 20% faster. Forced GPU remains experimental.
+The chat footer and 360AI.log show which backend/storage were selected.
+Matching conversation history is reused. Prompt progress and elapsed time
+are displayed while processing; tokens/second measures generation itself.
+Console replies default to 128 tokens; change Reply token limit if needed.
+Xbox speed and full GPU correctness still need physical-console testing.
 
 OPTIONAL OPENAI / MCP SERVER
 Turn OpenAI / MCP server ON before loading the model. Use the IP and

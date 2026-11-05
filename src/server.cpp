@@ -251,6 +251,7 @@ static void handle_client(SOCKET s){
     health["version"]=Json(GX_VERSION);
     health["status"]=Json(engine && engine->ready() ? (engine->storage_ok() ? "ok" : "storage_error") : "no model");
     health["backend"]=Json(gx_gpu_status()); health["gpu_diagnostic"]=Json(gx_gpu_diagnostic());
+    health["backend_selection"]=Json(engine ? engine->backend_note() : "no model");
     health["weight_storage"]=Json(engine && engine->disk_streaming() ? "HDD/USB stream (8 MB cache)" : "RAM");
     health["storage_ok"]=Json::boolean(engine && engine->storage_ok());
     health["api_base"]=Json("/v1"); health["completions"]=Json("POST /v1/completions with a JSON prompt");

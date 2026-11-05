@@ -2,6 +2,9 @@
 #define GEMMA_XEX_OPS_H
 
 #include "common.h"
+
+f32 gx_dot_f32(const f32* x,const f32* y,size_t n);
+void gx_accum_scaled(f32* out,const f32* x,f32 scale,size_t n);
 #include "quant.h"
 
 void gx_rmsnorm(const f32* x, const f32* w, f32* out, size_t n, f32 eps);

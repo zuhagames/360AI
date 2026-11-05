@@ -4,6 +4,7 @@
 #include "mcp.h"
 #include "server.h"
 #include "app.h"
+#include "gpu.h"
 #include <assert.h>
 #include <iostream>
 #include <algorithm>
@@ -53,6 +54,33 @@ static void cancel_after_token(int,const char*,void* user){
 static void checks(){
   quant_checks();
   sampling_checks();
+  assert(gx_gpu_prefer(2,1,true) && !gx_gpu_prefer(1,2,true));
+  assert(!gx_gpu_prefer(1,0.9,true) && !gx_gpu_prefer(2,1,false));
+  assert(!gx_gpu_prefer(0,0,true) && !gx_gpu_prefer(1,-1,true));
+  {
+    Engine engine;assert(engine.load(path("qwen2").c_str(),0,false,true));assert(!engine.disk_streaming());
+    engine.select_backend(0);assert(!gx_gpu_enabled());
+    KVCache warm,cold;warm.init(32,1,2,1);cold.init(32,1,2,1);
+    EngineCfg ec={0,1,true,0};std::vector<int> prompt(6,4),a,b;
+    engine.generate(prompt,a,4,warm,ec);assert(engine.stats().reused_tokens==0);
+    engine.generate(prompt,b,4,warm,ec);assert(a==b && engine.stats().reused_tokens==5);
+    prompt.push_back(4);prompt.push_back(4);
+    engine.generate(prompt,a,4,warm,ec);assert(engine.stats().reused_tokens>=6);
+    engine.generate(prompt,b,4,cold,ec);assert(a==b);
+    for(size_t i=0;i<cold.tokens.size();++i){
+      for(int d=0;d<2;++d){assert(warm.k_row(0,(u32)i)[d]==cold.k_row(0,(u32)i)[d]);assert(warm.v_row(0,(u32)i)[d]==cold.v_row(0,(u32)i)[d]);}
+    }
+    prompt[2]=5;engine.generate(prompt,a,4,warm,ec);assert(engine.stats().reused_tokens==2);
+    cold.clear();engine.generate(prompt,b,4,cold,ec);assert(a==b);
+    warm.clear();engine.generate(prompt,a,4,warm,ec);assert(engine.stats().reused_tokens==0);
+    assert(engine.load(path("qwen2").c_str()));engine.generate(prompt,a,4,warm,ec);assert(engine.stats().reused_tokens==0);
+    // Cancellation keeps only successfully evaluated tokens reusable.
+    CancelAfterToken cancel={false,0};EngineCfg stopped=ec;stopped.stop=&cancel.stop;
+    engine.generate(prompt,a,4,warm,stopped,cancel_after_token,&cancel);assert(a.size()==1);
+    engine.generate(prompt,a,4,warm,ec);cold.clear();engine.generate(prompt,b,4,cold,ec);assert(a==b);
+    KVCache trimmed;trimmed.init(4,1,2,1);
+    engine.generate(prompt,a,2,trimmed,ec);engine.generate(prompt,b,2,trimmed,ec);assert(a==b && engine.stats().reused_tokens==3);
+  }
   {GGUF g;assert(g.load(path("smollm-missing-byte").c_str()));Tokenizer tok;assert(tok.load(g));
     std::vector<int> ids;tok.encode(std::string(1,'\x04')+"abc",ids);assert(ids.size()==1 && ids[0]==258);}
   {
@@ -62,6 +90,7 @@ static void checks(){
     TensorView matrix; matrix.type=GXQ_F32;matrix.rows=10000;matrix.cols=256;matrix.row_stride=1024;
     matrix.source=t->source;matrix.offset=t->data_off;matrix.cache=&cache;matrix.ok=true;
     f32 input[256],row[256];for(int c=0;c<256;++c) input[c]=(c%7-3)*0.125f;
+    assert(matrix.row_dequant(0,row));assert(cache.length<cache.capacity/8);
     std::vector<f32> out(10000);assert(matrix.matvec(input,&out[0],out.size(),row));
     for(int r=0;r<10000;++r){
       double expected=0;for(int c=0;c<256;++c) expected+=((r+c)%13-6)*0.0625*input[c];
@@ -160,7 +189,7 @@ static void checks(){
 }
 int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
-  if(argc>2 && (std::string(argv[1])=="--model" || std::string(argv[1])=="--model-stream" || std::string(argv[1])=="--compare-model")){
+  if(argc>2 && (std::string(argv[1])=="--model" || std::string(argv[1])=="--model-stream" || std::string(argv[1])=="--compare-model" || std::string(argv[1])=="--bench-cache")){
     gx_set_debug_level(GX_DEBUG_WARN);
     bool stream=std::string(argv[1])=="--model-stream";
     Engine engine; if(!engine.load(argv[2],0,stream)) return 1;
@@ -175,6 +204,24 @@ int main(int argc,char** argv){
     std::string text=engine.tok().decode(out);
     if(text.empty()) return 2;
     std::cout<<"Generated "<<out.size()<<" tokens in "<<gx_time_seconds()-start<<" seconds: "<<text<<std::endl;
+    if(std::string(argv[1])=="--bench-cache"){
+      std::vector<int> repeated;engine.generate(ids,repeated,12,cache,ec);
+      if(repeated!=out || engine.stats().reused_tokens!=ids.size()-1) return 5;
+      std::cout<<"Repeated prompt: "<<engine.stats().reused_tokens<<" cached tokens, first token "<<engine.stats().first_token_seconds<<" seconds\n";
+      messages.push_back(std::make_pair(std::string("assistant"),text));
+      messages.push_back(std::make_pair(std::string("user"),std::string("What do you think about the Xbox 360?")));
+      engine.tok().encode_prompt(engine.tok().chat_prompt(messages),ids);
+      engine.generate(ids,repeated,8,cache,ec);GenerationStats warm_stats=engine.stats();
+      if(!warm_stats.reused_tokens) return 6;
+      KVCache fresh;fresh.init(256,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
+      engine.generate(ids,out,8,fresh,ec);
+      if(repeated!=out || cache.tokens!=fresh.tokens) return 7;
+      for(u32 l=0;l<c.num_layers;++l) for(u32 pos=0;pos<fresh.tokens.size();++pos) for(u32 d=0;d<c.layer.kv_heads*c.layer.qkv_dim;++d){
+        if(cache.k_row(l,pos)[d]!=fresh.k_row(l,pos)[d] || cache.v_row(l,pos)[d]!=fresh.v_row(l,pos)[d]) return 8;
+      }
+      std::cout<<"Follow-up: "<<warm_stats.reused_tokens<<"/"<<warm_stats.prompt_tokens<<" cached tokens, first token "<<warm_stats.first_token_seconds
+        <<" vs "<<engine.stats().first_token_seconds<<" seconds fresh; tokens and valid KV entries match exactly\n";
+    }
     if(std::string(argv[1])=="--compare-model"){
       Engine disk;if(!disk.load(argv[2],0,true)) return 3;
       KVCache streamed;streamed.init(256,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
