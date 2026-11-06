@@ -1,4 +1,5 @@
 #include "json.h"
+#include "textstream.h"
 #include <float.h>
 
 const Json& Json::get(const char* key) const{
@@ -111,7 +112,7 @@ struct Parser{
 };
 }
 bool Json::parse(const std::string& s,Json& out){
-  if(s.size()>1024*1024) return false;
+  if(s.size()>1024*1024 || !gx_utf8_valid(s)) return false;
   Parser p(s); Json j; if(!p.value(j,0)) return false; p.ws(); if(p.p!=s.size()) return false;
   out=j; return true;
 }

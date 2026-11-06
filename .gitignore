@@ -4,3 +4,9 @@ bridge/mcp.json
 bridge/*.local.json
 *.log
 *.gguf
+/360AI.json
+/360AI.json.bak
+/360AI.json.tmp
+/360AI.json.bak.tmp
+/360AI-chat.txt
+/360AI-chat.txt.tmp

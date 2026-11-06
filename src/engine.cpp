@@ -280,6 +280,7 @@ int Engine::sample(const EngineCfg& ecfg){
   return (int)idx[k-1];
 }
 
+static bool cancelled(const EngineCfg& c){return (c.stop && *c.stop) || (c.cancel && *c.cancel);}
 int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_tokens,
                      int max_new, KVCache& kv, const EngineCfg& ecfg,
                      void (*on_token)(int, const char*, void*), void* user,
@@ -318,13 +319,13 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
   }
 
   for(size_t i = reused; i + 1 < pr.size(); ++i){
-    if(ecfg.stop && *ecfg.stop){ out_tokens.clear(); return 0; }
-    if(!forward(pr, i, i, false, kv)){out_tokens.clear();return 0;}
+    if(cancelled(ecfg)){stats_.end_reason=GE_CANCELLED;out_tokens.clear();return 0;}
+    if(!forward(pr, i, i, false, kv)){stats_.end_reason=GE_ERROR;out_tokens.clear();return 0;}
     kv.tokens.push_back(pr[i]);++stats_.evaluated_tokens;
     if(on_prefill) on_prefill((u32)(i+1),(u32)pr.size(),user);
   }
-  if(ecfg.stop && *ecfg.stop){ out_tokens.clear(); return 0; }
-  if(!forward(pr, pr.size() - 1, pr.size() - 1, true, kv)){out_tokens.clear();return 0;}
+  if(cancelled(ecfg)){stats_.end_reason=GE_CANCELLED;out_tokens.clear();return 0;}
+  if(!forward(pr, pr.size() - 1, pr.size() - 1, true, kv)){stats_.end_reason=GE_ERROR;out_tokens.clear();return 0;}
   kv.tokens.push_back(pr.back());++stats_.evaluated_tokens;
   stats_.prefill_seconds=gx_time_seconds()-started;
   if(on_prefill) on_prefill((u32)pr.size(),(u32)pr.size(),user);
@@ -339,18 +340,20 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
 
   size_t pos = pr.size();
   for(int g = 0; g < max_new; ++g){
-    if(ecfg.stop && *ecfg.stop) break;
+    if(cancelled(ecfg)){stats_.end_reason=GE_CANCELLED;break;}
     if(g < 24 && gx_get_debug_level() == GX_DEBUG_ALL){
       std::string t = tok_.decode_token(next);
       GX_LOG_ALL("gen: tok %d %s%s", next, t.c_str(), tok_.is_stop(next) ? " [stop]" : "");
     }
-    if(tok_.is_stop(next)) break;
+    if(tok_.is_stop(next)){stats_.end_reason=GE_STOP;break;}
     out_tokens.push_back(next);
     if(out_tokens.size()==1) stats_.first_token_seconds=gx_time_seconds()-started;
     if(on_token) on_token(next, tok_.decode_token(next).c_str(), user);
-    if(g + 1 >= max_new || pos >= kv.seq_len || (ecfg.stop && *ecfg.stop)) break;
+    if(cancelled(ecfg)){stats_.end_reason=GE_CANCELLED;break;}
+    if(g+1>=max_new){stats_.end_reason=GE_LIMIT;break;}
+    if(pos>=kv.seq_len){stats_.end_reason=GE_CONTEXT;break;}
     std::vector<int> one(1, next);
-    if(!forward(one, 0, pos, true, kv)){out_tokens.clear();return 0;}
+    if(!forward(one, 0, pos, true, kv)){stats_.end_reason=GE_ERROR;out_tokens.clear();return 0;}
     kv.tokens.push_back(next);++stats_.evaluated_tokens;
     pos++;
     next = sample(ecfg);

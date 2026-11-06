@@ -32,6 +32,8 @@ struct AppSettings{
   int reply_tokens;
 
   AppSettings();
+  bool load(const char* path);
+  bool save(const char* path) const;
 };
 
 class App{
@@ -88,11 +90,15 @@ private:
   std::vector<std::pair<int,std::string> > turns_;
   std::string chat_log_;
   std::string user_input_;
+  std::string chat_notice_;
 
   void browse_frame();
   void settings_frame();
   void loading_frame();
   void chat_frame();
+  void save_settings();
+  void new_chat();
+  void export_chat();
 
   void kb_open(int mode, const char* title, const char* desc, const std::string& initial);
   void kb_draw();

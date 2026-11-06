@@ -186,6 +186,7 @@ gx_mutex_t gx_mutex_create(){
   return (gx_mutex_t)cs;
 }
 void gx_mutex_lock(gx_mutex_t m){ EnterCriticalSection((CRITICAL_SECTION*)m); }
+bool gx_mutex_try_lock(gx_mutex_t m){return TryEnterCriticalSection((CRITICAL_SECTION*)m)!=0;}
 void gx_mutex_unlock(gx_mutex_t m){ LeaveCriticalSection((CRITICAL_SECTION*)m); }
 void gx_mutex_destroy(gx_mutex_t m){
   CRITICAL_SECTION* cs = (CRITICAL_SECTION*)m;
@@ -216,6 +217,7 @@ void gx_thread_join(gx_thread_t t){
 #else
 gx_mutex_t gx_mutex_create(){ return 0; }
 void gx_mutex_lock(gx_mutex_t m){ (void)m; }
+bool gx_mutex_try_lock(gx_mutex_t m){(void)m;return true;}
 void gx_mutex_unlock(gx_mutex_t m){ (void)m; }
 void gx_mutex_destroy(gx_mutex_t m){ (void)m; }
 gx_thread_t gx_thread_begin(void (*fn)(void*), void* arg){ fn(arg); return 0; }
@@ -295,4 +297,29 @@ void gx_inference_thread(){
   // thread of each physical core; the two matrix workers use 2 and 4.
   XSetThreadProcessor(GetCurrentThread(),0);
 #endif
+}
+
+bool gx_read_text_file(const char* path,std::string& text,size_t limit){
+  FILE* f=fopen(path,"rb");if(!f) return false;
+  text.clear();char buffer[4096];size_t n;
+  while((n=fread(buffer,1,sizeof(buffer),f))!=0){
+    if(n>limit-text.size()){fclose(f);text.clear();return false;}
+    text.append(buffer,n);
+  }
+  bool ok=ferror(f)==0;fclose(f);return ok;
+}
+bool gx_write_text_file(const char* path,const std::string& text){
+  std::string temp=std::string(path)+".tmp";
+  FILE* f=fopen(temp.c_str(),"wb");if(!f) return false;
+  bool ok=fwrite(text.data(),1,text.size(),f)==text.size();
+  if(fflush(f)!=0) ok=false;
+  if(fclose(f)!=0) ok=false;
+  if(ok){
+#if defined(_XBOX) || defined(_WIN32)
+    ok=MoveFileExA(temp.c_str(),path,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
+#else
+    ok=rename(temp.c_str(),path)==0;
+#endif
+  }
+  if(!ok) remove(temp.c_str());return ok;
 }

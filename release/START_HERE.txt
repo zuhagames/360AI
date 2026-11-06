@@ -1,4 +1,4 @@
-360AI 1.1.1 - Xbox 360 USB package
+360AI 1.2 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -51,6 +51,20 @@ are displayed while processing; tokens/second measures generation itself.
 Console replies default to 128 tokens; change Reply token limit if needed.
 Xbox speed and full GPU correctness still need physical-console testing.
 
+NEW CHAT CONTROLS AND SAVED SETTINGS
+X: start a new conversation without reloading the model (when idle).
+START: save the current conversation to 360AI-chat.txt (when idle).
+Y: stop a running console reply. B: return to the model list.
+Saving a conversation replaces the previous export; nothing is exported
+automatically. The model and weight files stay loaded for a new chat.
+If an API request is running, new chat reports busy instead of waiting.
+
+Settings are remembered in 360AI.json beside the executable, including
+context, sampling, reply limit, logging and chat/server/backend/storage.
+A previous valid copy is kept in 360AI.json.bak for recovery. These files
+are not bundled in updates. Remove both files to restore defaults.
+The app folder must be writable to save settings and conversations.
+
 OPTIONAL OPENAI / MCP SERVER
 Turn OpenAI / MCP server ON before loading the model. Use the IP and
 port displayed on the console; the default port is 80, then 8080.
@@ -58,6 +72,12 @@ Open http://CONSOLE-IP:PORT/health to check connectivity.
 OpenAI client base URL: http://CONSOLE-IP:PORT/v1
 Generation endpoints require POST with JSON, not browser navigation.
 The server is for your private LAN; it has no authentication.
+
+Requests support temperature, top_k, max_tokens/max_completion_tokens,
+stop strings and streaming usage. Stop strings can span multiple tokens.
+Responses include token usage and timings, and distinguish stop/length.
+For streaming usage add stream_options: {"include_usage": true}.
+Developer-role text messages map to system messages for local templates.
 
 External MCP stdio/HTTPS servers use the bridge source from the project's
 GitHub repository on a PC. See docs/TECHNICAL.md in the repository for setup.

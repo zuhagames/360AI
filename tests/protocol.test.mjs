@@ -103,6 +103,38 @@ for(const streamed of [false,true]) test(`native Xbox HTTP routes (${streamed?'d
     assert.equal((await (await fetch(url+'/v1/models')).json()).data[0].id,'qwen2');
     const completion=await (await post('/v1/completions',{model:'qwen2',prompt:'Say hello.',max_tokens:1,stream:false})).json();
     assert.equal(completion.object,'text_completion'); assert.equal(completion.choices[0].text,'\u0004');
+    assert.equal(completion.choices[0].finish_reason,'length');
+    assert.equal(completion.usage.completion_tokens,1);
+    assert.ok(completion.usage.prompt_tokens>0);
+    assert.equal(completion.usage.total_tokens,completion.usage.prompt_tokens+1);
+    assert.equal(typeof completion.timings.first_token_ms,'number');
+    const overridden=await (await post('/v1/completions',{prompt:'Say hello.',max_completion_tokens:2,temperature:2,top_k:1})).json();
+    assert.equal(overridden.choices[0].text,'\u0004\u0004');assert.equal(overridden.usage.completion_tokens,2);
+    assert.equal(overridden.timings.temperature,2);assert.equal(overridden.timings.top_k,1);
+    assert.notEqual(overridden.id,completion.id);
+    const status=await (await fetch(url+'/health')).json();
+    assert.equal(status.defaults.temperature,0);assert.equal(status.defaults.top_k,40);
+    assert.equal(status.last_generation.generated_tokens,2);
+    const stopped=await (await post('/v1/completions',{prompt:'Say hello.',max_tokens:20,stop:['\u0004\u0004','END']})).json();
+    assert.equal(stopped.choices[0].text,'');assert.equal(stopped.choices[0].finish_reason,'stop');
+    assert.equal(stopped.usage.completion_tokens,2,'stop sequence must cancel before unused token evaluations');
+    const richStream=await (await post('/v1/chat/completions',{messages:[{role:'user',content:'hi'}],max_completion_tokens:2,stream:true,stream_options:{include_usage:true}})).text();
+    const chunks=richStream.split('\n').filter(s=>s.startsWith('data: ') && !s.includes('[DONE]')).map(s=>JSON.parse(s.slice(6)));
+    assert.equal(chunks[0].choices[0].delta.role,'assistant');
+    assert.equal(chunks.filter(c=>c.choices.length).map(c=>c.choices[0].delta.content||'').join(''),'\u0004\u0004');
+    assert.ok(chunks.every(c=>c.id===chunks[0].id));
+    assert.equal(chunks.at(-2).choices[0].finish_reason,'length');
+    assert.deepEqual(chunks.at(-1).choices,[]);assert.equal(chunks.at(-1).usage.completion_tokens,2);
+    assert.ok(chunks.slice(0,-1).every(c=>c.usage===null));
+    const stopStream=await (await post('/v1/chat/completions',{messages:[{role:'user',content:'hi'}],max_tokens:20,stream:true,stop:'\u0004'})).text();
+    const stopChunks=stopStream.split('\n').filter(s=>s.startsWith('data: ') && !s.includes('[DONE]')).map(s=>JSON.parse(s.slice(6)));
+    assert.equal(stopChunks.map(c=>c.choices[0].delta.content||'').join(''),'');
+    assert.equal(stopChunks.at(-1).choices[0].finish_reason,'stop');
+    for(const fields of [{temperature:-1},{temperature:3},{temperature:'0'},{top_k:0},{top_k:201},{top_k:1.5},{stream:'yes'},
+      {stream_options:{include_usage:true}},{stream:true,stream_options:{include_usage:'true'}},{stop:''},{stop:[]},{stop:['a','b','c','d','e']},
+      {stop:42},{max_completion_tokens:0},{max_tokens:1,max_completion_tokens:2}]){
+      assert.equal((await post('/v1/completions',{prompt:'hi',...fields})).status,400,JSON.stringify(fields));
+    }
     for(const origin of ['http://localhost:3000','http://127.0.0.1:8081','http://192.168.1.2:9000','https://10.0.0.2','http://[::1]:3000']){
       const response=await fetch(url+'/v1/models',{headers:{Origin:origin}});
       assert.equal(response.status,200,origin);assert.equal(response.headers.get('access-control-allow-origin'),origin);
@@ -126,6 +158,7 @@ for(const streamed of [false,true]) test(`native Xbox HTTP routes (${streamed?'d
     assert.equal((await fetch(url+'/mcp')).status,405);
     assert.equal((await post('/mcp',{}, {Origin:'http://evil.example'})).status,403);
     assert.equal((await post('/v1/chat/completions',{messages:[{role:'user',content:'x "role" {nested}\n\u010d'}],max_tokens:1})).status,200);
+    assert.equal((await post('/v1/chat/completions',{messages:[{role:'developer',content:'Be brief.'},{role:'user',content:'hi'}],max_completion_tokens:1})).status,200);
     const streamResponse=await post('/v1/completions',{prompt:'hi',max_tokens:1,stream:true},{Origin:'http://localhost:3000'});
     assert.equal(streamResponse.headers.get('access-control-allow-origin'),'http://localhost:3000');
     const stream=await streamResponse.text();

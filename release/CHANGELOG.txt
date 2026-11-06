@@ -1,3 +1,22 @@
+360AI 1.2 - saved settings, chat controls and API improvements
+===========================================================
+
+- Settings saved beside the app with validation and a valid recovery copy.
+- X starts a new chat without reloading; START exports the current chat.
+- Per-request API temperature/top-k, token limit aliases and stop strings.
+- UTF-8 safe streaming and cross-token stop matching without leaking markers.
+- Assistant-role stream starts, progress comments and failed-send cancellation.
+- Token usage, optional stream usage, stop/length reasons and request timings.
+- Developer-role mapping, option validation and malformed UTF-8 rejection.
+- Chat synchronization and thread-start failure handling.
+- Both existing bundled models and all 1.1.1 performance work retained.
+
+VALIDATION
+Xbox SDK build, native settings/Unicode/stop/cache tests and all eight
+protocol/tokenizer/package test groups passed. API tests run in RAM and
+streaming modes. Console controls and file persistence need hardware
+verification. No new Xbox speedup is claimed; large HDD models stay slow.
+
 360AI 1.1.1 - performance patch
 ================================
 

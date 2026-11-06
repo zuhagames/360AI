@@ -27,10 +27,12 @@ struct KVCache{
   size_t bytes() const { return (k.size() + v.size()) * sizeof(f32); }
 };
 
+enum GenerationEnd{GE_NONE,GE_STOP,GE_LIMIT,GE_CONTEXT,GE_CANCELLED,GE_ERROR};
 struct GenerationStats{
   u32 prompt_tokens, reused_tokens, evaluated_tokens, generated_tokens;
   double prefill_seconds, decode_seconds, first_token_seconds;
-  GenerationStats(){prompt_tokens=reused_tokens=evaluated_tokens=generated_tokens=0;prefill_seconds=decode_seconds=first_token_seconds=0;}
+  GenerationEnd end_reason;
+  GenerationStats(){prompt_tokens=reused_tokens=evaluated_tokens=generated_tokens=0;prefill_seconds=decode_seconds=first_token_seconds=0;end_reason=GE_NONE;}
 };
 
 struct EngineCfg{
@@ -38,6 +40,7 @@ struct EngineCfg{
   u32 top_k;
   bool greedy;
   const volatile bool* stop;
+  const volatile bool* cancel;
 };
 
 struct Scratch{

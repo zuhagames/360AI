@@ -3,6 +3,8 @@
 #include "json.h"
 #include "mcp.h"
 #include "gpu.h"
+#include "textstream.h"
+#include <time.h>
 #include "version.h"
 #include <errno.h>
 
@@ -158,35 +160,108 @@ static bool local_origin(const std::string& origin){
 }
 static std::string model_name(){ return engine->cfg().name; }
 struct Generation{
-  SOCKET socket; bool streaming, chat; bool disconnected; std::string text;
+  SOCKET socket;bool streaming,chat,disconnected,include_usage;
+  volatile bool cancelled;std::string text,id;double created,last_heartbeat;
+  EngineCfg config;GenerationStats stats;TextStream filter;u32 input_tokens;
+  Generation():socket(INVALID_SOCKET),streaming(false),chat(false),disconnected(false),include_usage(false),cancelled(false),input_tokens(0){
+    config.temperature=settings ? settings->temperature : 0.8f;
+    config.top_k=settings ? (u32)settings->topk : 40;
+    config.greedy=config.temperature<=0.001f;config.stop=&stopping;config.cancel=&cancelled;
+    created=(double)time(0);last_heartbeat=gx_time_seconds();
+    char name[96];snprintf(name,sizeof(name),"360ai-%u-%.0f",requests,last_heartbeat*1000000);id=name;
+  }
 };
-static void on_token(int,const char* text,void* user){
-  Generation* g=(Generation*)user; g->text+=text;
+static Json last_generation;
+static Json envelope(const Generation& g){
+  Json r=Json::object();r["id"]=Json(g.id);r["created"]=Json(g.created);r["model"]=Json(model_name());
+  r["object"]=Json(g.chat ? (g.streaming ? "chat.completion.chunk" : "chat.completion") : "text_completion");
+  r["choices"]=Json::array();if(g.streaming && g.include_usage) r["usage"]=Json();return r;
+}
+static bool event(Generation* g,const Json& chunk){
+  if(g->disconnected) return false;
+  if(send_all(g->socket,"data: "+chunk.dump()+"\n\n")) return true;
+  g->disconnected=true;g->cancelled=true;return false;
+}
+static void emit_text(Generation* g,const std::string& text){
+  if(text.empty()) return;g->text+=text;
   if(!g->streaming || g->disconnected) return;
-  Json chunk=Json::object(), choice=Json::object();
-  chunk["id"]=Json("xex-completion"); chunk["created"]=Json(0.0);
-  chunk["model"]=Json(model_name()); chunk["object"]=Json(g->chat ? "chat.completion.chunk" : "text_completion");
+  Json chunk=envelope(*g),choice=Json::object();
   choice["index"]=Json(0.0); choice["finish_reason"]=Json();
   if(g->chat) choice["delta"]["content"]=Json(text); else choice["text"]=Json(text);
-  chunk["choices"]=Json::array(); chunk["choices"].items.push_back(choice);
-  if(!send_all(g->socket,"data: "+chunk.dump()+"\n\n")) g->disconnected=true;
+  chunk["choices"].items.push_back(choice);event(g,chunk);
+}
+static void on_token(int token,const char*,void* user){
+  // Token byte pieces can contain NUL; preserve their string length.
+  Generation* g=(Generation*)user;emit_text(g,g->filter.push(engine->tok().decode_token(token)));
+  if(g->filter.stopped()) g->cancelled=true;
+}
+static void on_prefill(u32 done,u32 total,void* user){
+  Generation* g=(Generation*)user;
+  if(!g->streaming || g->disconnected || g->cancelled) return;
+  double now=gx_time_seconds();if(now-g->last_heartbeat<2) return;g->last_heartbeat=now;
+  char progress[96];snprintf(progress,sizeof(progress),": processing %u/%u\n\n",done,total);
+  if(!send_all(g->socket,progress)){g->disconnected=true;g->cancelled=true;}
+}
+static Json timings(const Generation& g){
+  Json r=Json::object();r["input_tokens"]=Json((double)g.input_tokens);
+  r["prompt_tokens"]=Json((double)g.stats.prompt_tokens);r["cached_prompt_tokens"]=Json((double)g.stats.reused_tokens);
+  r["generated_tokens"]=Json((double)g.stats.generated_tokens);
+  r["first_token_ms"]=Json(g.stats.first_token_seconds*1000);r["prefill_ms"]=Json(g.stats.prefill_seconds*1000);
+  r["decode_ms"]=Json(g.stats.decode_seconds*1000);
+  r["decode_tokens_per_second"]=Json(g.stats.generated_tokens>1 && g.stats.decode_seconds>0 ? (g.stats.generated_tokens-1)/g.stats.decode_seconds : 0);
+  r["temperature"]=Json((double)g.config.temperature);r["top_k"]=Json((double)g.config.top_k);return r;
+}
+static Json usage(const Generation& g){
+  Json r=Json::object();r["prompt_tokens"]=Json((double)g.stats.prompt_tokens);
+  r["completion_tokens"]=Json((double)g.stats.generated_tokens);
+  r["total_tokens"]=Json((double)g.stats.prompt_tokens+g.stats.generated_tokens);
+  r["prompt_tokens_details"]["cached_tokens"]=Json((double)g.stats.reused_tokens);return r;
 }
 static std::string complete(const std::string& prompt,int max_tokens,void* user){
-  Generation local; local.socket=INVALID_SOCKET; local.streaming=false; local.chat=false; local.disconnected=false;
+  Generation local;
   Generation* g=user ? (Generation*)user : &local;
   std::vector<int> ids,out; engine->tok().encode_prompt(prompt,ids);
+  g->input_tokens=(u32)ids.size();
   if(engine_mutex) gx_mutex_lock(engine_mutex);
-  EngineCfg ec; ec.temperature=settings->temperature; ec.top_k=(u32)settings->topk;
-  ec.greedy=ec.temperature<=0.001f; ec.stop=&stopping;
-  engine->generate(ids,out,GX_CLAMP(max_tokens,1,512),*cache,ec,on_token,g);
+  g->config.greedy=g->config.temperature<=0.001f;
+  if(!g->cancelled) engine->generate(ids,out,GX_CLAMP(max_tokens,1,512),*cache,g->config,on_token,g,on_prefill);
+  g->stats=engine->stats();
   if(engine_mutex) gx_mutex_unlock(engine_mutex);
+  if(g->filter.stopped()) g->stats.end_reason=GE_STOP;
+  emit_text(g,g->filter.finish());last_generation=timings(*g);
   return g->text;
 }
 static int token_limit(const Json& j){
-  const Json& n=j.get("max_tokens");
-  if(n.type==Json::NIL) return 256;
+  const Json& old=j.get("max_tokens");const Json& modern=j.get("max_completion_tokens");
+  if(old.type!=Json::NIL && modern.type!=Json::NIL && (old.type!=Json::NUMBER || modern.type!=Json::NUMBER || old.number!=modern.number)) return -1;
+  const Json& n=modern.type!=Json::NIL ? modern : old;
+  if(n.type==Json::NIL) return settings ? settings->reply_tokens : 128;
   if(n.type!=Json::NUMBER || n.number<1 || n.number>512 || floor(n.number)!=n.number) return -1;
   return (int)n.number;
+}
+static bool options(const Json& input,Generation& gen){
+  const Json& temp=input.get("temperature");
+  if(temp.type!=Json::NIL){if(temp.type!=Json::NUMBER || temp.number<0 || temp.number>2) return false;gen.config.temperature=(f32)temp.number;}
+  const Json& k=input.get("top_k");
+  if(k.type!=Json::NIL){if(k.type!=Json::NUMBER || k.number<1 || k.number>200 || floor(k.number)!=k.number) return false;gen.config.top_k=(u32)k.number;}
+  const Json& stream=input.get("stream");
+  if(stream.type!=Json::NIL && stream.type!=Json::BOOL) return false;
+  gen.streaming=stream.type==Json::BOOL && stream.flag;
+  const Json& stream_options=input.get("stream_options");
+  if(stream_options.type!=Json::NIL){
+    if(stream_options.type!=Json::OBJECT || !gen.streaming) return false;
+    if(stream_options.has("include_usage")){
+      const Json& u=stream_options.get("include_usage");if(u.type!=Json::BOOL) return false;gen.include_usage=u.flag;
+    }
+  }
+  const Json& stop=input.get("stop");std::vector<std::string> stops;
+  if(stop.type==Json::STRING) stops.push_back(stop.text);
+  else if(stop.type==Json::ARRAY){
+    if(stop.items.empty() || stop.items.size()>4) return false;
+    for(size_t i=0;i<stop.items.size();++i){if(stop.items[i].type!=Json::STRING) return false;stops.push_back(stop.items[i].text);}
+  } else if(stop.type!=Json::NIL) return false;
+  for(size_t i=0;i<stops.size();++i) if(stops[i].empty() || stops[i].size()>256) return false;
+  gen.filter.set_stops(stops);return true;
 }
 static void handle_client(SOCKET s){
   cors_headers.clear();
@@ -254,6 +329,8 @@ static void handle_client(SOCKET s){
     health["backend_selection"]=Json(engine ? engine->backend_note() : "no model");
     health["weight_storage"]=Json(engine && engine->disk_streaming() ? "HDD/USB stream (8 MB cache)" : "RAM");
     health["storage_ok"]=Json::boolean(engine && engine->storage_ok());
+    health["last_generation"]=last_generation;
+    if(settings){health["defaults"]["temperature"]=Json((double)settings->temperature);health["defaults"]["top_k"]=Json((double)settings->topk);health["defaults"]["max_tokens"]=Json((double)settings->reply_tokens);}
     health["api_base"]=Json("/v1"); health["completions"]=Json("POST /v1/completions with a JSON prompt");
     reply(s,200,health.dump()); return;
   }
@@ -290,10 +367,10 @@ static void handle_client(SOCKET s){
     for(size_t i=0;i<msgs.items.size();++i){
       const Json& msg=msgs.items[i]; const Json& role=msg.get("role"); const Json& content=msg.get("content");
       if(role.type!=Json::STRING || content.type!=Json::STRING ||
-         (role.text!="system" && role.text!="user" && role.text!="assistant" && role.text!="tool")){
+         (role.text!="system" && role.text!="developer" && role.text!="user" && role.text!="assistant" && role.text!="tool")){
         reply(s,400,"{\"error\":\"expected text messages\"}"); return;
       }
-      turns.push_back(std::make_pair(role.text,content.text));
+      turns.push_back(std::make_pair(role.text=="developer" ? std::string("system") : role.text,content.text));
     }
     prompt=engine->tok().chat_prompt(turns);
   } else {
@@ -301,27 +378,39 @@ static void handle_client(SOCKET s){
     prompt=input.get("prompt").text;
   }
   int limit=token_limit(input);
-  if(limit<0 || prompt.empty()){ reply(s,400,"{\"error\":\"invalid prompt or max_tokens (1-512)\"}"); return; }
+  if(limit<0 || prompt.empty()){ reply(s,400,"{\"error\":\"invalid prompt or token limit (1-512; max_tokens/max_completion_tokens must agree)\"}"); return; }
   if(!engine->storage_ok()){reply(s,503,"{\"error\":{\"message\":\"Disk read failed. Check HDD/USB and reload the model.\",\"type\":\"storage_error\"}}");return;}
-  Generation gen; gen.socket=s; gen.chat=chat; gen.streaming=input.get("stream").type==Json::BOOL && input.get("stream").flag;
-  gen.disconnected=false;
-  if(gen.streaming) send_all(s,"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n"+cors_headers+"\r\n");
+  Generation gen;gen.socket=s;gen.chat=chat;
+  if(!options(input,gen)){reply(s,400,"{\"error\":\"invalid temperature, top_k, stream options or stop sequences\"}");return;}
+  if(gen.streaming){
+    if(!send_all(s,"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-cache\r\nConnection: close\r\n"+cors_headers+"\r\n")) return;
+    Json first=envelope(gen),choice=Json::object();choice["index"]=Json(0.0);choice["finish_reason"]=Json();
+    if(chat){choice["delta"]["role"]=Json("assistant");choice["delta"]["content"]=Json("");}else choice["text"]=Json("");
+    first["choices"].items.push_back(choice);if(!event(&gen,first)) return;
+  }
   std::string output=complete(prompt,limit,&gen);
   if(!engine->storage_ok()){
     const std::string error="{\"error\":{\"message\":\"Disk read failed. Check HDD/USB and reload the model.\",\"type\":\"storage_error\"}}";
     if(gen.streaming) send_all(s,"data: "+error+"\n\ndata: [DONE]\n\n"); else reply(s,503,error);
     return;
   }
-  Json r=Json::object(), choice=Json::object();
-  r["id"]=Json("xex-completion"); r["created"]=Json(0.0); r["model"]=Json(model_name());
-  r["object"]=Json(chat ? (gen.streaming ? "chat.completion.chunk" : "chat.completion") : "text_completion");
-  choice["index"]=Json(0.0); choice["finish_reason"]=Json("stop");
+  if(gen.disconnected) return;
+  if(gen.stats.end_reason==GE_NONE){
+    const std::string error="{\"error\":\"Prompt could not be encoded into usable tokens.\"}";
+    if(gen.streaming) send_all(s,"data: "+error+"\n\ndata: [DONE]\n\n");else reply(s,400,error);return;
+  }
+  Json r=envelope(gen),choice=Json::object();
+  choice["index"]=Json(0.0);choice["finish_reason"]=Json(gen.stats.end_reason==GE_LIMIT || gen.stats.end_reason==GE_CONTEXT ? "length" : "stop");
   if(chat){
     if(gen.streaming) choice["delta"]=Json::object();
     else { choice["message"]["role"]=Json("assistant"); choice["message"]["content"]=Json(output); }
   } else choice["text"]=Json(gen.streaming ? "" : output);
-  r["choices"]=Json::array(); r["choices"].items.push_back(choice);
-  if(gen.streaming) send_all(s,"data: "+r.dump()+"\n\ndata: [DONE]\n\n"); else reply(s,200,r.dump());
+  r["choices"].items.push_back(choice);r["timings"]=timings(gen);
+  if(gen.streaming){
+    if(!event(&gen,r)) return;
+    if(gen.include_usage){Json total=envelope(gen);total["usage"]=usage(gen);if(!event(&gen,total)) return;}
+    send_all(s,"data: [DONE]\n\n");
+  }else {r["usage"]=usage(gen);reply(s,200,r.dump());}
 }
 static void server_thread(void*){
   while(running){
@@ -340,7 +429,7 @@ static void server_thread(void*){
 }
 bool server_start(Engine* eng,KVCache* kv,AppSettings* set,gx_mutex_t mutex){
   if(running) return true;
-  engine=eng; cache=kv; settings=set; engine_mutex=mutex; stopping=false;
+  engine=eng; cache=kv; settings=set; engine_mutex=mutex; stopping=false;last_generation=Json();
   if(!net_init()) return false; net_started=true; fetch_ip();
   listener=socket(AF_INET,SOCK_STREAM,IPPROTO_TCP);
   if(listener==INVALID_SOCKET){ net_error("socket",socket_error()); net_shutdown(); return false; }

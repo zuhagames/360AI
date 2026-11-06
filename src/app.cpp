@@ -4,6 +4,7 @@
 #include "server.h"
 #include "gpu.h"
 #include "version.h"
+#include "textstream.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -11,6 +12,7 @@
 #include <wchar.h>
 
 static const char* kBrowseDir = "game:";
+static const char* kSettingsPath="game:\\360AI.json";
 
 AppSettings::AppSettings(){
   ctx_size = 512;
@@ -82,6 +84,8 @@ static void utf8_truncate_scroll(const std::string& s, size_t max_chars,
 }
 
 int App::run(){
+  settings_.load(kSettingsPath);
+  gx_set_debug_level(settings_.debug_level);
   if(!gxui_init()) return 1;
 
   std::vector<gx_file_entry> all_files;
@@ -135,6 +139,7 @@ int App::run(){
         model_loaded_ = false;
         turns_.clear();
         chat_log_.clear();
+        chat_notice_.clear();
         screen_ = AS_BROWSE;
       }
     }
@@ -150,6 +155,7 @@ int App::run(){
         screen_ = AS_CHAT;
         if(settings_.server_on) server_start(&engine_, &kv_, &settings_, eng_mutex_);
       } else {
+        if(chat_notice_.empty()) chat_notice_="Model load failed. Check 360AI.log for details.";
         screen_ = AS_SETTINGS;
       }
     }
@@ -213,7 +219,6 @@ void App::browse_frame(){
   if(p & GX_BTN_A){
     model_path_ = std::string(kBrowseDir) + "\\" + files_[file_sel_].name;
     model_name_ = files_[file_sel_].name;
-    if(files_[file_sel_].size>320u*1024u*1024u) settings_.ctx_size=512;
     screen_ = AS_SETTINGS;
   }
 }
@@ -253,6 +258,7 @@ void App::settings_frame(){
   }
 
   f32 my = gx_physical_free() / (1024.0f*1024.0f);
+  if(!chat_notice_.empty()) gxui_text_shadow(40,720-lh*5,GXRGB(220,180,120),"%s",chat_notice_.c_str());
   gxui_text_shadow(40,720-lh*4,GXRGB(150,150,160),"GPU: %s",gx_gpu_diagnostic());
   gxui_text_shadow(40, 720 - lh*3, GXRGB(120,140,120), "Free memory: %.0f MB", my);
 
@@ -291,24 +297,31 @@ void App::settings_frame(){
       case 3:
         settings_.debug_level = (settings_.debug_level + 1) % DC_COUNT;
         gx_set_debug_level(settings_.debug_level);
+        save_settings();
         break;
       case 4:
         settings_.server_on = !settings_.server_on;
+        save_settings();
         break;
       case 5:
         settings_.chat_on = !settings_.chat_on;
+        save_settings();
         break;
       case 6:
         settings_.backend_mode=(settings_.backend_mode+1)%3;
+        save_settings();
         break;
       case 7:
         settings_.weight_mode=(settings_.weight_mode+1)%3;
+        save_settings();
         break;
       case 8:
         {char ib[32];snprintf(ib,sizeof(ib),"%d",settings_.reply_tokens);
         kb_open(KB_REPLY,"Reply token limit","Maximum reply length (16-512)",ib);}
         break;
       case 9:
+        chat_notice_.clear();
+        save_settings();
         gx_gpu_enable(false);
         gx_set_debug_level(settings_.debug_level);
         start_load();
@@ -329,6 +342,7 @@ void App::start_load(){
   load_label_[sizeof(load_label_)-1] = 0;
   gx_thread_join(load_thread_);
   load_thread_ = gx_thread_begin(&App::load_thread, this);
+  if(!load_thread_){loading_=false;load_done_=true;chat_notice_="Could not start model loader. Try a smaller context.";GX_LOG_ERROR("load: could not start worker thread");}
 }
 
 void App::load_thread(void* arg){
@@ -454,15 +468,15 @@ void App::chat_frame(){
     gxui_text_shadow(400, 20, GXRGB(120,180,120), "%s", server_status_text().c_str());
   }
 
-  std::string body = chat_log_;
+  if(gen_mutex_) gx_mutex_lock(gen_mutex_);
+  std::string body = chat_log_,notice=chat_notice_;
   if(generating_){
     body += "Model: ";
-    if(gen_mutex_) gx_mutex_lock(gen_mutex_);
     body += gen_text_;
-    if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
   }
+  if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
 
-  int max_lines = (int)((720.0f - (20.0f + lh*2) - lh*4) / lh);
+  int max_lines = (int)((720.0f - (20.0f + lh*2) - lh*5) / lh);
   if(max_lines < 1) max_lines = 1;
   std::vector<std::string> lines;
   {
@@ -493,9 +507,9 @@ void App::chat_frame(){
     y += lh;
   }
 
-  if(!settings_.chat_on){
-    gxui_text_shadow(40, 720 - lh*3, GXRGB(120,120,130), "Monitoring only (Chat on Xbox off)");
-  }
+  if(!notice.empty()) gxui_text_shadow(40,720-lh*4,GXRGB(180,200,150),"%s",notice.c_str());
+  gxui_text_shadow(40,720-lh,GXRGB(120,130,140),settings_.chat_on ?
+    "A: message   X: new chat   START: save chat   Y: stop   B: models" : "Monitoring API server   B: models");
   if(generating_){
     if(gen_mutex_) gx_mutex_lock(gen_mutex_);
     f32 tps = gen_tps_;
@@ -521,12 +535,38 @@ void App::chat_frame(){
   }
 
   u32 p = gxui_buttons_pressed();
-  if(settings_.chat_on && !generating_ && (p & GX_BTN_A)){
-    kb_open(KB_CHAT, "Your message", "Type your message to the model", "");
-  }
   if(generating_ && (p & GX_BTN_Y)){
     gen_stop_ = true;
+  } else if(settings_.chat_on && !generating_){
+    if(p & GX_BTN_X) new_chat();
+    else if(p & GX_BTN_START) export_chat();
+    else if(p & GX_BTN_A) kb_open(KB_CHAT,"Your message","Type your message to the model","");
   }
+}
+
+void App::save_settings(){
+  if(!settings_.save(kSettingsPath)){
+    chat_notice_="Could not save settings. Check HDD/USB is writable.";
+    GX_LOG_WARN("settings: could not save game:\\360AI.json; check drive is writable");
+  }
+}
+void App::new_chat(){
+  if(eng_mutex_ && !gx_mutex_try_lock(eng_mutex_)){chat_notice_="API request running; try new chat when it finishes.";return;}
+  gx_thread_join(gen_thread_);gen_thread_=0;
+  if(gen_mutex_) gx_mutex_lock(gen_mutex_);
+  kv_.clear();turns_.clear();chat_log_.clear();gen_text_.clear();
+  chat_notice_="New chat started. Model stays loaded.";
+  if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
+  if(eng_mutex_) gx_mutex_unlock(eng_mutex_);
+}
+void App::export_chat(){
+  if(gen_mutex_) gx_mutex_lock(gen_mutex_);
+  std::string text=chat_log_;
+  if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
+  if(text.empty()){chat_notice_="No conversation to save.";return;}
+  text=gx_utf8_clean("360AI "+std::string(GX_VERSION)+" - "+model_name_+"\n\n"+text);
+  chat_notice_=gx_write_text_file("game:\\360AI-chat.txt",text) ?
+    "Saved conversation to 360AI-chat.txt." : "Could not save chat. Check HDD/USB is writable.";
 }
 
 void App::start_generate(const std::string& prompt){
@@ -551,9 +591,11 @@ void App::start_generate(const std::string& prompt){
   gen_tps_ = 0;
   if(gen_mutex_) gx_mutex_lock(gen_mutex_);
   gen_text_.clear();
+  chat_notice_.clear();
   if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
   user_input_ = prompt;
   gen_thread_ = gx_thread_begin(&App::gen_thread, this);
+  if(!gen_thread_){generating_=false;chat_notice_="Could not start generation. Try a smaller context.";}
 }
 
 void App::gen_thread(void* arg){
@@ -569,6 +611,7 @@ void App::do_generate(const std::vector<int>& prompt){
   ec.top_k = (u32)settings_.topk;
   ec.greedy = settings_.temperature <= 0.001f;
   ec.stop = &gen_stop_;
+  ec.cancel=0;
 
   std::vector<int> out;
   int maxn = GX_MIN(settings_.reply_tokens,(int)kv_.seq_len);
@@ -582,19 +625,20 @@ void App::do_generate(const std::vector<int>& prompt){
   }
   if(gen_mutex_) gx_mutex_lock(gen_mutex_);
   gen_text_ = reply;
-  if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
-  turns_.push_back(std::make_pair(1, reply));
-  append_chat("Model: ", reply);
+  if(!reply.empty()){
+    turns_.push_back(std::make_pair(1, reply));
+    append_chat("Model: ", reply);
+  }
   generating_ = false;
   gen_stop_ = false;
+  if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
 }
 
-void App::on_token(int id, const char* text, void* user){
+void App::on_token(int id, const char*, void* user){
   App* a = (App*)user;
-  (void)id;
   double now = gx_time_seconds();
   if(a->gen_mutex_) gx_mutex_lock(a->gen_mutex_);
-  a->gen_text_ += text;
+  a->gen_text_ += a->engine_.tok().decode_token(id);
   if(a->gen_count_ == 0){
     a->gen_first_time_=now;
     a->gen_last_ms_ = (f32)((now - a->gen_start_time_) * 1000.0);
@@ -754,4 +798,5 @@ void App::kb_commit(){
       start_generate(build_fitted_prompt());
     }
   }
+  if(mode!=KB_CHAT) save_settings();
 }

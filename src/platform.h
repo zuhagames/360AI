@@ -20,6 +20,8 @@ int gx_list_dir(const char* dir, const char* ext, std::vector<gx_file_entry>& ou
 
 double gx_time_seconds();
 void gx_sleep_ms(int ms);
+bool gx_read_text_file(const char* path,std::string& text,size_t limit);
+bool gx_write_text_file(const char* path,const std::string& text);
 void gx_inference_thread();
 
 typedef void* gx_thread_t;
@@ -27,6 +29,7 @@ typedef void* gx_mutex_t;
 
 gx_mutex_t gx_mutex_create();
 void gx_mutex_lock(gx_mutex_t m);
+bool gx_mutex_try_lock(gx_mutex_t m);
 void gx_mutex_unlock(gx_mutex_t m);
 void gx_mutex_destroy(gx_mutex_t m);
 

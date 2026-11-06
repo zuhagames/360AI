@@ -14,9 +14,15 @@ After launching the app:
 
 A console capable of running unsigned XEX files is required. The default context is 512 tokens. RAM mode keeps all weights in memory; HDD/USB streaming keeps matrix weights on disk with an 8 MB cache. The tokenizer, scratch buffers, small norm/bias tensors, KV cache, UI and GPU buffers still share the console's 512 MB RAM. Start at context 256–512 and raise it only when memory allows.
 
+## Saved settings and chat controls
+
+Settings are saved to `360AI.json` beside the executable after an edit or loading a model. This includes context, sampling, reply length, compute/storage choices, logging and chat/server toggles. Values are validated before use; missing fields use defaults. Saves write a temporary file before replacing the main file, and keep the previous valid settings in `360AI.json.bak`. A damaged main file can recover from that backup. Neither configuration file is bundled in updates, so copying a new release preserves your preferences. Remove both files to restore defaults. The app folder must be writable to save preferences or exports.
+
+While the console chat is idle, **X** starts a fresh conversation and clears its KV history while keeping the model loaded. If an API request holds the engine, it reports busy. **START** saves the current console conversation as UTF-8 in `360AI-chat.txt`, replacing the previous export. Nothing is exported automatically. **Y** still cancels an active console reply and **B** returns to the model browser. Controller menus and export persistence require physical-console verification.
+
 ## HDD streaming and model downloads
 
-The 1.1.1 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
+The 1.2 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
 
 | Model | Exact model file size | Reserve free disk space | Status |
 | --- | --- | --- | --- |
@@ -89,12 +95,27 @@ The optional Qwen2.5 0.5B Q4_K_M model uses mostly Q5_0 weights. Its same 10-tok
 With the server enabled:
 
 - `GET /v1/models` reports the loaded architecture.
-- `POST /v1/chat/completions` accepts text `messages`, `max_tokens` (1–512), and `stream`.
+- `POST /v1/chat/completions` accepts text `messages` and the request options below. The `developer` role maps to `system` for the local model's template.
 - `POST /v1/completions` accepts `prompt` with the same limits and streaming option.
 - `POST /mcp` exposes the MCP endpoint.
 - `GET /health` (or `/`) checks connectivity and reports the compute backend and GPU diagnostic.
 
-Sampling uses the temperature and top-k chosen on the console. Requests run sequentially and share the inference lock with local chat. This is a limited OpenAI-compatible text API; native OpenAI `tool_calls`, image inputs and per-request sampling overrides are not implemented.
+Requests run sequentially and share the inference lock with local chat. Sampling defaults to the console settings; a request can override it without changing saved preferences. Native OpenAI `tool_calls`, image inputs, nucleus/top-p sampling and per-request context changes are not implemented.
+
+| Request option | Accepted values | Default |
+| --- | --- | --- |
+| `max_tokens` or `max_completion_tokens` | Integer 1–512; both must agree if supplied together | Console reply limit (128 initially) |
+| `temperature` | Number 0–2; 0 selects greedy output | Console setting |
+| `top_k` | Integer 1–200; 360AI extension | Console setting |
+| `stop` | One string or 1–4 strings, each 1–256 UTF-8 bytes | No extra stop strings |
+| `stream` | Boolean | `false` |
+| `stream_options.include_usage` | Boolean; requires streaming | `false` |
+
+Matched stop strings are excluded from returned text, including matches across tokens. Streaming holds incomplete UTF-8 characters and stop prefixes until they can be resolved. It begins with an assistant-role chunk for chat, sends progress comments between prompt-token evaluations when processing is slow, and stops inference after a failed streaming send. A single expensive model evaluation can still exceed a client's timeout.
+
+Responses distinguish `finish_reason: "stop"` from `"length"` (reply or context limit). Non-streamed responses include token `usage`; with streaming, `include_usage: true` requests a final usage chunk with empty `choices` before `[DONE]`. Token counts use the loaded model's tokenizer and include generated tokens consumed by a stop match. These fields follow the supported subset of the [official Chat Completions format](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create) and [stream format](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events).
+
+The final response includes a 360AI `timings` object with input, actual prompt, cached-prefix and generated token counts, first-token/prefill/decode time, decode speed and sampling settings. Input and prompt counts can differ when a request is trimmed to the context. `/health` reports request defaults and a snapshot of the last API/MCP generation. This endpoint is served sequentially, so it does not provide live polling during an active request.
 
 The service is an unauthenticated LAN endpoint. The XEX declares the insecure-socket privilege, and the server configures plaintext LAN access on both listening and accepted Xbox sockets. Public browser origins are rejected; localhost and private-LAN OpenAI web clients can use CORS and OPTIONS preflight. MCP browser origins remain disabled. Do not expose the service to the public internet.
 
@@ -170,7 +191,7 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.1.1`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
+Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.2`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
 
 Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
@@ -205,7 +226,7 @@ Developed by **ZuhaGames & Canyons**. 360AI is a fork of [Canyons' gemma.xex](ht
 The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), and **SmolLM2 135M Instruct**, created by Hugging Face, using [lmstudio-community's GGUF conversion](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF). Their attribution, provenance, and terms are included in the download.
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.1.1">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.2">Get 360AI</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>

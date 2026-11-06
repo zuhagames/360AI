@@ -1,30 +1,32 @@
-# 360AI 1.1.1 — performance patch
+# 360AI 1.2
 
-Download **360AI-1.1.1-USB.zip**, extract it and copy the `360AI` folder to your USB/HDD. Launch `360AI.xex`. Gemma 3 270M and SmolLM2 135M Q8_0 weights are included.
+Download **360AI-1.2-USB.zip**, extract it and copy the `360AI` folder to USB/HDD. Launch `360AI.xex` on your modded Xbox 360. **Gemma 3 270M and SmolLM2 135M weights are included.**
 
-Start with **SmolLM2 135M**, context **512**, **Compute backend: Auto** and **Weight storage: Auto**.
+## What's new
 
-## Changes
+- **Remembered settings:** context, sampling, reply limit, compute/storage choices and chat/server toggles are saved beside the app. Saves replace files through a temporary file and preserve a valid recovery copy.
+- **New chat without reloading:** press **X** while idle to clear the conversation and KV history while keeping the model loaded. An active API request reports busy.
+- **Chat export:** press **START** while idle to save the current conversation as UTF-8 in `360AI-chat.txt`. This replaces the previous export; nothing is exported automatically.
+- **Per-request API controls:** temperature, top-k, `max_tokens` or `max_completion_tokens`, and up to four stop strings. Overrides do not change saved settings.
+- **Better streaming:** Unicode characters and stop strings can span tokens without broken output. Chat streams start with the assistant role, send prompt-progress comments, and cancel inference after a failed streaming send.
+- **Useful API results:** accurate stop/length reasons, token usage, optional final streaming usage, unique request IDs and generation timings. `/health` includes defaults and the last API/MCP timing snapshot.
+- **Client compatibility:** developer-role text maps to system messages for local templates. Invalid options and malformed UTF-8 JSON are rejected clearly.
+- **Reliability:** synchronized chat snapshots and final replies, visible worker-start failures, and consistent generation-end reporting.
 
-- **CPU matrix kernels:** direct Q4/Q5/Q8 calculations avoid repeatedly converting whole weight rows to floats. Xenon uses VMX operations; Q4_K/Q5_K decoding also does less repeated work.
-- **CPU core assignment:** inference and its two matrix workers now run on separate physical cores. The old workers inherited the parent's hardware thread. Completion events replace polling/yielding.
-- **Automatic backend selection:** compares CPU/GPU timing on a small real-weight matrix, checks numerical parity, and uses the GPU only when at least 20% faster. Manual CPU/GPU choices remain available.
-- **Automatic weight storage:** keeps weights in RAM when model, context, scratch buffers and a reserve fit. HDD streaming remains available for larger models.
-- **Conversation cache reuse:** matching history is reused instead of being computed again on every turn. Model/backend changes, edited prefixes, trimming and cancellation are handled explicitly.
-- **Smaller disk reads:** one embedding lookup no longer causes an 8 MB disk read. Large matrix batches still use the bounded 8 MB cache.
-- **Useful progress:** prompt token counts and elapsed processing time are shown. Decode speed excludes prompt processing, and one performance summary is logged per request.
-- **Reply length control:** console replies default to 128 tokens, adjustable from 16 to 512. API limits are unchanged.
+The 1.1.1 CPU kernels, core assignment, Auto compute/storage and history reuse remain included. No additional Xbox speedup is claimed for 1.2.
 
-## Measurements and validation
+## Updating
 
-With the same Windows host compiler, model weights, 16-token prompt and greedy output, SmolLM2's 12-token reply took **2.14 s versus 7.10 s** in 1.1. Gemma's same 3-token reply took **1.87 s versus 5.49 s**. These are host CPU measurements, not Xbox performance promises.
+Replace the executable and guides from the new ZIP. Existing weights are unchanged and may be kept. `360AI.json`, `360AI.json.bak` and exported conversations are not bundled, so updates preserve them. Delete both settings files if you want defaults.
 
-In follow-up tests, SmolLM2 reached the first token in **1.79 s cached versus 3.69 s fresh**, and Gemma in **1.76 s versus 3.15 s**. Output tokens and all valid KV entries matched exactly.
+For local chat, start with **SmolLM2 135M**, context **512**, **Compute: Auto** and **Storage: Auto**. The folder must be writable for settings and exports.
 
-Qwen2.5 0.5B's same 10-token host reply improved from **30.37 s to 17.65 s** with the direct Q5 kernel. Its RAM and streamed outputs/KV match exactly; it remains much slower than the bundled models.
+## Validation and limits
 
-The Xbox SDK build, native numerical/cache tests and all eight protocol/tokenizer/package test groups pass. Tests cover signed Q8 values and alignments, prefix edits, cache clearing, model reloads, cancellation and context trimming. Physical-console VMX performance, core scaling and Auto selection still need validation. Larger HDD models remain experimental and can be extremely slow.
+Built with the Xbox 360 SDK. Native checks cover settings round trips, damaged-file recovery, failed saves, Unicode split boundaries, malformed UTF-8, cross-token stop matching, cancellation and end reasons. HTTP tests cover request overrides, usage, stop sequences, stream role/usage chunks and validation in RAM and disk modes. All eight protocol/tokenizer/package groups pass.
 
-The USB ZIP is the only uploaded asset and includes both models, model downloader/catalog, guides and required model licenses/notices. For an existing installation, replace `360AI.xex` and guides from the new folder; the unchanged weights can be kept.
+Physical-console controller behavior, file persistence, GPU selection and performance still need hardware verification. The API remains a limited text-only compatible server; top-p, native tool calls and image inputs are not implemented. Large HDD models remain experimental and can be extremely slow.
+
+The single USB ZIP includes the executable, both models, model catalog/downloader, guides and required licenses/notices.
 
 Made by **ZuhaGames & Canyons**. A fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma. AI tools assisted with development, debugging and documentation.

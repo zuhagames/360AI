@@ -5,6 +5,7 @@
 #include "server.h"
 #include "app.h"
 #include "gpu.h"
+#include "textstream.h"
 #include <assert.h>
 #include <iostream>
 #include <algorithm>
@@ -52,6 +53,50 @@ static void cancel_after_token(int,const char*,void* user){
   CancelAfterToken* state=(CancelAfterToken*)user; ++state->calls; state->stop=true;
 }
 static void checks(){
+  {
+    const char* file="build/tests/preferences.json";
+    remove(file);remove("build/tests/preferences.json.bak");
+    AppSettings s;s.ctx_size=2048;s.temperature=0.25f;s.topk=17;s.reply_tokens=96;
+    s.backend_mode=1;s.weight_mode=2;s.server_on=true;s.chat_on=false;s.debug_level=2;
+    assert(s.save(file));AppSettings loaded;assert(loaded.load(file));
+    assert(loaded.ctx_size==2048 && loaded.temperature==0.25f && loaded.topk==17 && loaded.reply_tokens==96);
+    assert(loaded.backend_mode==1 && loaded.weight_mode==2 && loaded.server_on && !loaded.chat_on && loaded.debug_level==2);
+    s.ctx_size=4096;assert(s.save(file));assert(loaded.load(file) && loaded.ctx_size==4096);
+    assert(gx_write_text_file(file,"{broken"));assert(loaded.load(file) && loaded.ctx_size==2048);
+    // Repairing a damaged main file must preserve the valid recovery copy.
+    s.ctx_size=1024;assert(s.save(file));assert(gx_write_text_file(file,"{\"context\":-1}"));
+    assert(loaded.load(file) && loaded.ctx_size==2048);
+    assert(!s.save("build/tests/missing-directory/preferences.json"));
+    s.ctx_size=100000;assert(!s.save(file));assert(loaded.load(file) && loaded.ctx_size==2048);
+    remove(file);remove("build/tests/preferences.json.bak");
+    loaded.ctx_size=777;assert(!loaded.load(file) && loaded.ctx_size==777);
+  }
+  {
+    const std::string unicode="Hello \xc5\xbe\xe4\xb8\xad\xf0\x9f\x98\x80!";
+    assert(gx_utf8_valid(unicode));
+    for(size_t cut=0;cut<=unicode.size();++cut){
+      TextStream s;std::string result=s.push(unicode.substr(0,cut));
+      assert(gx_utf8_valid(result));std::string second=s.push(unicode.substr(cut));assert(gx_utf8_valid(second));
+      result+=second;result+=s.finish();assert(result==unicode);
+    }
+    std::vector<std::string> stops;stops.push_back("STOP");stops.push_back("END");
+    const std::string all=unicode+"STOPignored";
+    for(size_t cut=0;cut<=all.size();++cut){
+      TextStream s;s.set_stops(stops);std::string result=s.push(all.substr(0,cut));
+      result+=s.push(all.substr(cut));result+=s.finish();assert(result==unicode && s.stopped());
+    }
+    TextStream partial;partial.set_stops(stops);assert(partial.push("hello ST")=="hello ");assert(partial.finish()=="ST" && !partial.stopped());
+    TextStream split;std::string pieces;
+    for(size_t i=0;i<unicode.size();++i){std::string part=split.push(unicode.substr(i,1));assert(gx_utf8_valid(part));pieces+=part;}
+    pieces+=split.finish();assert(pieces==unicode);
+    TextStream broken;assert(broken.push("\xe2\x82").empty());assert(broken.finish()=="\xef\xbf\xbd");
+    TextStream binary;std::vector<std::string> nul_stop(1,std::string(1,'\0'));binary.set_stops(nul_stop);
+    assert(binary.push(std::string("ok\0hidden",9))=="ok" && binary.stopped());
+    std::vector<std::string> unicode_stop(1,std::string("\xe4\xb8\xad"));TextStream marked;marked.set_stops(unicode_stop);
+    assert(marked.push("hi \xe4")=="hi ");assert(marked.push("\xb8").empty());assert(marked.push("\xad ignored").empty() && marked.stopped());
+    const char* invalid[]={"\xc0\xaf","\xed\xa0\x80","\xf4\x90\x80\x80","\xff","\x80"};
+    for(int i=0;i<5;++i){assert(!gx_utf8_valid(invalid[i]));assert(gx_utf8_valid(gx_utf8_clean(invalid[i])));Json j;assert(!Json::parse(std::string("\"")+invalid[i]+"\"",j));}
+  }
   quant_checks();
   sampling_checks();
   assert(gx_gpu_prefer(2,1,true) && !gx_gpu_prefer(1,2,true));
@@ -80,6 +125,7 @@ static void checks(){
     engine.generate(prompt,a,4,warm,ec);cold.clear();engine.generate(prompt,b,4,cold,ec);assert(a==b);
     KVCache trimmed;trimmed.init(4,1,2,1);
     engine.generate(prompt,a,2,trimmed,ec);engine.generate(prompt,b,2,trimmed,ec);assert(a==b && engine.stats().reused_tokens==3);
+    assert(engine.stats().end_reason==GE_CONTEXT);
   }
   {GGUF g;assert(g.load(path("smollm-missing-byte").c_str()));Tokenizer tok;assert(tok.load(g));
     std::vector<int> ids;tok.encode(std::string(1,'\x04')+"abc",ids);assert(ids.size()==1 && ids[0]==258);}
@@ -147,6 +193,7 @@ static void checks(){
     Engine engine; assert(engine.load(path(name).c_str()));
     KVCache kv; kv.init(32,1,2,1); EngineCfg ec={0,1,true,0}; std::vector<int> out,prompt(1,4);
     assert(engine.generate(prompt,out,1,kv,ec)==1 && out[0]==4);
+    assert(engine.stats().end_reason==GE_LIMIT);
     // A one-token response must not evaluate an unused second token.
     for(int d=0;d<2;++d) assert(kv.k_row(0,1)[d]==0 && kv.v_row(0,1)[d]==0);
     EngineCfg sampled={0.8f,2,false,0};
@@ -172,6 +219,10 @@ static void checks(){
     CancelAfterToken cancelled={false,0}; EngineCfg cancel_cfg=ec; cancel_cfg.stop=&cancelled.stop;
     assert(engine.generate(prompt,out,5,kv,cancel_cfg,cancel_after_token,&cancelled)==1);
     assert(cancelled.calls==1);
+    assert(engine.stats().end_reason==GE_CANCELLED);
+    CancelAfterToken local_cancel={false,0};EngineCfg local_cfg=ec;local_cfg.cancel=&local_cancel.stop;
+    assert(engine.generate(prompt,out,5,kv,local_cfg,cancel_after_token,&local_cancel)==1);
+    assert(engine.stats().end_reason==GE_CANCELLED);
     for(int d=0;d<2;++d) assert(kv.k_row(0,1)[d]==0 && kv.v_row(0,1)[d]==0);
     KVCache empty; assert(engine.generate(prompt,out,1,empty,ec)==0);
     prompt[0]=-1; assert(engine.generate(prompt,out,1,kv,ec)==0);
