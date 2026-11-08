@@ -61,7 +61,12 @@ void ChatView::update(const std::string& body,int columns,int rows){
       // The console font is ASCII: one placeholder per UTF-8 character.
       if((c&0xc0)==0x80) continue;
       if(c>=127) c='?';else if(c<32) c=' ';
-      if((int)line.size()>=columns_){lines_.push_back(line);line.clear();}
+      if((int)line.size()>=columns_){
+        size_t space=line.rfind(' ');
+        if(c==' '){lines_.push_back(line);line.clear();continue;}
+        if(space!=std::string::npos && space>0){lines_.push_back(line.substr(0,space));line=line.substr(space+1);}
+        else {lines_.push_back(line);line.clear();}
+      }
       line+=(char)c;
     }
     if(!line.empty() || lines_.empty()) lines_.push_back(line);

@@ -6,12 +6,17 @@
 #include "engine.h"
 #include "chat.h"
 #include "assistant.h"
+#include "assistant_store.h"
 
 enum app_screen{
   AS_BROWSE=0,
   AS_SETTINGS,
   AS_LOADING,
-  AS_CHAT
+  AS_CHAT,
+  AS_HOME,
+  AS_NOTES,
+  AS_TIMERS,
+  AS_TOOLS
 };
 
 enum debug_cycle{
@@ -19,7 +24,7 @@ enum debug_cycle{
 };
 
 enum kb_kind{
-  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_SYS=0x100
+  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_NOTE_NEW, KB_NOTE_EDIT, KB_TIMER_NEW, KB_SYS=0x100
 };
 
 struct AppSettings{
@@ -48,6 +53,15 @@ public:
   ~App();
 
   int run();
+#ifndef _XBOX
+  void test_frame(u32 buttons);
+  app_screen test_screen() const {return screen_;}
+  void test_seed();
+  bool test_capture(const char* screen,const char* path);
+  const Assistant& test_assistant() const {return assistant_;}
+  bool test_keyboard() const {return kb_mode_!=KB_NONE;}
+  void test_ask(const char* text) {assistant_send(text);}
+#endif
 
 private:
   app_screen screen_;
@@ -60,6 +74,7 @@ private:
   int file_scroll_;
 
   int set_sel_;
+  int home_sel_,tool_sel_,note_sel_,timer_sel_,confirm_id_,edit_id_;
 
   int kb_mode_;
   int kb_cur_;
@@ -74,6 +89,8 @@ private:
   bool model_loaded_;
   bool assistant_mode_;
   Assistant assistant_;
+  AssistantStore assistant_store_;
+  std::string save_status_;
   std::string timer_notice_;
   double timer_notice_until_;
 
@@ -100,11 +117,26 @@ private:
   gx_thread_t gen_thread_, load_thread_;
   std::vector<std::pair<int,std::string> > turns_;
   std::string chat_log_;
+  u64 chat_revision_,view_revision_;
+  int view_tokens_;
+  bool view_generating_;
   std::string user_input_;
   std::string chat_notice_;
   ChatView chat_view_;
+  ChatView note_view_;
+  int note_view_id_;
 
   void browse_frame();
+  void frame();
+  void home_frame();
+  void notes_frame();
+  void timers_frame();
+  void tools_frame();
+  void shell(const char* title,const char* subtitle);
+  void home();
+  void local_command(const std::string& command);
+  void queue_assistant_save();
+  void poll_assistant_save();
   void settings_frame();
   void loading_frame();
   void chat_frame();

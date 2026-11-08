@@ -1,23 +1,18 @@
-# 360AI 1.6 — 360 Assistant
+# 360AI 2.0 — At your service
 
-A native offline keyword and intent assistant is now available without loading any GGUF. On the model list, press **X**, then **A** to enter text. Type **help**. It works even when no model files are present.
+360AI now opens to a native console dashboard with **Assistant, Notes, Timers and Models**. Warm gray panels, numbered sections, sharp edges, green highlights and real Xbox 360 controller prompts give the app its own identity.
 
-- **Calculator:** precedence, parentheses, powers, percentages, sqrt/abs/round, pi/e and ans. English numbers such as “twenty-five” and “one hundred and five” work in calculations, conversions and durations. Invalid syntax, division by zero and oversized expressions fail clearly.
-- **Conversions:** length, mass, temperature, time and byte storage. Follow-up values reuse the last successful unit pair.
-- **Timers/reminders:** up to eight timers with pause, resume, restart, extension, named controls, clarification for duplicate labels and recent alert history. A banner appears across app screens while the app remains open.
-- **Saved notes and name:** search, read, edit and delete by exact note ID. IDs stay unused after deletion/restart. Validated JSON, atomic saves and a previous valid backup protect personal data; old saves migrate automatically.
-- **Teach answers on Xbox:** save up to 16 phrase/answer pairs directly in chat. They return text only, with built-in commands taking priority. List, replace and forget them without editing a file.
-- **Undo:** restore the last change to notes, your name or taught answers within the current app session.
-- **Xbox commands:** status, console time/date, model list, model reply presets, transcript export and return to models.
-- **Intent handling/debugging:** whole-word/phrase matches, polite prefixes, wake phrases, follow-up questions, negation, confirmation for bulk deletion/clearing, conservative typo suggestions and explicit unknown-question fallback. Fixed punctuation after IDs, bare “do not,” negative timer IDs, stale timer references and pending confirmations surviving oversized requests. Invalid saved control characters are rejected.
-- **Further debugging:** `status?`, `notes` and `timer history` interrupt follow-ups correctly. Timer labels retain words such as “the” and “timer”; unknown punctuation selectors do not select a timer. Ordinary taught phrases no longer trigger the calculator. Compact JSON escapes keep multiline notes saveable and undoable within the file limit.
-- **Custom FAQ answers:** edit assistant-rules.json. Rules return text only; they cannot execute actions, scripts or network calls.
-- **Controller keyboard:** parentheses, powers and apostrophes are available in the fallback keyboard, with the grid/footer sized to fit.
+- **Predefined answers:** 106 exact phrase variants cover greetings, thanks, everyday conversation and common questions. Say `hello` for an immediate fixed answer. No model is loaded for these replies. Matching uses a small index built once; ordinary phrases are not mistaken for commands. Saved custom answers remain available.
+- **Quick tools:** open calculations, conversions, a new timer, a new note, taught answers or the command guide from controller menus.
+- **Notes screen:** read, page through, create, edit, confirm deletion and undo using the controller. Note content is treated literally, including text such as `status?`.
+- **Timers screen:** live countdowns, pause/resume, add one minute, restart and confirm cancellation. Timers require 360AI to remain open and are not system alarms.
+- **Faster native drawing:** text and prompts share a 512 KiB texture and batched quads. The previous renderer submitted many small draws per glyph. Chat layout refreshes when the transcript or generation state changes; word wrapping keeps ordinary words intact.
+- **Background saves:** one bounded worker coalesces assistant-data changes into the latest snapshot. Saving/Saved/Not saved is visible; failures retain in-memory data. A stale completion cannot mark newer edits as saved. Existing notes/name/taught answers migrate automatically, with validated JSON, atomic replacement and a valid backup.
+- **Xbox button artwork:** Xelu's CC0 Xbox 360 prompts are embedded in the XEX. No external icon downloads or runtime asset folder is needed. Source/license details are in INPUT_ICONS.txt.
+- **Models:** the ZIP still includes SmolLM2 135M, Gemma 3 270M and two TinyStories models. Model chat, OpenAI-compatible endpoints and MCP remain available through Models. GPU acceleration remains experimental; no new model-inference speedup is claimed.
 
-This is a **text-based rule assistant**, not a language model or Siri-equivalent speech system. Microphone input, speech recognition, spoken replies, live weather/news and internet search are not implemented. Timers require 360AI to stay running; they are not system alarms and do not survive restarting the app. Notes/name persist separately from chat.
+Copy the entire **360AI** folder from **360AI-2.0-USB.zip** to your USB/HDD and launch **360AI.xex**. Select Assistant for predefined replies, or Models for a GGUF. On Home, X opens the input keyboard and Y opens Quick tools. Updates exclude personal notes, settings, exports and custom rules. Wait for **Saved** before closing after an edit.
 
-The full USB package includes the app, assistant guide/rules, all four existing model files, catalog/downloader and required model notices. The assistant itself needs no weights. Personal settings, notes and exports are excluded from updates.
-
-Xbox SDK compilation and native checks cover intent matching, arithmetic errors/precedence, unit dimensions, 78 prompt/command interruption pairs, timer controls/limits/ambiguity/literal labels, note edits/undo, taught answers, save migration, multiline saves, corrupt data and backup recovery, plus 2,000 deterministic malformed-input cases. Existing protocol/tokenizer/package checks protect GGUF features. Physical Xbox menus, keyboard behavior, timer banners and drive persistence still need console validation; host processing measurements do not measure Xbox UI latency.
+Validation includes the Xbox SDK build, native assistant/inference tests, 2,000 malformed-input cases, 78 follow-up interruption pairs, all 106 fixed-reply variants, background-save coalescing/failure handling, controller navigation and native UI captures, plus protocol/tokenizer/package checks and ZIP XEX/model checksums. Host UI captures use the same layout/atlas code; physical Xbox shader rendering, guide keyboard, controller feel and drive behavior still need hardware validation. Desktop timing does not establish Xbox latency or FPS.
 
 Made by **ZuhaGames & Canyons**, expanded from [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex). AI tools assisted development, debugging and documentation.

@@ -8,15 +8,19 @@ Build and command examples below run from the repository root.
 
 After launching the app:
 
-1. Select the model and set the context, sampling, chat and server options before choosing **Load model**.
+1. Home opens Assistant, Notes, Timers or Models. Assistant uses predefined replies and tools without loading a model. For GGUF chat, open Models and set context, sampling, chat and server options before choosing **Load model**.
 2. Leave **Compute backend: Auto** and **Weight storage: Auto** selected. Auto compares a small real-weight matrix on CPU/GPU and uses the GPU only if its result matches and it is at least 20% faster. Storage Auto keeps the model in RAM when weights, scratch/KV buffers and a memory reserve fit. CPU, forced GPU and explicit RAM/streaming overrides remain available.
 3. Enable **OpenAI / MCP server** before loading the model to access the console over your LAN. The chat screen displays its actual address and port (80, or 8080 if 80 cannot be bound).
 
 A console capable of running unsigned XEX files is required. New installs default to a 256-token context and 48-token reply cap; saved preferences are preserved. RAM mode keeps all weights in memory; HDD/USB streaming keeps matrix weights on disk with an 8 MB cache. The tokenizer, scratch buffers, small norm/bias tensors, KV cache, UI and GPU buffers still share the console's 512 MB RAM. Start at context 256–512 and raise it only when memory allows. The model's own context limit still applies.
 
-## 360 Assistant (1.6 builds)
+## 360 Assistant and native UI (2.0)
 
-Press **X on the model list** to open the native keyword/intent assistant, including when no GGUF files are installed. It uses the controller keyboard and does not load a language model. Type `help` for supported commands. This is text input/output; speech recognition and spoken replies are not implemented.
+Select **Assistant on Home**, or press Home X to open input directly. Home Y opens Quick tools. The assistant works with no GGUF files. Its 106 predefined phrase variants use an exact normalized index built once; `hello` gets a fixed reply immediately. It also supports saved text answers and local tools. Type `help` for commands. This is text input/output; speech recognition and spoken replies are not implemented.
+
+The native UI uses a 256x512 ARGB atlas (512 KiB) with the existing bitmap font and Xelu's CC0 Xbox 360 button prompts. Draws batch up to 512 quads, preserving draw order. The decoded CPU atlas is released after upload on Xbox. Chat layout updates on transcript/generation changes and wraps words. Dedicated Notes and Timers screens operate on exact IDs, with confirmation before deletion/cancellation. Guide-keyboard cancellation consumes its input event. See [icon provenance](../assets/input/SOURCE.txt).
+
+Assistant persistence runs on one worker with a single bounded latest-snapshot queue. The UI thread owns Assistant; the worker owns file writes. A completion clears dirty state only when its snapshot matches current data. Save failures retain data in memory and surface Not saved; Saved confirms success. Atomic replacement, validated backups and the 64 KiB bound remain. Wait for Saved before closing after an edit. Native tests cover coalescing, stale acknowledgements, failure handling and controller navigation. Host preview mode renders the same atlas/layout to BMP using `build/tests/native.exe --ui-preview home build/ui/home.bmp`; it does not validate Xbox GPU output or frame rate.
 
 The assistant supports bounded expression parsing with precedence, parentheses, powers, `ans`, `sqrt`, `abs` and `round`; English numbers through thousands; unit conversion with follow-up values; eight session timers with named pause/resume/restart/extend controls; 32 searchable/editable notes; a saved name and up to 16 taught text answers. App status/help, model presets, export and navigation remain available. Note operations require exact IDs; duplicate timer labels ask for clarification. Clearing all notes/chat and cancelling all timers require a yes/no follow-up. Negation and spelling suggestions do not execute commands. Empty/oversized requests cancel waiting confirmations. Unknown questions get an explicit fallback. It processes one supported command per message.
 

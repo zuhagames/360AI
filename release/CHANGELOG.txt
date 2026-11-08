@@ -1,3 +1,19 @@
+360AI 2.0 - At your service
+==========================
+
+- Native Home with Assistant, Notes, Timers and Models; Quick tools shortcuts.
+- Warm gray/ink/green console design with embedded Xelu Xbox 360 CC0 icons.
+- 106 fixed phrase variants for greetings and everyday questions; no model load.
+- Indexed fixed replies, word-wrapped chat and cached unchanged chat layout.
+- Font/icons share a 512 KiB atlas with batched draws instead of per-glyph runs.
+- Controller note editing, paging, delete confirmation and undo.
+- Live timer dashboard: pause/run, extend, restart and cancel confirmation.
+- One background save worker with a bounded latest-snapshot queue and status.
+- Validated atomic saves/backups; old notes/name/taught answers migrate.
+- All four existing models remain bundled; assistant needs no weights.
+- Native tests include predefined replies, persistence failures and navigation.
+- Physical Xbox shader/UI/guide keyboard and USB behavior need validation.
+
 360AI 1.6 - native offline keyword assistant
 ==========================================
 

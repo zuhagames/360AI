@@ -2,8 +2,10 @@
 #include "json.h"
 #include "platform.h"
 #include "textstream.h"
+#include "replies.h"
 #include <ctype.h>
 #include <float.h>
+#include <map>
 
 namespace {
 std::string trim(const std::string& s){
@@ -220,11 +222,22 @@ bool mathish(const std::string& s){
   size_t split=tail.find(" to ");if(split==std::string::npos) split=tail.find(" in ");
   return split!=std::string::npos && unit(tail.substr(0,split))!=0;
 }
+const char* fixed_reply(const std::string& normalized){
+  struct Index {
+    std::map<std::string,const char*> entries;
+    Index(){for(size_t i=0;i<sizeof(gx_replies)/sizeof(gx_replies[0]);++i){std::string aliases=gx_replies[i].phrases;size_t start=0;
+      for(;;){size_t end=aliases.find('|',start);entries[aliases.substr(start,end==std::string::npos ? end : end-start)]=gx_replies[i].answer;
+        if(end==std::string::npos) break;start=end+1;}}}
+  };
+  static const Index index;std::map<std::string,const char*>::const_iterator found=index.entries.find(normalized);
+  return found==index.entries.end() ? 0 : found->second;
+}
 bool new_request(const std::string& raw){
   // Use the same punctuation/word normalization as exact command dispatch.
   // Keep payloads untouched: this only decides whether a follow-up is interrupted.
-  const char* commands[]={"time","date","status","help","list","show","cancel","stop","delete","forget","clear","convert","calculate","compute","work out","remember","remind","my name","call me","open","switch","use","set","quick preset","balanced preset","creative preset","what","whats","who","how","export","save chat","joke","another joke","find notes","search notes","read note","edit note","change note","teach","learn","undo","pause","resume","restart","extend","check timer","timer","add note","add time","note","take a note","notes","timers","version","system status","free memory","available models","model list","save conversation","new chat","recent alerts","hi","hello","hey","thanks","thank you","good morning","good evening","tell me a joke"};
-  std::string normalized=words(raw),rest;for(size_t i=0;i<sizeof(commands)/sizeof(commands[0]);++i) if(take(normalized,commands[i],rest)) return true;return false;
+  const char* commands[]={"time","date","status","help","list","show","cancel","stop","delete","forget","clear","convert","calculate","compute","work out","remember","remind","my name","call me","open","switch","use","set","quick preset","balanced preset","creative preset","what","whats","who","how","export","save chat","joke","another joke","find notes","search notes","read note","edit note","change note","teach","learn","undo","pause","resume","restart","extend","check timer","timer","add note","add time","note","take a note","notes","timers","version","system status","free memory","available models","model list","save conversation","new chat","recent alerts","hi","hello","hey","thanks","thank you","good morning","good evening","tell me a joke","give me","add another minute"};
+  std::string normalized=words(raw),rest;if(fixed_reply(normalized)) return true;
+  for(size_t i=0;i<sizeof(commands)/sizeof(commands[0]);++i) if(take(normalized,commands[i],rest)) return true;return false;
 }
 const char* help_text="360 Assistant works offline without a model. Try:\n"
   "calculate (12 + 8) * 3 | what is 20 percent of 80\n"
@@ -406,7 +419,8 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
   if(text.size()>512){pending_=P_NONE;pending_label_.clear();return AssistantReply("Keep a request within 512 bytes. Any waiting follow-up has been cancelled.");}
   std::string raw=single_line(gx_utf8_clean(text)),rest;
   if(take(raw,"hey 360ai",rest) || take(raw,"hey assistant",rest) || take(raw,"360ai",rest) || take(raw,"assistant",rest)) raw=rest;
-  for(int polite=0;polite<2;++polite){if(take(raw,"please",rest) || take(raw,"can you",rest) || take(raw,"could you",rest) || take(raw,"would you",rest)) raw=rest;else break;}
+  for(int polite=0;polite<2;++polite){if(fixed_reply(words(raw))) break;
+    if(take(raw,"please",rest) || take(raw,"can you",rest) || take(raw,"could you",rest) || take(raw,"would you",rest)) raw=rest;else break;}
   std::string norm=words(raw);if(norm.empty()){pending_=P_NONE;pending_label_.clear();return AssistantReply("Ready. Type help for commands.");}
   if(take(raw,"don't forget to",rest) || take(raw,"do not forget to",rest)){pending_=P_NONE;pending_label_.clear();return add_note(rest);}
   if(norm=="dont" || norm=="do not" || norm.compare(0,5,"dont ")==0 || norm.compare(0,7,"do not ")==0 ||
@@ -441,10 +455,17 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
     int highwater=next_note_;std::string snapshot=undo_state_;if(!parse_state(snapshot)) return AssistantReply("The undo snapshot could not be restored.");
     next_note_=GX_MAX(next_note_,highwater);dirty_=true;undo_state_.clear();return AssistantReply("Undid the last saved-data change. Timers and chat are unchanged.");
   }
-  if(norm=="hi" || norm=="hello" || norm=="hey" || norm=="good morning" || norm=="good evening")
-    return AssistantReply("Hello"+(name_.empty() ? std::string("") : " "+name_)+". Ready for calculations, conversions, timers, notes and Xbox help.");
-  if(norm=="thanks" || norm=="thank you") return AssistantReply("You're welcome.");
-  if(norm=="how are you" || norm=="how are you doing") return AssistantReply("Ready to help. My supported commands work offline without loading a model.");
+  // Saved text answers can personalize small talk, while command dispatch below
+  // still keeps priority over FAQ matches and cannot be replaced by taught text.
+  const char* canned=fixed_reply(norm);
+  if(canned){
+    size_t best=0;std::string custom;
+    for(size_t i=0;i<answers_.size();++i) if(phrase(norm,answers_[i].phrase) && answers_[i].phrase.size()>best){best=answers_[i].phrase.size();custom=answers_[i].response;}
+    for(size_t i=0;i<rules_.size();++i) for(size_t p=0;p<rules_[i].phrases.size();++p) if(phrase(norm,rules_[i].phrases[p]) && rules_[i].phrases[p].size()>best){best=rules_[i].phrases[p].size();custom=rules_[i].response;}
+    if(best) return AssistantReply(custom);
+    std::string response=canned;size_t at=response.find("{name}");if(at!=std::string::npos) response.replace(at,6,name_.empty() ? "there" : name_);
+    return AssistantReply(response);
+  }
   if(norm=="my name" || norm=="what is my name" || norm=="whats my name" || norm=="who am i") return AssistantReply(name_.empty() ? "You haven't told me your name. Say my name is Martin, for example." : "Your name is "+name_+".");
   if(take(raw,"my name is",rest) || take(raw,"call me",rest)){
     if(rest.empty()){pending_=P_NAME;return AssistantReply("What should I call you?");}
@@ -493,6 +514,9 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
     if(at==std::string::npos) return AssistantReply("Use remind me in 5 minutes to check the oven.");
     return add_timer(rest.substr(0,at)+" called "+rest.substr(at+4),context);
   }
+  if(take(raw,"give me",rest)){double seconds=0;if(duration(command_tail(rest),seconds)) return add_timer(rest,context);}
+  if(norm=="add another minute") return timer_action("it",TA_EXTEND,context,60);
+  if(take(raw,"how long until",rest)) return timer_action(rest,TA_STATUS,context);
   if(take(raw,"remind me to",rest)){
     size_t at=lower(rest).rfind(" in ");
     if(at==std::string::npos){pending_=P_TIMER;pending_label_=rest;return AssistantReply("In how long should I remind you? Try 5 minutes. Keep 360AI open for the alert.");}
@@ -583,11 +607,21 @@ bool Assistant::load(const char* path){
   if(loaded){undo_state_.clear();pending_=P_NONE;pending_label_.clear();}return loaded;
 }
 bool Assistant::save(const char* path){
-  std::string next=state_text(),previous;Assistant check;if(!check.parse_state(next)) return false;
+  if(!write_snapshot(path,state_text())) return false;dirty_=false;return true;
+}
+bool Assistant::write_snapshot(const char* path,const std::string& next){
+  std::string previous;Assistant check;if(!check.parse_state(next)) return false;
   if(gx_read_text_file(path,previous,65536) && check.parse_state(previous)){
     std::string backup=std::string(path)+".bak";if(!gx_write_text_file(backup.c_str(),previous)) return false;
   }
-  if(!gx_write_text_file(path,next)) return false;dirty_=false;return true;
+  return gx_write_text_file(path,next);
+}
+AssistantReply Assistant::write_note(int id,const std::string& text){
+  pending_=P_NONE;pending_label_.clear();
+  if(text.size()>512) return AssistantReply("Keep a note within 512 bytes.");
+  std::string clean=single_line(gx_utf8_clean(text));
+  if(trim(clean).empty()) return AssistantReply("A note needs some text.");
+  return id ? edit_note(id,clean) : add_note(clean);
 }
 bool Assistant::load_rules(const char* path){
   std::string text;Json j;if(!gx_read_text_file(path,text,65536) || !Json::parse(text,j) || j.type!=Json::OBJECT ||

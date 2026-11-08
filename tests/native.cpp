@@ -4,6 +4,7 @@
 #include "mcp.h"
 #include "server.h"
 #include "app.h"
+#include "xboxui.h"
 #include "gpu.h"
 #include "textstream.h"
 #include "version.h"
@@ -12,6 +13,7 @@
 #include <algorithm>
 #include "quant_checks.h"
 #include "assistant_checks.h"
+#include "dashboard_checks.h"
 
 static std::string path(const char* name){ return std::string("build/tests/")+name+".gguf"; }
 static std::string completion(const std::string& prompt,int n,void*){
@@ -88,6 +90,8 @@ static void chat_checks(){
   view.update("abcde\nfghij\n",5,2);
   assert(view.lines().size()==2 && view.lines()[0]=="abcde" && view.lines()[1]=="fghij");
   view.update("abcdef",3,1);assert(view.lines().size()==2 && view.lines()[1]=="def");
+  view.update("one two three four",10,3);assert(view.lines().size()==2 && view.lines()[0]=="one two" && view.lines()[1]=="three four");
+  view.update("one two three",7,3);assert(view.lines().size()==2 && view.lines()[0]=="one two" && view.lines()[1]=="three");
   view.update("A\xc5\xbe\xe4\xb8\xad\xf0\x9f\x98\x80\tB\r\n",20,1);
   assert(view.lines().size()==1 && view.lines()[0]=="A??? B");
   view.update("",1,0);assert(view.top()==0 && view.lines().size()==1);
@@ -138,6 +142,7 @@ static void cancel_after_token(int,const char*,void* user){
 }
 static void checks(){
   assistant_checks();
+  dashboard_checks();
   {
     GGUF g;assert(g.load(path("stories-tokenizer").c_str()));Tokenizer tok;assert(tok.load(g) && tok.completion_only());
     std::vector<std::pair<std::string,std::string> > messages;
@@ -384,6 +389,9 @@ static void checks(){
 }
 int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
+  if(argc>3 && std::string(argv[1])=="--ui-preview"){
+    if(!gxui_init()) return 2;App app;bool ok=app.test_capture(argv[2],argv[3]);gxui_shutdown();return ok ? 0 : 3;
+  }
   if(argc>1 && std::string(argv[1])=="--assistant"){
     Assistant assistant;AssistantContext context;context.version=GX_VERSION;context.free_bytes=gx_physical_free();
     assistant.load_rules("release/assistant-rules.example.json");std::string line;

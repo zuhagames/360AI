@@ -4,7 +4,7 @@
 
 <h3 align="center">AI on Xbox 360.</h3>
 
-<p align="center">Chat locally, run GGUF models, and connect your apps.</p>
+<p align="center">Your Xbox. A little more useful.</p>
 
 <p align="center">
   <a href="https://github.com/zuhagames/360AI/releases/latest"><img src="https://img.shields.io/github/v/release/zuhagames/360AI?style=flat-square&amp;label=release&amp;color=9acd32" alt="Latest release"></a>
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v1.5/360AI-1.5-USB.zip"><strong>Download 360AI 1.5</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v2.0/360AI-2.0-USB.zip"><strong>Download 360AI 2.0</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
@@ -25,7 +25,7 @@
 
 ## About
 
-360AI runs local language models on a modded Xbox 360. Chat on the console or use it as an inference server over your network. Local chat works offline.
+360AI is an offline assistant and local model runner for modded Xbox 360 consoles. Say hello for a predefined reply, use notes and timers, or open Models for GGUF chat.
 
 Made by **ZuhaGames & Canyons**. A fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma.
 
@@ -33,10 +33,10 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-1.5-USB.zip](https://github.com/zuhagames/360AI/releases/download/v1.5/360AI-1.5-USB.zip)**.
+1. Download and extract **[360AI-2.0-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.0/360AI-2.0-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
-4. Select a model, leave compute and weight storage on **Auto**, and select **Load model**.
+4. Select **Assistant** for instant replies, or **Models** for GGUF chat. Leave model compute/storage on **Auto**.
 
 Requires a console capable of running unsigned XEX files. No separate model download is needed.
 
@@ -58,7 +58,9 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 
 ## Features
 
-- **360 Assistant (1.6 builds):** press X for offline calculations, conversions, named timers, searchable notes, taught answers and undo. No weights needed. [Commands](release/ASSISTANT.txt).
+- **360 Assistant:** 106 predefined phrases, calculations, conversions, saved notes, taught answers and timers. No weights needed. [Commands](release/ASSISTANT.txt).
+- Native dashboard, Quick tools, dedicated Notes/Timers screens and Xbox 360 button artwork.
+- Batched text rendering, cached chat layout and background assistant saves.
 - Console chat with controller and on-screen keyboard support.
 - Saved settings and model selection, chat scrollback, new chat, and USB/HDD export.
 - Long conversations keep recent complete turns in context and show trimming notices.

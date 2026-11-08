@@ -22,19 +22,26 @@ struct AssistantContext {
 // network access or speech recognition. App actions are returned to the caller.
 class Assistant {
 public:
+  struct Note {int id;std::string text;};
+  struct Timer {int id;double due,duration,left;bool paused;std::string label;};
   Assistant();
   AssistantReply respond(const std::string& text,const AssistantContext& context);
   void poll(double now,std::vector<std::string>& notifications);
   void reset_conversation();
+  void cancel_followup() {pending_=P_NONE;pending_label_.clear();}
   bool load(const char* path);
   bool save(const char* path);
   bool load_rules(const char* path);
+  std::string snapshot() const {return state_text();}
+  void saved_snapshot(const std::string& text) {if(state_text()==text) dirty_=false;}
+  static bool write_snapshot(const char* path,const std::string& text);
+  AssistantReply write_note(int id,const std::string& text);
   bool dirty() const { return dirty_; }
   size_t timer_count() const { return timers_.size(); }
   size_t note_count() const { return notes_.size(); }
+  const std::vector<Note>& notes() const {return notes_;}
+  const std::vector<Timer>& timers() const {return timers_;}
 private:
-  struct Note { int id;std::string text; };
-  struct Timer { int id;double due,duration,left;bool paused;std::string label; };
   struct Answer { std::string phrase,response; };
   struct Rule { std::vector<std::string> phrases;std::string response; };
   enum Pending { P_NONE,P_TIMER,P_NOTE,P_CALC,P_NAME,P_CLEAR_NOTES,P_CLEAR_CHAT,P_TIMER_CANCEL,P_TIMER_SELECT,P_NOTE_SEARCH,P_NOTE_EDIT };

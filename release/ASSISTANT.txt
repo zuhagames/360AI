@@ -2,11 +2,31 @@
 ======================================================
 
 OPEN IT
-Launch 360AI.xex. On the model list press X, even if no GGUF files are present.
-Press A to enter text with the existing controller keyboard. Type help.
+Launch 360AI.xex and select Assistant on Home, even with no GGUF files present.
+Press A to enter text. Say hello for a predefined reply, or type help.
+Home X opens input directly; Home Y opens Quick tools. Notes and Timers have
+their own controller screens. Xbox 360 button artwork is embedded in the XEX.
 This mode runs inside the Xbox app with no model inference, website or PC.
 It is a text assistant: microphone input, speech recognition and voice output
 are not implemented. It matches supported intents, not arbitrary conversation.
+
+PREDEFINED ANSWERS
+106 exact phrase variants cover greetings, thanks, everyday conversation and
+common questions. Examples: hello, good morning, how are you, i am bored,
+and what do you think about the xbox 360. Matching ignores case and ordinary
+punctuation. It uses a small index built once, with no model inference. Saved
+taught/file answers can customize a matching reply; built-in actions retain
+priority. A phrase inside an unrelated sentence does not trigger an action.
+
+CONTROLLER SCREENS
+Home: D-pad selects Assistant, Notes, Timers or Models. A opens the selection.
+Quick tools: calculations, conversions, new timer/note, teaching and help.
+Notes: up/down select, A edits, X adds, Y asks to delete, START undoes.
+LB/RB pages through a long note. Typed note content is saved literally.
+Timers: up/down select, A pauses/resumes, X adds, Y asks to cancel.
+RB adds a minute; LB restarts. B returns Home. Confirmations use A/B.
+Returning Home cancels a waiting chat follow-up or confirmation. Chat text
+and saved data are kept; an old yes/no question cannot execute after reopening.
 
 CALCULATOR
   calculate (12 + 8) * 3
@@ -77,8 +97,11 @@ NOTES AND NAME
   forget my name
 Up to 32 notes (512 bytes each) and a name (64 bytes) save as plain text in
 360AI-assistant.json beside the app, with a previous valid .bak recovery copy.
-The drive must be writable. A save failure is shown on screen; data stays
-in memory for this session. Updates do not include or overwrite these files.
+The drive must be writable. A single background worker saves the latest
+bounded snapshot. Saving/Saved/Not saved is shown; wait for Saved before
+closing after an edit. Failures retain in-memory data and can be retried by
+another command. Older completions cannot mark newer edits as saved. Updates
+do not include or overwrite these personal files.
 Deleting one note requires its exact number. Deleting all notes and clearing
 chat ask yes/no; a different request cancels the pending operation.
 Search matches all supplied whole words in any order. Read/edit/delete
@@ -136,7 +159,7 @@ to is treated as a request to save a note. Timer alerts still work after
 returning to models or switching to a GGUF while this app remains open.
 
 A: input. D-pad: scroll. LB/RB: page. Right-stick: latest. X: new chat.
-START: save transcript to 360AI-chat.txt. B: model list.
+Y: Quick tools. START: save transcript to 360AI-chat.txt. B: Home.
 New/cleared chat resets dialog, ans, conversion follow-ups and the it timer
 reference. It keeps saved data, undo and session timers. Scrollback is bounded.
 
