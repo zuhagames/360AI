@@ -4,7 +4,8 @@
 INSTALL
 For immediate keyword answers without a model, launch 360AI.xex and press X
 on the model list. Press A, type help, and read ASSISTANT.txt for commands.
-360 Assistant handles calculations, conversions, notes and session timers.
+360 Assistant handles calculations, conversions, notes, session timers and
+taught answers. Search/edit notes, pause/resume timers and undo data changes.
 This mode uses text, not voice. It works even with no GGUF files installed.
 
 1. Extract the ZIP on your PC.

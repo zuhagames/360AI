@@ -585,7 +585,7 @@ AssistantContext App::assistant_context() const{
 void App::open_assistant(){
   assistant_mode_=true;model_name_="360 Assistant - keywords and intents";
   turns_.clear();chat_log_.clear();chat_notice_.clear();chat_view_=ChatView();assistant_.reset_conversation();
-  append_chat("Assistant: ","Ready without loading a model. Type help for calculations, conversions, notes, timers and Xbox commands.");
+  append_chat("Assistant: ","Ready without loading a model. Type help for calculations, conversions, notes, timers, taught answers and Xbox commands.");
   screen_=AS_CHAT;
 }
 void App::assistant_send(const std::string& text){
@@ -597,7 +597,7 @@ void App::assistant_send(const std::string& text){
   } else if(reply.action==AA_EXPORT){export_chat();reply.text=chat_notice_;}
   else if(reply.action==AA_CLEAR_CHAT) new_chat();
   else if(reply.action==AA_MODELS){assistant_mode_=false;chat_log_.clear();turns_.clear();chat_view_=ChatView();screen_=AS_BROWSE;return;}
-  if(assistant_.dirty() && !assistant_.save(kAssistantPath)) chat_notice_="Notes/name are in memory only: could not save 360AI-assistant.json.";
+  if(assistant_.dirty() && !assistant_.save(kAssistantPath)) chat_notice_="Assistant data is in memory only: could not save 360AI-assistant.json.";
   append_chat("Assistant: ",reply.text);
   if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}
 }

@@ -5,7 +5,13 @@
 - Calculations, operator precedence, functions, percentages and ans.
 - Unit conversion and follow-up values across five unit dimensions.
 - Eight session timers, relative reminders, named alerts and timer history.
+- Pause/resume/restart/extend timers by ID or label, with ambiguous-label prompts.
+- English numbers in calculations, conversions and timers; punctuated IDs work.
 - Saved notebook/name with validated JSON, atomic writes and backup recovery.
+- Read/search/edit notes, teach text answers on Xbox, and undo one data change.
+- Version 2 saves migrate old notes and preserve the next unused note ID.
+- Fixed stale confirmations after oversized input, negative timer IDs and bare
+  negation; saved control characters/NUL and duplicate learned phrases reject.
 - Status, console clock, model list, presets, export and model navigation.
 - Keyword/phrase boundaries, polite prefixes, follow-up slots, negation,
   confirmations, conservative typo suggestions and clear fallback responses.
@@ -16,7 +22,7 @@
 Text input/output only: no microphone, speech recognition or spoken replies.
 Timers need the app to remain running and do not survive restarting it.
 Personal notes/settings are not bundled. Full model package remains available.
-Native functional checks and Xbox SDK build pass; physical controller/UI,
+Native functional checks, 2,000 malformed-input cases and Xbox SDK build pass; physical controller/UI,
 alert banner and drive persistence require Xbox validation. See ASSISTANT.txt.
 
 360AI 1.5 - smaller models and native speed defaults

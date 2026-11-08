@@ -58,7 +58,7 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 
 ## Features
 
-- **360 Assistant (1.6 builds):** press X on the model list for offline keyword commands, calculations, conversions, notes and timers. No weights needed. [Commands](release/ASSISTANT.txt).
+- **360 Assistant (1.6 builds):** press X for offline calculations, conversions, named timers, searchable notes, taught answers and undo. No weights needed. [Commands](release/ASSISTANT.txt).
 - Console chat with controller and on-screen keyboard support.
 - Saved settings and model selection, chat scrollback, new chat, and USB/HDD export.
 - Long conversations keep recent complete turns in context and show trimming notices.
@@ -69,7 +69,7 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 - Adjustable context size, temperature, and top-k sampling.
 - On-console reply presets, top-p and repetition controls, and layer progress.
 - OpenAI-compatible chat/completions API with streaming.
-- MCP endpoint and an optional PC bridge for external MCP servers.
+- MCP endpoint for compatible clients.
 - Experimental Xenos pixel-shader matrix calculations with CPU fallback. No speedup is guaranteed.
 
 ## Documentation & support

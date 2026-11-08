@@ -14,10 +14,13 @@ CALCULATOR
   calculate sqrt(81) + abs(-5)
   calculate 2^8
   calculate ans / 2
+  what's twenty-five plus one hundred and five
 Precedence, parentheses, unary minus, right-associative powers, round, pi and
 e are supported. ans is the last successful answer. % means remainder.
 Division by zero, invalid syntax, overflow and overly complex input fail
 without changing ans. Expressions are bounded to 256 characters.
+English numbers through thousands and decimal digit words are accepted,
+such as two point five times four. This is bounded parsing, not general NLP.
 
 UNIT CONVERSIONS
   convert 5 miles to km
@@ -37,21 +40,38 @@ TIMERS AND RELATIVE REMINDERS
   (then answer 5 minutes)
   list timers
   cancel timer 1
+  pause timer pizza
+  resume it
+  extend timer pizza by thirty seconds
+  restart timer pizza
+  check timer pizza
   cancel all timers
   timer history
 Up to eight timers, 1 second to 7 days, run while 360AI remains open. Half an
-hour, two minutes and compound durations are understood. Completion shows
+hour, twenty five minutes and compound durations are understood. Completion shows
 a ten-second banner on app screens and records a chat alert. Timer history
 keeps the last eight alerts for this session. Timers/history do not survive
 closing or restarting the app. There is no system alarm or audio alert.
+Pause freezes the remaining time; resume continues it. Restart uses the
+original duration plus any extensions. Extensions keep the total within
+seven days. Commands accept an exact timer number or label; duplicate labels
+ask for a number. It refers to the most recently created/selected timer in
+this chat and is cleared when that timer is cancelled or completes. Expired
+timers cannot be restarted. Paused timers count toward the eight-timer limit.
 
 NOTES AND NAME
   remember to buy batteries
   remember
   (then enter the note)
   list notes
+  read note 1
+  find notes about batteries
+  edit note 1: buy rechargeable batteries
+  edit note 1
+  (then enter replacement text)
   delete note 1
   delete all notes
+  undo
   my name is Martin
   what is my name
   forget my name
@@ -61,6 +81,32 @@ The drive must be writable. A save failure is shown on screen; data stays
 in memory for this session. Updates do not include or overwrite these files.
 Deleting one note requires its exact number. Deleting all notes and clearing
 chat ask yes/no; a different request cancels the pending operation.
+Search matches all supplied whole words in any order. Read/edit/delete
+require an exact note number. Note IDs are not reused after deletion or undo,
+including after restarting with the new save format. Version 1 saves migrate
+automatically. Invalid saved text/control characters are rejected before
+changing memory; backup recovery is attempted when the main file is invalid.
+
+TEACH ANSWERS ON YOUR XBOX
+  teach favorite game: Halo 3
+  what is your favorite game
+  list learned answers
+  forget answer favorite game
+  undo
+Up to 16 phrase/answer pairs are saved in 360AI-assistant.json with your notes
+and name. Phrases use 3-80 bytes after normalization; answers use 1-512 bytes.
+Teaching the same normalized phrase replaces its answer. Forget requires
+that exact phrase. Whole-phrase matches win by length; a taught answer wins
+ties with file-based/built-in FAQ answers. Built-in commands keep priority.
+Answers are text only: even an answer saying clear chat cannot run a command.
+This is explicit saved knowledge, not neural training or arbitrary reasoning.
+
+UNDO
+Undo restores the last change to notes, your name or taught answers, including
+confirmed bulk note deletion. It is one level, kept for this app session only.
+Unsuccessful commands and read-only questions leave it available. Undo does
+not affect timers, presets, transcript export or cleared chat. Undo itself
+cannot be undone. The restored data is saved through the normal save path.
 
 XBOX APP COMMANDS AND HELP
   status | time | date | list models
@@ -76,14 +122,16 @@ fallback. Spelling suggestions never automatically execute a command.
 FOLLOW-UPS AND CONTROLS
 Use cancel or never mind to leave a follow-up. A recognized new command
 replaces it. Polite prefixes, case differences and normal spacing are handled.
+Common sentence punctuation works after timer/note numbers. An oversized
+request or an empty message cancels a waiting follow-up/confirmation.
 Use one command per message. Negated commands do not execute; don't forget
 to is treated as a request to save a note. Timer alerts still work after
 returning to models or switching to a GGUF while this app remains open.
 
 A: input. D-pad: scroll. LB/RB: page. Right-stick: latest. X: new chat.
 START: save transcript to 360AI-chat.txt. B: model list.
-New/cleared chat resets dialog, ans and conversion follow-ups. It keeps saved
-notes, your name and session timers. Assistant scrollback is bounded.
+New/cleared chat resets dialog, ans, conversion follow-ups and the it timer
+reference. It keeps saved data, undo and session timers. Scrollback is bounded.
 
 CUSTOM ANSWERS
 Copy assistant-rules.example.json to assistant-rules.json to add custom
@@ -93,14 +141,17 @@ is available. Optional assistant-rules.json contains version 1 and a rules array
 has phrases (1-8 strings, up to 80 bytes each) and response (up to 2000 bytes).
 Up to 64 rules in a 64 KiB file are accepted. Entire phrases match at word
 boundaries; the longest match wins. Equal-length custom answers take priority
-over built-in FAQ entries. Built-in actions take priority over FAQ rules.
+over built-in FAQ entries. Taught answers win ties with file answers;
+built-in actions take priority over all FAQ rules.
 Rules return text only, with no scripts, shell commands or networking.
 Restart after editing. An invalid file is ignored; built-in commands remain.
 
 VALIDATION
 Native tests exercise arithmetic errors/precedence, conversion dimensions,
-follow-up slots, word boundaries, typo suggestions, negation, confirmations,
-timer expiry/cancellation/limits, note limits, persistence/backup recovery and
-custom-rule validation. Xbox SDK compilation is checked. Physical-console
+follow-up slots, word boundaries, typo suggestions, negation, interrupted
+confirmations, timer expiry/pause/resume/restart/extension/ambiguity, note
+search/edit/undo, learned-answer limits, save migration/stable IDs, corrupt
+data and backup recovery. A deterministic 2,000-case malformed-input pass
+checks bounded failure without app actions. Xbox SDK compilation is checked. Physical-console
 menus, keyboard behavior, timer banner and storage persistence still need
 hardware validation. No Siri-equivalent language or speech ability is claimed.
