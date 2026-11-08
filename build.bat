@@ -9,7 +9,7 @@ set LIB=%SDK%\lib\xbox
 set OUT=build
 if not exist %OUT% mkdir %OUT%
 
-set SRC=common platform gguf model quant tokenizer weights gpu ops engine xboxui json settings textstream mcp server app main
+set SRC=common platform gguf model quant tokenizer weights gpu ops engine xboxui json settings textstream chat mcp server app main
 set FLAGS=/c /nologo /O2 /Oi /MT /GR- /EHs-c- /GS- /D_XBOX /D XBOX /D NDEBUG /I src
 
 for %%f in (%SRC%) do (
@@ -18,7 +18,7 @@ for %%f in (%SRC%) do (
 )
 
 echo linking default.xex
-"%LINK_EXE%" /nologo /OUT:%OUT%\default.xex /MACHINE:PPCBE /XEX:NO /IGNORE:4089 %OUT%\common.obj %OUT%\platform.obj %OUT%\gguf.obj %OUT%\model.obj %OUT%\quant.obj %OUT%\tokenizer.obj %OUT%\weights.obj %OUT%\gpu.obj %OUT%\ops.obj %OUT%\engine.obj %OUT%\xboxui.obj %OUT%\json.obj %OUT%\settings.obj %OUT%\textstream.obj %OUT%\mcp.obj %OUT%\server.obj %OUT%\app.obj %OUT%\main.obj /LIBPATH:"%LIB%" xnet.lib d3d9.lib d3dx9.lib xgraphics.lib xapilib.lib xboxkrnl.lib || goto fail
+"%LINK_EXE%" /nologo /OUT:%OUT%\default.xex /MACHINE:PPCBE /XEX:NO /IGNORE:4089 %OUT%\common.obj %OUT%\platform.obj %OUT%\gguf.obj %OUT%\model.obj %OUT%\quant.obj %OUT%\tokenizer.obj %OUT%\weights.obj %OUT%\gpu.obj %OUT%\ops.obj %OUT%\engine.obj %OUT%\xboxui.obj %OUT%\json.obj %OUT%\settings.obj %OUT%\textstream.obj %OUT%\chat.obj %OUT%\mcp.obj %OUT%\server.obj %OUT%\app.obj %OUT%\main.obj /LIBPATH:"%LIB%" xnet.lib d3d9.lib d3dx9.lib xgraphics.lib xapilib.lib xboxkrnl.lib || goto fail
 
 echo packaging 360AI.xex
 "%IXE%\imagexex.exe" /IN:%OUT%\default.xex /OUT:360AI.xex /CONFIG:xex.xml || goto fail

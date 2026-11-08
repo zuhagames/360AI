@@ -95,6 +95,7 @@ private:
 
   std::vector<f32> inv_ts_;
   std::vector<f32> inv_ts_global_;
+  std::vector<f32> rope_cos_,rope_sin_,rope_cos_global_,rope_sin_global_;
   u32 seq_cache_len_;
 
   void build_timescales();

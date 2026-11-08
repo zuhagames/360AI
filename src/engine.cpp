@@ -79,6 +79,8 @@ bool Engine::alloc_scratch(){
 void Engine::build_timescales(){
   const ModelCfg& c = weights_.cfg;
   u32 half = c.layer.qkv_dim / 2;
+  rope_cos_.resize(half);rope_sin_.resize(half);
+  rope_cos_global_.resize(half);rope_sin_global_.resize(half);
   f32 bl = c.rope_theta;
   f32 bg = c.rope_theta;
   if(c.family == GF_GEMMA3){
@@ -132,7 +134,7 @@ void Engine::attention(size_t layer, const f32* xn, KVCache& kv, u32 pos,
   u32 groups = heads / kvh;
   f32 eps = c.rms_eps;
   f32 softcap = c.att_logit_softcapping;
-  bool global = c.is_global_layer(layer);
+  bool global = c.family==GF_GEMMA3 && c.is_global_layer(layer);
   u32 window = lc.use_sliding ? lc.window : c.max_seq_len;
 
   L.q_w.matvec(xn, q, (size_t)heads*qd, sc_.deq);
@@ -142,14 +144,13 @@ void Engine::attention(size_t layer, const f32* xn, KVCache& kv, u32 pos,
   add_bias(kv.k_row(layer,pos), L.k_b, (size_t)kvh*qd, sc_.deq);
   add_bias(kv.v_row(layer,pos), L.v_b, (size_t)kvh*qd, sc_.deq);
 
-  const f32* ts = global ? &inv_ts_global_[0] : &inv_ts_[0];
+  const f32* cosine=global ? &rope_cos_global_[0] : &rope_cos_[0];
+  const f32* sine=global ? &rope_sin_global_[0] : &rope_sin_[0];
   f32* kcur = kv.k_row(layer,pos);
   for(u32 h = 0; h < kvh; ++h){
     f32* kh = kcur + h*qd;
     if(L.k_norm.ok) rmsnorm_inplace(kh, L.k_norm, qd, eps, sc_.deq);
-    if(!c.rope_neox) gx_rope_interleaved(kh, qd, ts, (int)pos);
-    else if(lc.use_sliding) gx_rope_half(kh, qd, ts, (int)pos);
-    else gx_rope(kh, qd, ts, (int)pos);
+    gx_rope_cached(kh,qd,cosine,sine,!c.rope_neox);
   }
 
   u32 start = 0;
@@ -159,9 +160,7 @@ void Engine::attention(size_t layer, const f32* xn, KVCache& kv, u32 pos,
   for(u32 h = 0; h < heads; ++h){
     f32* qh = q + h*qd;
     if(L.q_norm.ok) rmsnorm_inplace(qh, L.q_norm, qd, eps, sc_.deq);
-    if(!c.rope_neox) gx_rope_interleaved(qh, qd, ts, (int)pos);
-    else if(lc.use_sliding) gx_rope_half(qh, qd, ts, (int)pos);
-    else gx_rope(qh, qd, ts, (int)pos);
+    gx_rope_cached(qh,qd,cosine,sine,!c.rope_neox);
     gx_mul_by(qh, c.query_scale, qd);
 
     u32 kvh_idx = h / groups;
@@ -208,6 +207,10 @@ bool Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t po
   const ModelCfg& c = weights_.cfg;
   u32 md = c.model_dim;
   int tok = tokens[tok_index];
+  // Every head/layer in a forward pass shares this position.
+  gx_rope_angles(&inv_ts_[0],inv_ts_.size(),(int)pos,&rope_cos_[0],&rope_sin_[0]);
+  if(c.family==GF_GEMMA3)
+    gx_rope_angles(&inv_ts_global_[0],inv_ts_global_.size(),(int)pos,&rope_cos_global_[0],&rope_sin_global_[0]);
 
   if(!weights_.token_embd.row_dequant((u32)tok, sc_.x)) return false;
   if(c.scale_embeddings) gx_mul_by(sc_.x, sqrtf((f32)md), md);

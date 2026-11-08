@@ -28,6 +28,21 @@ static bool parse_settings(const std::string& text,AppSettings& out){
     if(n.type!=Json::NUMBER || n.number<0 || n.number>2) return false;
     s.temperature=(f32)n.number;
   }
+  if(j.has("last_model")){
+    const Json& n=j.get("last_model");
+    if(n.type!=Json::STRING || n.text.size()>255) return false;
+    s.last_model=n.text;
+    for(size_t i=0;i<s.last_model.size();++i){
+      u8 c=(u8)s.last_model[i];
+      if(c<32 || c==127 || c==':' || c=='/' || c=='\\') return false;
+    }
+    if(!s.last_model.empty()){
+      if(s.last_model.size()<6) return false;
+      std::string suffix=s.last_model.substr(s.last_model.size()-5);
+      for(size_t i=0;i<suffix.size();++i) if(suffix[i]>='A' && suffix[i]<='Z') suffix[i]+='a'-'A';
+      if(suffix!=".gguf") return false;
+    }
+  }
   out=s;return true;
 }
 bool AppSettings::load(const char* path){
@@ -45,6 +60,7 @@ bool AppSettings::save(const char* path) const{
   j["top_k"]=Json((double)topk);j["debug_level"]=Json((double)debug_level);
   j["backend"]=Json((double)backend_mode);j["weight_storage"]=Json((double)weight_mode);
   j["reply_tokens"]=Json((double)reply_tokens);
+  j["last_model"]=Json(last_model);
   j["server"]=Json::boolean(server_on);j["console_chat"]=Json::boolean(chat_on);
   AppSettings check;std::string next=j.dump()+"\n",previous;
   if(!parse_settings(next,check)) return false;

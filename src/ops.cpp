@@ -115,6 +115,20 @@ void gx_silu_mul(f32* gate, const f32* up, size_t n){
   }
 }
 
+void gx_rope_angles(const f32* ts,size_t half,int pos,f32* cosine,f32* sine){
+  for(size_t i=0;i<half;++i){
+    f32 angle=(f32)pos*ts[i];cosine[i]=cosf(angle);sine[i]=sinf(angle);
+  }
+}
+void gx_rope_cached(f32* q,size_t dim,const f32* cosine,const f32* sine,bool interleaved){
+  size_t half=dim/2;
+  for(size_t i=0;i<half;++i){
+    size_t a=interleaved ? 2*i : i,b=interleaved ? 2*i+1 : i+half;
+    f32 x=q[a],y=q[b],c=cosine[i],s=sine[i];
+    q[a]=x*c-y*s;q[b]=x*s+y*c;
+  }
+}
+
 void gx_softmax(f32* x, size_t n){
   if(n == 0) return;
   f32 mx = x[0];

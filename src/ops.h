@@ -12,6 +12,8 @@ void gx_rmsnorm(const f32* x, const f32* w, f32* out, size_t n, f32 eps);
 void gx_rope(f32* q, size_t dim, const f32* inv_timescale, int pos);
 void gx_rope_half(f32* q, size_t dim, const f32* inv_timescale, int pos);
 void gx_rope_interleaved(f32* q, size_t dim, const f32* inv_timescale, int pos);
+void gx_rope_angles(const f32* ts,size_t half,int pos,f32* cosine,f32* sine);
+void gx_rope_cached(f32* q,size_t dim,const f32* cosine,const f32* sine,bool interleaved);
 
 void gx_softmax(f32* x, size_t n);
 void gx_softmax_temp(f32* x, size_t n, f32 temp);

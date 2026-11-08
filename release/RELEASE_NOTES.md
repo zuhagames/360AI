@@ -1,32 +1,30 @@
-# 360AI 1.2
+# 360AI 1.3
 
-Download **360AI-1.2-USB.zip**, extract it and copy the `360AI` folder to USB/HDD. Launch `360AI.xex` on your modded Xbox 360. **Gemma 3 270M and SmolLM2 135M weights are included.**
+Download **360AI-1.3-USB.zip**, extract it and copy the `360AI` folder to USB/HDD. Launch `360AI.xex` on your modded Xbox 360. **Gemma 3 270M and SmolLM2 135M weights are included.**
 
 ## What's new
 
-- **Remembered settings:** context, sampling, reply limit, compute/storage choices and chat/server toggles are saved beside the app. Saves replace files through a temporary file and preserve a valid recovery copy.
-- **New chat without reloading:** press **X** while idle to clear the conversation and KV history while keeping the model loaded. An active API request reports busy.
-- **Chat export:** press **START** while idle to save the current conversation as UTF-8 in `360AI-chat.txt`. This replaces the previous export; nothing is exported automatically.
-- **Per-request API controls:** temperature, top-k, `max_tokens` or `max_completion_tokens`, and up to four stop strings. Overrides do not change saved settings.
-- **Better streaming:** Unicode characters and stop strings can span tokens without broken output. Chat streams start with the assistant role, send prompt-progress comments, and cancel inference after a failed streaming send.
-- **Useful API results:** accurate stop/length reasons, token usage, optional final streaming usage, unique request IDs and generation timings. `/health` includes defaults and the last API/MCP timing snapshot.
-- **Client compatibility:** developer-role text maps to system messages for local templates. Invalid options and malformed UTF-8 JSON are rejected clearly.
-- **Reliability:** synchronized chat snapshots and final replies, visible worker-start failures, and consistent generation-end reporting.
+- **Chat scrollback:** D-pad up/down scrolls by line, LB/RB by page, and clicking the right stick returns to the newest text. Reading older messages pauses automatic following, even during a reply.
+- **Remembered model selection:** the browser highlights the last selected model after restart when its file is still present. Existing 1.2 settings remain compatible. Models do not load automatically.
+- **Safer long conversations:** keep recent complete turns in context instead of leaving an orphan assistant message. Reserve space for a reply using actual encoded prompt size, including template/BOS tokens.
+- **Clear trimming notices:** oversized input is shortened at UTF-8 boundaries while retaining the model template. The full message and older history remain available in scrollback and chat export.
+- **Less repeated work:** position angles are computed once per token and frequency table, then reused across attention heads and layers. Chat line wrapping is cached until text changes, and prompt fitting starts with recent history instead of repeatedly encoding the entire transcript.
+- **Browser reliability:** simultaneous navigation and selection cannot move the selection outside the model list.
 
-The 1.1.1 CPU kernels, core assignment, Auto compute/storage and history reuse remain included. No additional Xbox speedup is claimed for 1.2.
+All previous API, MCP, saved-settings, export, compute/storage Auto and conversation-cache features remain included. Bundled models and their required notices are unchanged.
 
 ## Updating
 
-Replace the executable and guides from the new ZIP. Existing weights are unchanged and may be kept. `360AI.json`, `360AI.json.bak` and exported conversations are not bundled, so updates preserve them. Delete both settings files if you want defaults.
+Copy the new executable and guides over your existing installation. Existing weights may be kept. Settings, backups and exported chats are not bundled, so updating preserves them.
 
-For local chat, start with **SmolLM2 135M**, context **512**, **Compute: Auto** and **Storage: Auto**. The folder must be writable for settings and exports.
+For local chat, start with **SmolLM2 135M**, context **512**, **Compute: Auto** and **Storage: Auto**. The app folder must be writable to save settings and exports.
 
 ## Validation and limits
 
-Built with the Xbox 360 SDK. Native checks cover settings round trips, damaged-file recovery, failed saves, Unicode split boundaries, malformed UTF-8, cross-token stop matching, cancellation and end reasons. HTTP tests cover request overrides, usage, stop sequences, stream role/usage chunks and validation in RAM and disk modes. All eight protocol/tokenizer/package groups pass.
+Xbox 360 SDK build and native checks pass, including scroll/follow behavior, model preference compatibility, prompt budgets, complete-turn retention, Unicode trimming and exact cached/reference rotary-transform comparisons. All eight protocol/tokenizer/package groups pass. Both real bundled models produce the same greedy sample text as 1.2; their RAM and streamed outputs and complete KV caches match exactly.
 
-Physical-console controller behavior, file persistence, GPU selection and performance still need hardware verification. The API remains a limited text-only compatible server; top-p, native tool calls and image inputs are not implemented. Large HDD models remain experimental and can be extremely slow.
+Physical-console controller behavior and performance still need hardware verification. No overall Xbox speedup is claimed from the reduced rotary calculations. Large HDD models can still be extremely slow. The console font remains ASCII; unsupported characters display as placeholders, while exports retain UTF-8.
 
-The single USB ZIP includes the executable, both models, model catalog/downloader, guides and required licenses/notices.
+The release contains one complete USB ZIP, with the executable, both models, model catalog/downloader, guides and required licenses/notices.
 
 Made by **ZuhaGames & Canyons**. A fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma. AI tools assisted with development, debugging and documentation.

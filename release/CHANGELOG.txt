@@ -1,3 +1,23 @@
+360AI 1.3 - console chat and prompt efficiency
+============================================
+
+- D-pad scrollback, LB/RB paging and right-stick return to newest text.
+- Scrolling pauses automatic following while a new reply streams.
+- Saved model selection; old settings remain compatible.
+- Long chats retain complete recent turns and reserve actual reply space.
+- Unicode-safe input trimming preserves templates and shows a notice.
+- Full input and older messages remain in scrollback and exports.
+- Shared per-token rotary angles and cached chat line wrapping.
+- Prompt fitting starts with recent history; browser selection is clamped.
+
+VALIDATION
+Xbox SDK build and all eight protocol/tokenizer/package groups passed.
+Native checks cover scroll/follow behavior, setting compatibility, prompt
+budgets, complete-turn retention, Unicode trimming and exact rotary math.
+Both bundled models retain 1.2 greedy sample text; RAM and disk outputs
+and full KV caches match exactly. Xbox controller behavior and speed
+still need physical-console validation. Large HDD models remain slow.
+
 360AI 1.2 - saved settings, chat controls and API improvements
 ===========================================================
 

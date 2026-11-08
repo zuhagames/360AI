@@ -4,6 +4,7 @@
 #include "common.h"
 #include "platform.h"
 #include "engine.h"
+#include "chat.h"
 
 enum app_screen{
   AS_BROWSE=0,
@@ -30,6 +31,7 @@ struct AppSettings{
   int backend_mode; // Auto / CPU / forced GPU
   int weight_mode; // Auto / RAM / HDD stream
   int reply_tokens;
+  std::string last_model;
 
   AppSettings();
   bool load(const char* path);
@@ -91,6 +93,7 @@ private:
   std::string chat_log_;
   std::string user_input_;
   std::string chat_notice_;
+  ChatView chat_view_;
 
   void browse_frame();
   void settings_frame();
@@ -118,9 +121,6 @@ private:
   static void on_prefill(u32 done,u32 total,void* user);
 
   void append_chat(const std::string& role, const std::string& text);
-  std::string build_prompt() const;
-  std::string build_prompt_impl(size_t from) const;
-  std::string build_fitted_prompt() const;
 };
 
 #endif

@@ -1,4 +1,4 @@
-360AI 1.2 - Xbox 360 USB package
+360AI 1.3 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -52,6 +52,9 @@ Console replies default to 128 tokens; change Reply token limit if needed.
 Xbox speed and full GPU correctness still need physical-console testing.
 
 NEW CHAT CONTROLS AND SAVED SETTINGS
+UP/DOWN: scroll one line. LB/RB: scroll a page. Click right stick: latest.
+Scrolling up pauses automatic following, including while a reply streams.
+Scroll to the bottom or click right stick to follow new text again.
 X: start a new conversation without reloading the model (when idle).
 START: save the current conversation to 360AI-chat.txt (when idle).
 Y: stop a running console reply. B: return to the model list.
@@ -61,9 +64,17 @@ If an API request is running, new chat reports busy instead of waiting.
 
 Settings are remembered in 360AI.json beside the executable, including
 context, sampling, reply limit, logging and chat/server/backend/storage.
+The model browser remembers your last selection when the file is present.
+It highlights that model after restart; it does not load automatically.
 A previous valid copy is kept in 360AI.json.bak for recovery. These files
 are not bundled in updates. Remove both files to restore defaults.
 The app folder must be writable to save settings and conversations.
+
+Long conversations keep complete recent turns in the model context.
+Older messages remain in the transcript for scrolling and export. Very long
+messages are shortened at UTF-8 character boundaries while preserving the
+model template; a notice explains when history or input was shortened.
+The original message remains in the transcript, including exported chats.
 
 OPTIONAL OPENAI / MCP SERVER
 Turn OpenAI / MCP server ON before loading the model. Use the IP and

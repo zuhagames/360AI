@@ -49,6 +49,64 @@ static void sampling_checks(){
   }
 }
 struct CancelAfterToken{ volatile bool stop; int calls; };
+static void chat_checks(){
+  ChatView view;view.update("0\n1\n2\n3\n4\n5",10,2);
+  assert(view.top()==4 && view.following());
+  view.scroll(-2);assert(view.top()==2 && !view.following());
+  view.update("0\n1\n2\n3\n4\n5\n6",10,2);
+  assert(view.top()==2 && !view.following());
+  view.scroll(-100);assert(view.top()==0);
+  view.scroll(100);assert(view.top()==5 && view.following());
+  view.update("0\n1\n2\n3\n4\n5\n6\n7",10,2);assert(view.top()==6);
+  view.scroll(-3);view.latest();assert(view.top()==6 && view.following());
+  view.update("abcde\nfghij\n",5,2);
+  assert(view.lines().size()==2 && view.lines()[0]=="abcde" && view.lines()[1]=="fghij");
+  view.update("abcdef",3,1);assert(view.lines().size()==2 && view.lines()[1]=="def");
+  view.update("A\xc5\xbe\xe4\xb8\xad\xf0\x9f\x98\x80\tB\r\n",20,1);
+  assert(view.lines().size()==1 && view.lines()[0]=="A??? B");
+  view.update("",1,0);assert(view.top()==0 && view.lines().size()==1);
+  const char* kinds[]={"qwen2","llama3-tokenizer","smollm-tokenizer","llama"};
+  for(int kind=0;kind<4;++kind){
+    GGUF g;assert(g.load(path(kinds[kind]).c_str()));Tokenizer tok;assert(tok.load(g));
+    std::vector<std::pair<int,std::string> > turns;
+    turns.push_back(std::make_pair(0,std::string("first question")));
+    turns.push_back(std::make_pair(1,std::string("old answer")));
+    turns.push_back(std::make_pair(0,std::string("latest question")));
+    FittedChat full=gx_fit_chat(tok,turns,4096,128);
+    assert(full.fits && !full.truncated && full.dropped_messages==0);
+    std::vector<int> ids;tok.encode_prompt(full.prompt,ids);assert(ids.size()<=4096-128);
+    std::vector<std::pair<int,std::string> > latest(1,turns.back());
+    FittedChat one=gx_fit_chat(tok,latest,4096,128);
+    tok.encode_prompt(one.prompt,ids);u32 budget=(u32)ids.size();
+    FittedChat fitted=gx_fit_chat(tok,turns,budget+16,16);
+    assert(fitted.fits && fitted.dropped_messages==2 && !fitted.truncated && fitted.prompt==one.prompt);
+    std::string long_text;for(int i=0;i<600;++i) long_text+="hi \xc5\xbe\xe4\xb8\xad\xf0\x9f\x98\x80 ";
+    turns.back().second=long_text;
+    fitted=gx_fit_chat(tok,turns,128,32);
+    assert(fitted.fits && fitted.truncated && fitted.dropped_messages==2 && gx_utf8_valid(fitted.prompt));
+    tok.encode_prompt(fitted.prompt,ids);assert(ids.size()<=96);
+    assert(turns.back().second==long_text); // Display/export keep the full input.
+    fitted=gx_fit_chat(tok,turns,1,1);assert(!fitted.fits);
+    turns.clear();assert(!gx_fit_chat(tok,turns,512,128).fits);
+    turns.push_back(std::make_pair(1,std::string("orphan answer")));
+    assert(!gx_fit_chat(tok,turns,512,128).fits);
+  }
+}
+static void rope_checks(){
+  const size_t dimensions[]={2,32,64,256};const int positions[]={0,1,17,511,8191};
+  for(int d=0;d<4;++d){
+    size_t n=dimensions[d];std::vector<f32> ts(n/2),cosine(n/2),sine(n/2),a(n),b(n);
+    for(size_t i=0;i<n/2;++i) ts[i]=1.0f/powf(10000.0f,(f32)i*2/(f32)n);
+    for(int p=0;p<5;++p) for(int interleaved=0;interleaved<2;++interleaved){
+      for(size_t i=0;i<n;++i) a[i]=b[i]=(f32)((int)(i%19)-9)*0.137f;
+      if(interleaved) gx_rope_interleaved(&a[0],n,&ts[0],positions[p]);
+      else gx_rope(&a[0],n,&ts[0],positions[p]);
+      gx_rope_angles(&ts[0],n/2,positions[p],&cosine[0],&sine[0]);
+      gx_rope_cached(&b[0],n,&cosine[0],&sine[0],interleaved!=0);
+      for(size_t i=0;i<n;++i) assert(a[i]==b[i]);
+    }
+  }
+}
 static void cancel_after_token(int,const char*,void* user){
   CancelAfterToken* state=(CancelAfterToken*)user; ++state->calls; state->stop=true;
 }
@@ -58,9 +116,11 @@ static void checks(){
     remove(file);remove("build/tests/preferences.json.bak");
     AppSettings s;s.ctx_size=2048;s.temperature=0.25f;s.topk=17;s.reply_tokens=96;
     s.backend_mode=1;s.weight_mode=2;s.server_on=true;s.chat_on=false;s.debug_level=2;
+    s.last_model="SmolLM2-135M-Instruct-Q8_0.gguf";
     assert(s.save(file));AppSettings loaded;assert(loaded.load(file));
     assert(loaded.ctx_size==2048 && loaded.temperature==0.25f && loaded.topk==17 && loaded.reply_tokens==96);
     assert(loaded.backend_mode==1 && loaded.weight_mode==2 && loaded.server_on && !loaded.chat_on && loaded.debug_level==2);
+    assert(loaded.last_model==s.last_model);
     s.ctx_size=4096;assert(s.save(file));assert(loaded.load(file) && loaded.ctx_size==4096);
     assert(gx_write_text_file(file,"{broken"));assert(loaded.load(file) && loaded.ctx_size==2048);
     // Repairing a damaged main file must preserve the valid recovery copy.
@@ -70,6 +130,11 @@ static void checks(){
     s.ctx_size=100000;assert(!s.save(file));assert(loaded.load(file) && loaded.ctx_size==2048);
     remove(file);remove("build/tests/preferences.json.bak");
     loaded.ctx_size=777;assert(!loaded.load(file) && loaded.ctx_size==777);
+    assert(gx_write_text_file(file,"{\"context\":256}"));
+    assert(loaded.load(file) && loaded.ctx_size==256 && loaded.last_model.empty());
+    const char* invalid_models[]={"../model.gguf","game:\\model.gguf","folder/model.gguf","model.txt","bad\n.gguf"};
+    for(int i=0;i<5;++i){AppSettings invalid;invalid.last_model=invalid_models[i];assert(!invalid.save(file));}
+    remove(file);remove("build/tests/preferences.json.bak");
   }
   {
     const std::string unicode="Hello \xc5\xbe\xe4\xb8\xad\xf0\x9f\x98\x80!";
@@ -99,6 +164,7 @@ static void checks(){
   }
   quant_checks();
   sampling_checks();
+  chat_checks();rope_checks();
   assert(gx_gpu_prefer(2,1,true) && !gx_gpu_prefer(1,2,true));
   assert(!gx_gpu_prefer(1,0.9,true) && !gx_gpu_prefer(2,1,false));
   assert(!gx_gpu_prefer(0,0,true) && !gx_gpu_prefer(1,-1,true));

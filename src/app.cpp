@@ -113,6 +113,9 @@ int App::run(){
     }
   }
 
+  for(size_t i=0;i<files_.size();++i)
+    if(files_[i].name==settings_.last_model){file_sel_=(int)i;break;}
+
   bool running = true;
   while(running){
     gxui_begin_frame(0xFF101018);
@@ -140,6 +143,7 @@ int App::run(){
         turns_.clear();
         chat_log_.clear();
         chat_notice_.clear();
+        chat_view_=ChatView();
         screen_ = AS_BROWSE;
       }
     }
@@ -216,9 +220,12 @@ void App::browse_frame(){
   u32 p = gxui_buttons_pressed();
   if(p & GX_BTN_DUP) file_sel_--;
   if(p & GX_BTN_DDOWN) file_sel_++;
+  file_sel_=GX_CLAMP(file_sel_,0,(int)files_.size()-1);
   if(p & GX_BTN_A){
     model_path_ = std::string(kBrowseDir) + "\\" + files_[file_sel_].name;
     model_name_ = files_[file_sel_].name;
+    settings_.last_model=model_name_;
+    save_settings();
     screen_ = AS_SETTINGS;
   }
 }
@@ -415,51 +422,6 @@ void App::append_chat(const std::string& role, const std::string& text){
   chat_log_ += "\n";
 }
 
-std::string App::build_prompt() const {
-  return build_prompt_impl(0);
-}
-
-std::string App::build_prompt_impl(size_t from) const {
-  std::vector<std::pair<std::string,std::string> > msgs;
-  for(size_t i = from; i < turns_.size(); ++i){
-    if(turns_[i].first == 0){
-      msgs.push_back(std::make_pair(std::string("user"), turns_[i].second));
-    } else {
-      msgs.push_back(std::make_pair(std::string("assistant"), turns_[i].second));
-    }
-  }
-  return engine_.tok().chat_prompt(msgs);
-}
-
-std::string App::build_fitted_prompt() const {
-  if(turns_.empty()) return build_prompt_impl(0);
-  size_t cap = (size_t)kv_.seq_len;
-  if(cap>(size_t)settings_.reply_tokens) cap-=settings_.reply_tokens;
-  else cap/=2;
-  if(cap > 2048) cap = 2048;
-  std::vector<int> ids;
-  std::string p;
-  size_t from = 0;
-  for(;;){
-    p = build_prompt_impl(from);
-    ids.clear();
-    engine_.tok().encode(p, ids);
-    if(ids.size() + 2 <= cap) return p;
-    if(from + 1 < turns_.size()){ ++from; continue; }
-    std::string t = turns_.back().second;
-    while(t.size() > 8){
-      t.resize(t.size() - t.size() / 4);
-      std::vector<std::pair<std::string,std::string> > last;
-      last.push_back(std::make_pair(std::string(turns_.back().first ? "assistant" : "user"), t));
-      std::string q = engine_.tok().chat_prompt(last);
-      ids.clear();
-      engine_.tok().encode(q, ids);
-      if(ids.size() + 2 <= cap) return q;
-    }
-    return p;
-  }
-}
-
 void App::chat_frame(){
   f32 lh = gxui_line_h(), cw = gxui_char_w();
   gxui_text_shadow(40, 20, GX_ACCENT, "Chat");
@@ -478,31 +440,26 @@ void App::chat_frame(){
 
   int max_lines = (int)((720.0f - (20.0f + lh*2) - lh*5) / lh);
   if(max_lines < 1) max_lines = 1;
-  std::vector<std::string> lines;
-  {
-    std::string cur;
-    for(size_t i = 0; i < body.size(); ++i){
-      char c = body[i];
-      if(c != '\n' && ((unsigned char)c >= 127 || (unsigned char)c < 32)) c = ' ';
-      if(c == '\n' || (f32)cur.size() * cw > 1180.0f){
-        lines.push_back(cur);
-        cur.clear();
-        if(c != '\n') cur += c;
-      } else {
-        cur += c;
-      }
-    }
-    if(!cur.empty()) lines.push_back(cur);
+  chat_view_.update(body,(int)(1180.0f/cw),max_lines);
+  u32 p=gxui_buttons_pressed();
+  if(!kb_mode_){
+    if(p & GX_BTN_DUP) chat_view_.scroll(-1);
+    if(p & GX_BTN_DDOWN) chat_view_.scroll(1);
+    if(p & GX_BTN_LB) chat_view_.scroll(-max_lines);
+    if(p & GX_BTN_RB) chat_view_.scroll(max_lines);
+    if(p & GX_BTN_RTHUMB) chat_view_.latest();
   }
-
-  int start = (int)lines.size() - max_lines;
-  if(start < 0) start = 0;
+  const std::vector<std::string>& lines=chat_view_.lines();
+  int start=chat_view_.top();
+  gxui_text_shadow(40,20+lh,GXRGB(120,140,150),
+    "UP/DOWN: scroll  LB/RB: page  R-stick: latest | %s",
+    chat_view_.following() ? "following reply" : "reading history");
   f32 y = 20 + lh*2;
-  for(int i = start; i < (int)lines.size(); ++i){
+  for(int i = start; i < (int)lines.size() && i < start+max_lines; ++i){
     const std::string& L = lines[i];
     u32 col = GXRGB(200,200,210);
-    if(L.compare(0, 15, "<start_of_turn>user") == 0) col = GXRGB(140,190,255);
-    else if(L.compare(0, 17, "<start_of_turn>model") == 0) col = GXRGB(180,220,160);
+    if(L.compare(0,5,"You: ")==0) col = GXRGB(140,190,255);
+    else if(L.compare(0,7,"Model: ")==0) col = GXRGB(180,220,160);
     gxui_text_md(40, y, col, L.c_str());
     y += lh;
   }
@@ -534,7 +491,6 @@ void App::chat_frame(){
     return;
   }
 
-  u32 p = gxui_buttons_pressed();
   if(generating_ && (p & GX_BTN_Y)){
     gen_stop_ = true;
   } else if(settings_.chat_on && !generating_){
@@ -555,6 +511,7 @@ void App::new_chat(){
   gx_thread_join(gen_thread_);gen_thread_=0;
   if(gen_mutex_) gx_mutex_lock(gen_mutex_);
   kv_.clear();turns_.clear();chat_log_.clear();gen_text_.clear();
+  chat_view_=ChatView();
   chat_notice_="New chat started. Model stays loaded.";
   if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
   if(eng_mutex_) gx_mutex_unlock(eng_mutex_);
@@ -571,6 +528,7 @@ void App::export_chat(){
 
 void App::start_generate(const std::string& prompt){
   if(generating_) return;
+  chat_view_.latest();
   gx_thread_join(gen_thread_); gen_thread_ = 0;
   generating_ = true;
   gen_stop_ = false;
@@ -794,8 +752,16 @@ void App::kb_commit(){
   } else if(mode == KB_CHAT){
     if(!kb_text_.empty()){
       turns_.push_back(std::make_pair(0, kb_text_));
+      FittedChat fitted=gx_fit_chat(engine_.tok(),turns_,kv_.seq_len,(u32)settings_.reply_tokens);
+      if(!fitted.fits){
+        turns_.pop_back();chat_notice_="Message template does not fit. Increase context or reduce reply limit.";return;
+      }
       append_chat("You: ", kb_text_);
-      start_generate(build_fitted_prompt());
+      start_generate(fitted.prompt);
+      if(gen_thread_){
+        if(fitted.truncated) chat_notice_="Message shortened to fit context; full text stays in the transcript.";
+        else if(fitted.dropped_messages) chat_notice_="Older messages skipped for context; scroll up to read them.";
+      }
     }
   }
   if(mode!=KB_CHAT) save_settings();

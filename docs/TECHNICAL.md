@@ -20,9 +20,15 @@ Settings are saved to `360AI.json` beside the executable after an edit or loadin
 
 While the console chat is idle, **X** starts a fresh conversation and clears its KV history while keeping the model loaded. If an API request holds the engine, it reports busy. **START** saves the current console conversation as UTF-8 in `360AI-chat.txt`, replacing the previous export. Nothing is exported automatically. **Y** still cancels an active console reply and **B** returns to the model browser. Controller menus and export persistence require physical-console verification.
 
+The browser highlights the model named by the optional `last_model` preference after restarting, when that file is present. Only a filename beside the executable is accepted; paths and control characters are rejected. Older preferences without this field remain valid. Selection is remembered without automatically loading a model.
+
+D-pad **up/down** scrolls chat by line; **LB/RB** moves by page. Click the **right stick** to return to the newest text. Scrolling up keeps the viewport fixed while a reply streams; returning to the bottom resumes following. A new message or new chat returns to following. Line wrapping is reused while the text is unchanged. The ASCII console font displays a placeholder for unsupported characters; exports preserve UTF-8.
+
+Console prompt fitting starts with the latest user message and adds complete earlier turns while they fit. It uses `encode_prompt` so BOS and template tokens count against the budget. Reply space is reserved (or half the context when the requested reply exceeds it). Very long messages are shortened at UTF-8 boundaries while preserving the template; input/history trimming is reported on screen. The original transcript remains available for scrolling and export. This fitting applies to console chat; API context handling is unchanged.
+
 ## HDD streaming and model downloads
 
-The 1.2 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
+The 1.3 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
 
 | Model | Exact model file size | Reserve free disk space | Status |
 | --- | --- | --- | --- |
@@ -74,6 +80,8 @@ This backend is experimental. Uploads, GPU/CPU synchronization and readbacks may
 For normal chat, start with **SmolLM2 135M**, context **512**, and compute/storage **Auto**. The included Q8 models normally fit RAM; streaming them unnecessarily adds disk latency to every token. Large HDD models trade memory capacity for speed and can remain extremely slow.
 
 The 1.1.1 CPU Q4/Q5/Q8 kernels multiply signed quantized weights directly, avoiding a full float row conversion and intermediate buffer on every dot product. Xenon uses VMX unpack/conversion operations. Q4_K/Q5_K decoding reuses group scales. Attention dot products, weighted sums and RMS normalization use vector operations. Inference and its two workers run on hardware threads 0, 2 and 4, one per physical core; worker completion uses an event instead of polling/yielding. The old workers inherited their parent's hardware-thread assignment, as described in [Microsoft's Xbox threading guidance](https://learn.microsoft.com/en-us/windows/win32/dxtecharts/coding-for-multiple-cores#creating-threads).
+
+Version 1.3 computes rotary sine/cosine tables once per token position (local and global tables for Gemma 3), then reuses them across heads/layers. Native tests compare the cached transform exactly against the previous split-half and interleaved calculations at multiple dimensions/positions. Both bundled models retain the same greedy sample text as 1.2. This reduces repeated trigonometry; overall Xbox speed has not been measured.
 
 Each KV cache retains the token sequence it has actually evaluated. Subsequent requests reuse the matching prefix and recompute the final prompt token for fresh logits. Changed/truncated prefixes, model reloads, backend changes and explicit cache clearing invalidate the appropriate data. Cancelled generation retains only completed token evaluations. History that no longer fits the context must still be processed again after trimming.
 
@@ -191,7 +199,7 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.2`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
+Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.3`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
 
 Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
@@ -226,7 +234,7 @@ Developed by **ZuhaGames & Canyons**. 360AI is a fork of [Canyons' gemma.xex](ht
 The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), and **SmolLM2 135M Instruct**, created by Hugging Face, using [lmstudio-community's GGUF conversion](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF). Their attribution, provenance, and terms are included in the download.
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.2">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.3">Get 360AI</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>
