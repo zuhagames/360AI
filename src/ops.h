@@ -21,6 +21,8 @@ void gx_softcap(f32* x, size_t n, f32 cap);
 // Return the k highest logit indices in descending order; k=0 selects all.
 // The caller supplies n index slots. Ties prefer the lower token ID.
 void gx_top_k(const f32* logits, u32 n, u32 k, u32* indices);
+void gx_repeat_penalty(f32* logits,u32 n,const std::vector<int>& history,size_t window,f32 penalty);
+u32 gx_nucleus_count(const f32* weights,const u32* sorted_indices,u32 count,f32 top_p,f64& total);
 
 struct TensorViewRow{
   const u8* data;

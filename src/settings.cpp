@@ -12,6 +12,12 @@ static bool boolean(const Json& j,const char* key,bool& value){
   const Json& n=j.get(key);if(n.type!=Json::BOOL) return false;
   value=n.flag;return true;
 }
+static bool decimal(const Json& j,const char* key,f64 low,f64 high,f32& value){
+  if(!j.has(key)) return true;
+  const Json& n=j.get(key);
+  if(n.type!=Json::NUMBER || n.number<low || n.number>high) return false;
+  value=(f32)n.number;return true;
+}
 static bool parse_settings(const std::string& text,AppSettings& out){
   Json j;if(!Json::parse(text,j) || j.type!=Json::OBJECT) return false;
   AppSettings s;int version=1;
@@ -22,6 +28,8 @@ static bool parse_settings(const std::string& text,AppSettings& out){
      !integer(j,"backend",0,2,s.backend_mode) ||
      !integer(j,"weight_storage",0,2,s.weight_mode) ||
      !integer(j,"reply_tokens",16,512,s.reply_tokens) ||
+     !decimal(j,"top_p",0.05,1.0,s.top_p) ||
+     !decimal(j,"repeat_penalty",1.0,1.5,s.repeat_penalty) ||
      !boolean(j,"server",s.server_on) || !boolean(j,"console_chat",s.chat_on)) return false;
   if(j.has("temperature")){
     const Json& n=j.get("temperature");
@@ -61,6 +69,7 @@ bool AppSettings::save(const char* path) const{
   j["backend"]=Json((double)backend_mode);j["weight_storage"]=Json((double)weight_mode);
   j["reply_tokens"]=Json((double)reply_tokens);
   j["last_model"]=Json(last_model);
+  j["top_p"]=Json((double)top_p);j["repeat_penalty"]=Json((double)repeat_penalty);
   j["server"]=Json::boolean(server_on);j["console_chat"]=Json::boolean(chat_on);
   AppSettings check;std::string next=j.dump()+"\n",previous;
   if(!parse_settings(next,check)) return false;
@@ -71,4 +80,24 @@ bool AppSettings::save(const char* path) const{
     if(!gx_write_text_file(backup.c_str(),previous)) return false;
   }
   return gx_write_text_file(path,next);
+}
+
+void AppSettings::apply_profile(int selected){
+  if(selected<1 || selected>3) return;
+  ctx_size=selected==1 ? 256 : 512;
+  reply_tokens=selected==1 ? 48 : (selected==2 ? 128 : 192);
+  temperature=selected==1 ? 0.6f : (selected==2 ? 0.8f : 0.95f);
+  topk=selected==1 ? 32 : (selected==2 ? 40 : 60);
+  top_p=selected==1 ? 0.9f : 0.95f;
+  repeat_penalty=selected==1 ? 1.1f : (selected==2 ? 1.08f : 1.05f);
+  backend_mode=weight_mode=0;
+}
+int AppSettings::profile() const{
+  for(int i=1;i<=3;++i){
+    AppSettings p;p.apply_profile(i);
+    if(ctx_size==p.ctx_size && reply_tokens==p.reply_tokens && temperature==p.temperature &&
+       topk==p.topk && top_p==p.top_p && repeat_penalty==p.repeat_penalty &&
+       backend_mode==p.backend_mode && weight_mode==p.weight_mode) return i;
+  }
+  return 0;
 }

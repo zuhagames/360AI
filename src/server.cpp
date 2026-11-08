@@ -167,6 +167,7 @@ struct Generation{
     config.temperature=settings ? settings->temperature : 0.8f;
     config.top_k=settings ? (u32)settings->topk : 40;
     config.greedy=config.temperature<=0.001f;config.stop=&stopping;config.cancel=&cancelled;
+    config.top_p=1.0f;config.repeat_penalty=1.0f;
     created=(double)time(0);last_heartbeat=gx_time_seconds();
     char name[96];snprintf(name,sizeof(name),"360ai-%u-%.0f",requests,last_heartbeat*1000000);id=name;
   }

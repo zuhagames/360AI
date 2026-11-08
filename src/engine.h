@@ -41,6 +41,7 @@ struct EngineCfg{
   bool greedy;
   const volatile bool* stop;
   const volatile bool* cancel;
+  f32 top_p,repeat_penalty; // zero leaves legacy sampling unchanged
 };
 
 struct Scratch{
@@ -77,7 +78,8 @@ public:
   int generate(const std::vector<int>& prompt, std::vector<int>& out_tokens,
                int max_new, KVCache& kv, const EngineCfg& ecfg,
                void (*on_token)(int, const char*, void*)=0, void* user=0,
-               void (*on_prefill)(u32,u32,void*)=0);
+               void (*on_prefill)(u32,u32,void*)=0,
+               void (*on_layer)(u32,u32,void*)=0);
 
   size_t scratch_bytes() const;
   size_t kv_bytes(u32 seq_len) const;
@@ -103,10 +105,11 @@ private:
   void free_scratch();
   Scratch sc_;
 
-  bool forward(const std::vector<int>& tokens, size_t tok_index, size_t pos, bool want_logits, KVCache& kv);
+  bool forward(const std::vector<int>& tokens,size_t tok_index,size_t pos,bool want_logits,KVCache& kv,
+               const EngineCfg& ecfg,void (*on_layer)(u32,u32,void*),void* user);
   void attention(size_t layer, const f32* xn, KVCache& kv, u32 pos, f32* q, f32* out);
   void ffn(size_t layer, const f32* xn);
-  int sample(const EngineCfg& ecfg);
+  int sample(const EngineCfg& ecfg,const std::vector<int>& generated);
 };
 
 #endif

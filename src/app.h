@@ -18,12 +18,13 @@ enum debug_cycle{
 };
 
 enum kb_kind{
-  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_SYS=0x100
+  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_SYS=0x100
 };
 
 struct AppSettings{
   int ctx_size;
   f32 temperature;
+  f32 top_p,repeat_penalty;
   int topk;
   int debug_level;
   bool server_on;
@@ -36,6 +37,8 @@ struct AppSettings{
   AppSettings();
   bool load(const char* path);
   bool save(const char* path) const;
+  void apply_profile(int profile);
+  int profile() const;
 };
 
 class App{
@@ -83,6 +86,7 @@ private:
   double gen_last_time_;
   double gen_first_time_;
   u32 gen_prompt_done_,gen_prompt_total_;
+  u32 gen_layer_done_,gen_layer_total_;
   int gen_count_;
   f32 gen_last_ms_;
   f32 gen_tps_;
@@ -119,6 +123,7 @@ private:
   void do_generate(const std::vector<int>& prompt);
   static void on_token(int id, const char* text, void* user);
   static void on_prefill(u32 done,u32 total,void* user);
+  static void on_layer(u32 done,u32 total,void* user);
 
   void append_chat(const std::string& role, const std::string& text);
 };

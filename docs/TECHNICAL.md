@@ -26,9 +26,25 @@ D-pad **up/down** scrolls chat by line; **LB/RB** moves by page. Click the **rig
 
 Console prompt fitting starts with the latest user message and adds complete earlier turns while they fit. It uses `encode_prompt` so BOS and template tokens count against the budget. Reply space is reserved (or half the context when the requested reply exceeds it). Very long messages are shortened at UTF-8 boundaries while preserving the template; input/history trimming is reported on screen. The original transcript remains available for scrolling and export. This fitting applies to console chat; API context handling is unchanged.
 
+## Console reply controls
+
+Select **Reply preset** in the Xbox Settings menu and press **A** to cycle the presets. Manually changing a matching value makes the label **Custom**. Existing settings keep top-p and repetition control disabled until selected; upgrades do not apply a preset automatically.
+
+| Preset | Context | Reply cap | Temperature | Top-k | Top-p | Repeat penalty |
+| --- | --- | --- | --- | --- | --- | --- |
+| Quick | 256 | 48 | 0.60 | 32 | 0.90 | 1.10 |
+| Balanced | 512 | 128 | 0.80 | 40 | 0.95 | 1.08 |
+| Creative | 512 | 192 | 0.95 | 60 | 0.95 | 1.05 |
+
+Each preset selects compute/storage Auto and preserves logging, model selection and chat/server toggles. Quick provides shorter replies and a smaller context budget. It does not imply a measured increase in hardware decode speed.
+
+**Top-P** accepts 0.05-1.00. After top-k and temperature, it retains the smallest descending candidate prefix reaching that fraction of probability mass, then samples from the retained weights. A value of 1 disables the cutoff; greedy sampling ignores it. **Repeat penalty** accepts 1.00-1.50 and examines only the last 64 tokens of the current generated reply. Each distinct token's positive logit is divided by the penalty; a negative logit is multiplied. Prompt tokens are excluded. A value of 1 disables it. The `top_p` and `repeat_penalty` preferences are saved to `360AI.json`; these controls are for console chat.
+
+The console footer shows layer progress during prompt and decode work. **Y** is checked between attention, feed-forward and layer operations. A current matrix, disk read or GPU operation finishes before the next check. Cancelling retains completed reply text. KV history includes only complete forward evaluations; partial cache writes are overwritten when that position is evaluated again. Native tests cover cancellation during prompt and decode layers, then compare recovered output tokens and valid cache rows against fresh generation. Hardware responsiveness and sampling quality remain console validation tasks.
+
 ## HDD streaming and model downloads
 
-The 1.3 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
+The 1.4 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
 
 | Model | Exact model file size | Reserve free disk space | Status |
 | --- | --- | --- | --- |
@@ -199,7 +215,7 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.3`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
+Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.4`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
 
 Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
@@ -234,7 +250,7 @@ Developed by **ZuhaGames & Canyons**. 360AI is a fork of [Canyons' gemma.xex](ht
 The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), and **SmolLM2 135M Instruct**, created by Hugging Face, using [lmstudio-community's GGUF conversion](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF). Their attribution, provenance, and terms are included in the download.
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.3">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.4">Get 360AI</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>

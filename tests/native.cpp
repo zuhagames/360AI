@@ -16,6 +16,23 @@ static std::string completion(const std::string& prompt,int n,void*){
   assert(n==2); return "reply: "+prompt;
 }
 static void sampling_checks(){
+  {
+    f32 logits[]={-4,2,0,6,10};std::vector<int> history;
+    const int ids[]={0,3,3,1,-1,100};history.assign(ids,ids+6);
+    gx_repeat_penalty(logits,5,history,64,2);
+    assert(logits[0]==-8 && logits[1]==1 && logits[2]==0 && logits[3]==3 && logits[4]==10);
+    f32 recent[]={-4,2,0,6,10};gx_repeat_penalty(recent,5,history,3,2);
+    assert(recent[0]==-4 && recent[1]==1 && recent[3]==6);
+    f32 unchanged[]={-4,2,0,6,10};gx_repeat_penalty(unchanged,5,history,64,1);
+    assert(unchanged[0]==-4 && unchanged[1]==2 && unchanged[3]==6);
+    f32 weights[]={1,8,1};u32 order[]={1,0,2};f64 total=0;
+    assert(gx_nucleus_count(weights,order,3,0.75f,total)==1 && total==8);
+    assert(gx_nucleus_count(weights,order,3,0.875f,total)==2 && total==9);
+    assert(gx_nucleus_count(weights,order,3,0.99f,total)==3 && total==10);
+    assert(gx_nucleus_count(weights,order,3,1,total)==3 && total==10);
+    assert(gx_nucleus_count(weights,order,3,0,total)==3 && total==10);
+    assert(gx_nucleus_count(weights,0,0,0.9f,total)==0 && total==0);
+  }
   const u32 counts[]={1,17,257};
   for(size_t c=0;c<sizeof(counts)/sizeof(counts[0]);++c){
     u32 n=counts[c];
@@ -49,6 +66,13 @@ static void sampling_checks(){
   }
 }
 struct CancelAfterToken{ volatile bool stop; int calls; };
+struct CancelInLayer{volatile bool stop;bool after_token;int tokens,layers;};
+static void count_layer_token(int,const char*,void* user){++((CancelInLayer*)user)->tokens;}
+static void cancel_in_layer(u32 done,u32 total,void* user){
+  CancelInLayer* state=(CancelInLayer*)user;
+  assert(done<=total);
+  if(done){++state->layers;if(!state->after_token || state->tokens) state->stop=true;}
+}
 static void chat_checks(){
   ChatView view;view.update("0\n1\n2\n3\n4\n5",10,2);
   assert(view.top()==4 && view.following());
@@ -117,10 +141,12 @@ static void checks(){
     AppSettings s;s.ctx_size=2048;s.temperature=0.25f;s.topk=17;s.reply_tokens=96;
     s.backend_mode=1;s.weight_mode=2;s.server_on=true;s.chat_on=false;s.debug_level=2;
     s.last_model="SmolLM2-135M-Instruct-Q8_0.gguf";
+    s.top_p=0.9f;s.repeat_penalty=1.1f;
     assert(s.save(file));AppSettings loaded;assert(loaded.load(file));
     assert(loaded.ctx_size==2048 && loaded.temperature==0.25f && loaded.topk==17 && loaded.reply_tokens==96);
     assert(loaded.backend_mode==1 && loaded.weight_mode==2 && loaded.server_on && !loaded.chat_on && loaded.debug_level==2);
     assert(loaded.last_model==s.last_model);
+    assert(loaded.top_p==s.top_p && loaded.repeat_penalty==s.repeat_penalty);
     s.ctx_size=4096;assert(s.save(file));assert(loaded.load(file) && loaded.ctx_size==4096);
     assert(gx_write_text_file(file,"{broken"));assert(loaded.load(file) && loaded.ctx_size==2048);
     // Repairing a damaged main file must preserve the valid recovery copy.
@@ -132,8 +158,23 @@ static void checks(){
     loaded.ctx_size=777;assert(!loaded.load(file) && loaded.ctx_size==777);
     assert(gx_write_text_file(file,"{\"context\":256}"));
     assert(loaded.load(file) && loaded.ctx_size==256 && loaded.last_model.empty());
+    assert(loaded.top_p==1 && loaded.repeat_penalty==1);
+    assert(gx_write_text_file(file,"{\"top_p\":0.05,\"repeat_penalty\":1.5}"));
+    assert(loaded.load(file) && loaded.top_p==0.05f && loaded.repeat_penalty==1.5f);
+    const char* bad_sampling[]={"{\"top_p\":0}","{\"top_p\":1.1}","{\"top_p\":\"0.9\"}","{\"repeat_penalty\":0.9}","{\"repeat_penalty\":1.6}","{\"repeat_penalty\":false}"};
+    for(int i=0;i<6;++i){assert(gx_write_text_file(file,bad_sampling[i]));assert(!loaded.load(file));}
     const char* invalid_models[]={"../model.gguf","game:\\model.gguf","folder/model.gguf","model.txt","bad\n.gguf"};
     for(int i=0;i<5;++i){AppSettings invalid;invalid.last_model=invalid_models[i];assert(!invalid.save(file));}
+    remove(file);remove("build/tests/preferences.json.bak");
+    for(int i=1;i<=3;++i){
+      AppSettings preset;preset.server_on=true;preset.last_model="chosen.gguf";preset.apply_profile(i);
+      assert(preset.profile()==i && preset.backend_mode==0 && preset.weight_mode==0);
+      assert(preset.server_on && preset.last_model=="chosen.gguf");
+      assert(preset.ctx_size==(i==1 ? 256 : 512));
+      assert(preset.reply_tokens==(i==1 ? 48 : (i==2 ? 128 : 192)));
+      assert(preset.save(file));AppSettings restored;assert(restored.load(file) && restored.profile()==i);
+      preset.topk++;assert(preset.profile()==0);
+    }
     remove(file);remove("build/tests/preferences.json.bak");
   }
   {
@@ -271,6 +312,8 @@ static void checks(){
     }
     sampled.top_k=1;
     assert(engine.generate(prompt,out,1,kv,sampled)==1 && out[0]==4);
+    sampled.top_k=2;sampled.top_p=0.05f;
+    for(int trial=0;trial<16;++trial) assert(engine.generate(prompt,out,1,kv,sampled)==1 && out[0]==4);
     // At position zero RoPE is identity: inspect the cache against an independent
     // projection calculation, including the Qwen key/value biases.
     const f32 embedding[]={0.3f,-0.4f,0.2f,0.1f};
@@ -290,6 +333,21 @@ static void checks(){
     assert(engine.generate(prompt,out,5,kv,local_cfg,cancel_after_token,&local_cancel)==1);
     assert(engine.stats().end_reason==GE_CANCELLED);
     for(int d=0;d<2;++d) assert(kv.k_row(0,1)[d]==0 && kv.v_row(0,1)[d]==0);
+    for(int during_decode=0;during_decode<2;++during_decode){
+      KVCache interrupted;interrupted.init(32,1,2,1);
+      CancelInLayer layer_state={false,during_decode!=0,0,0};EngineCfg layer_cfg=ec;layer_cfg.stop=&layer_state.stop;
+      int count=engine.generate(prompt,out,5,interrupted,layer_cfg,count_layer_token,&layer_state,0,cancel_in_layer);
+      assert(count==during_decode && engine.stats().end_reason==GE_CANCELLED);
+      assert(out.size()==(size_t)during_decode && interrupted.tokens.size()==(size_t)during_decode);
+      // A partially evaluated position must not be treated as a reusable token.
+      std::vector<int> recovered,reference;KVCache fresh;fresh.init(32,1,2,1);
+      engine.generate(prompt,recovered,3,interrupted,ec);engine.generate(prompt,reference,3,fresh,ec);
+      assert(recovered==reference && interrupted.tokens==fresh.tokens);
+      for(u32 pos=0;pos<fresh.tokens.size();++pos) for(int d=0;d<2;++d){
+        assert(interrupted.k_row(0,pos)[d]==fresh.k_row(0,pos)[d]);
+        assert(interrupted.v_row(0,pos)[d]==fresh.v_row(0,pos)[d]);
+      }
+    }
     KVCache empty; assert(engine.generate(prompt,out,1,empty,ec)==0);
     prompt[0]=-1; assert(engine.generate(prompt,out,1,kv,ec)==0);
     std::string response;

@@ -17,6 +17,7 @@ static const char* kSettingsPath="game:\\360AI.json";
 AppSettings::AppSettings(){
   ctx_size = 512;
   temperature = 0.8f;
+  top_p=1.0f;repeat_penalty=1.0f;
   topk = 40;
   debug_level = DC_WARN;
   server_on = false;
@@ -45,6 +46,7 @@ App::App(){
   gen_stop_ = false;
   gen_start_time_ = 0;
   gen_first_time_=0;gen_prompt_done_=gen_prompt_total_=0;
+  gen_layer_done_=gen_layer_total_=0;
   gen_last_time_ = 0;
   gen_count_ = 0;
   gen_last_ms_ = 0;
@@ -241,7 +243,7 @@ void App::settings_frame(){
 
   const char* backends[]={"Auto (benchmark)","CPU","GPU forced (experimental)"};
   const char* storage[]={"Auto (RAM when it fits)","RAM","HDD/USB stream (8 MB cache)"};
-  char line[10][192];
+  char line[13][192];
   snprintf(line[0], 192, "Context size        %d", settings_.ctx_size);
   snprintf(line[1], 192, "Temperature         %.2f", (double)settings_.temperature);
   snprintf(line[2], 192, "Top-K               %d", settings_.topk);
@@ -251,10 +253,14 @@ void App::settings_frame(){
   snprintf(line[6], 192, "Compute backend     %s", backends[settings_.backend_mode]);
   snprintf(line[7], 192, "Weight storage      %s",storage[settings_.weight_mode]);
   snprintf(line[8], 192, "Reply token limit   %d",settings_.reply_tokens);
-  snprintf(line[9], 192, "Load model");
+  const char* profiles[]={"Custom","Quick (short replies)","Balanced","Creative"};
+  snprintf(line[9],192,"Top-P               %.2f",(double)settings_.top_p);
+  snprintf(line[10],192,"Repeat penalty      %.2f",(double)settings_.repeat_penalty);
+  snprintf(line[11],192,"Reply preset        %s",profiles[settings_.profile()]);
+  snprintf(line[12],192,"Load model");
 
   f32 y = 30 + lh*3;
-  for(int i = 0; i < 10; ++i){
+  for(int i = 0; i < 13; ++i){
     if(i == set_sel_){
       gxui_fill(36, y - 2, 700, lh + 2, GX_ACCENT_A(60));
       gxui_text_shadow(40, y, GXRGB(255,255,255), "> %s", line[i]);
@@ -266,6 +272,7 @@ void App::settings_frame(){
 
   f32 my = gx_physical_free() / (1024.0f*1024.0f);
   if(!chat_notice_.empty()) gxui_text_shadow(40,720-lh*5,GXRGB(220,180,120),"%s",chat_notice_.c_str());
+  else if(set_sel_==11) gxui_text_shadow(40,720-lh*5,GXRGB(160,200,140),"Quick: 256 ctx/48 reply | Balanced: 512/128 | Creative: 512/192");
   gxui_text_shadow(40,720-lh*4,GXRGB(150,150,160),"GPU: %s",gx_gpu_diagnostic());
   gxui_text_shadow(40, 720 - lh*3, GXRGB(120,140,120), "Free memory: %.0f MB", my);
 
@@ -279,7 +286,7 @@ void App::settings_frame(){
   if(p & GX_BTN_DUP) set_sel_--;
   if(p & GX_BTN_DDOWN) set_sel_++;
   if(set_sel_ < 0) set_sel_ = 0;
-  if(set_sel_ > 9) set_sel_ = 9;
+  if(set_sel_ > 12) set_sel_ = 12;
 
   if(p & GX_BTN_A){
     switch(set_sel_){
@@ -327,6 +334,19 @@ void App::settings_frame(){
         kb_open(KB_REPLY,"Reply token limit","Maximum reply length (16-512)",ib);}
         break;
       case 9:
+        {char ib[32];snprintf(ib,sizeof(ib),"%.2f",(double)settings_.top_p);
+        kb_open(KB_TOPP,"Top-P","0.05-1.00 (1=off)",ib);}
+        break;
+      case 10:
+        {char ib[32];snprintf(ib,sizeof(ib),"%.2f",(double)settings_.repeat_penalty);
+        kb_open(KB_REPEAT,"Repeat penalty","1.00-1.50 (1=off)",ib);}
+        break;
+      case 11:
+        settings_.apply_profile(settings_.profile()%3+1);
+        chat_notice_="Preset applied. Compute and weight storage are set to Auto.";
+        save_settings();
+        break;
+      case 12:
         chat_notice_.clear();
         save_settings();
         gx_gpu_enable(false);
@@ -473,11 +493,12 @@ void App::chat_frame(){
     f32 lat = gen_last_ms_;
     int cnt = gen_count_;
     u32 done=gen_prompt_done_,total=gen_prompt_total_;
+    u32 layer=gen_layer_done_,layers=gen_layer_total_;
     if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
     if(cnt == 0){
-      gxui_text_shadow(40, 720 - lh*2, GX_ACCENT, "Processing prompt: %u/%u tokens (%.0fs)",done,total,gx_time_seconds()-gen_start_time_);
+      gxui_text_shadow(40,720-lh*2,GX_ACCENT,"Prompt: %u/%u tokens | layer %u/%u | %.0fs",done,total,layer,layers,gx_time_seconds()-gen_start_time_);
     } else {
-      gxui_text_shadow(40, 720 - lh*2, GX_ACCENT, "generating...   [%.1ft/s %.0fms latency]", (double)tps, (double)lat);
+      gxui_text_shadow(40,720-lh*2,GX_ACCENT,"Generating: %.1ft/s %.0fms | layer %u/%u",(double)tps,(double)lat,layer,layers);
     }
   } else {
     gxui_text_shadow(40, 720 - lh*2, GXRGB(90,90,100), "idle");
@@ -493,6 +514,7 @@ void App::chat_frame(){
 
   if(generating_ && (p & GX_BTN_Y)){
     gen_stop_ = true;
+    chat_notice_="Stopping after the current operation...";
   } else if(settings_.chat_on && !generating_){
     if(p & GX_BTN_X) new_chat();
     else if(p & GX_BTN_START) export_chat();
@@ -545,6 +567,7 @@ void App::start_generate(const std::string& prompt){
   gen_last_time_ = gen_start_time_;
   gen_count_ = 0;
   gen_first_time_=0;gen_prompt_done_=gen_prompt_total_=0;
+  gen_layer_done_=gen_layer_total_=0;
   gen_last_ms_ = 0;
   gen_tps_ = 0;
   if(gen_mutex_) gx_mutex_lock(gen_mutex_);
@@ -570,11 +593,13 @@ void App::do_generate(const std::vector<int>& prompt){
   ec.greedy = settings_.temperature <= 0.001f;
   ec.stop = &gen_stop_;
   ec.cancel=0;
+  ec.top_p=settings_.top_p;ec.repeat_penalty=settings_.repeat_penalty;
 
   std::vector<int> out;
   int maxn = GX_MIN(settings_.reply_tokens,(int)kv_.seq_len);
   if(eng_mutex_) gx_mutex_lock(eng_mutex_);
-  engine_.generate(prompt, out, maxn, kv_, ec, &App::on_token, this,&App::on_prefill);
+  engine_.generate(prompt,out,maxn,kv_,ec,&App::on_token,this,&App::on_prefill,&App::on_layer);
+  GenerationStats stats=engine_.stats();
   if(eng_mutex_) gx_mutex_unlock(eng_mutex_);
 
   std::string reply;
@@ -589,6 +614,7 @@ void App::do_generate(const std::vector<int>& prompt){
   }
   generating_ = false;
   gen_stop_ = false;
+  if(stats.end_reason==GE_CANCELLED) chat_notice_=reply.empty() ? "Stopped." : "Stopped. Partial reply kept.";
   if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
 }
 
@@ -614,6 +640,12 @@ void App::on_prefill(u32 done,u32 total,void* user){
   App* a=(App*)user;
   if(a->gen_mutex_) gx_mutex_lock(a->gen_mutex_);
   a->gen_prompt_done_=done;a->gen_prompt_total_=total;
+  if(a->gen_mutex_) gx_mutex_unlock(a->gen_mutex_);
+}
+void App::on_layer(u32 done,u32 total,void* user){
+  App* a=(App*)user;
+  if(a->gen_mutex_) gx_mutex_lock(a->gen_mutex_);
+  a->gen_layer_done_=done;a->gen_layer_total_=total;
   if(a->gen_mutex_) gx_mutex_unlock(a->gen_mutex_);
 }
 
@@ -749,6 +781,12 @@ void App::kb_commit(){
     settings_.topk = v;
   } else if(mode == KB_REPLY){
     settings_.reply_tokens=GX_CLAMP(atoi(kb_text_.c_str()),16,512);
+  } else if(mode == KB_TOPP){
+    f32 value=(f32)atof(kb_text_.c_str());if(value!=value) value=1;
+    settings_.top_p=GX_CLAMP(value,0.05f,1.0f);
+  } else if(mode == KB_REPEAT){
+    f32 value=(f32)atof(kb_text_.c_str());if(value!=value) value=1;
+    settings_.repeat_penalty=GX_CLAMP(value,1.0f,1.5f);
   } else if(mode == KB_CHAT){
     if(!kb_text_.empty()){
       turns_.push_back(std::make_pair(0, kb_text_));

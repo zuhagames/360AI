@@ -1,3 +1,23 @@
+360AI 1.4 - native reply controls and cancellation
+================================================
+
+- Quick, Balanced and Creative presets in the Xbox Settings menu.
+- Quick uses 256 context/48 reply tokens; Balanced 512/128; Creative 512/192.
+- Console top-p probability cutoff and recent reply repetition penalty.
+- New sampling preferences persist; existing settings keep old behavior.
+- Layer progress during prompt processing and reply generation.
+- Y cancellation checks between attention, feed-forward and layer work.
+- Partial replies survive cancellation; interrupted cache entries are not reused.
+
+VALIDATION
+Xbox SDK build, native sampling/preset/settings/cancellation/recovery checks
+and all eight protocol/tokenizer/package groups pass. Both bundled models
+keep previous greedy sample text with controls disabled; RAM and streamed
+outputs and complete KV caches match. Hardware menus, sampling quality and
+performance need console testing. Cancellation waits for the current matrix,
+disk read or GPU operation. Quick limits reply/context budgets; no Xbox
+tokens-per-second gain is claimed. Large HDD models remain slow.
+
 360AI 1.3 - console chat and prompt efficiency
 ============================================
 

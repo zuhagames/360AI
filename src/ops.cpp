@@ -176,6 +176,26 @@ void gx_top_k(const f32* logits, u32 n, u32 k, u32* indices){
   std::partial_sort(indices,indices+k,indices+n,gx_logit_order(logits));
 }
 
+void gx_repeat_penalty(f32* logits,u32 n,const std::vector<int>& history,size_t window,f32 penalty){
+  if(!(penalty>1.0f) || !window) return;
+  size_t start=history.size()>window ? history.size()-window : 0;
+  for(size_t i=start;i<history.size();++i){
+    int id=history[i];if(id<0 || (u32)id>=n) continue;
+    bool seen=false;for(size_t j=start;j<i;++j) if(history[j]==id){seen=true;break;}
+    if(!seen) logits[id]=logits[id]<0 ? logits[id]*penalty : logits[id]/penalty;
+  }
+}
+u32 gx_nucleus_count(const f32* weights,const u32* indices,u32 count,f32 top_p,f64& total){
+  total=0;for(u32 i=0;i<count;++i) total+=weights[indices ? indices[i] : i];
+  if(!count || !(top_p>0 && top_p<1) || !(total>0)) return count;
+  f64 target=total*top_p,retained=0;
+  for(u32 i=0;i<count;++i){
+    retained+=weights[indices ? indices[i] : i];
+    if(retained>=target){total=retained;return i+1;}
+  }
+  return count;
+}
+
 void gx_gelu_mul(f32* c1, const f32* c2, size_t n){
   const f32 k = 0.7978845608028654f;
   const f32 b = 0.044715f;

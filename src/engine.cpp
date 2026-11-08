@@ -203,10 +203,14 @@ void Engine::ffn(size_t layer, const f32* xn){
   add_bias(sc_.ffw_out,L.ffn_down_b,lc.model_dim,sc_.deq);
 }
 
-bool Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t pos, bool want_logits, KVCache& kv){
+static bool cancelled(const EngineCfg& c){return (c.stop && *c.stop) || (c.cancel && *c.cancel);}
+bool Engine::forward(const std::vector<int>& tokens,size_t tok_index,size_t pos,bool want_logits,KVCache& kv,
+                     const EngineCfg& ecfg,void (*on_layer)(u32,u32,void*),void* user){
   const ModelCfg& c = weights_.cfg;
   u32 md = c.model_dim;
   int tok = tokens[tok_index];
+  if(on_layer) on_layer(0,c.num_layers,user);
+  if(cancelled(ecfg)) return false;
   // Every head/layer in a forward pass shares this position.
   gx_rope_angles(&inv_ts_[0],inv_ts_.size(),(int)pos,&rope_cos_[0],&rope_sin_[0]);
   if(c.family==GF_GEMMA3)
@@ -217,12 +221,13 @@ bool Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t po
   if(want_logits) GX_LOG_ALL("fwd: emb %.4f %.4f %.4f", (double)sc_.x[0], (double)sc_.x[1], (double)sc_.x[2]);
 
   for(size_t layer = 0; layer < c.num_layers; ++layer){
+    if(cancelled(ecfg)) return false;
     const LayerWeights& L = weights_.layers[layer];
     for(u32 d = 0; d < md; ++d) sc_.xn[d] = sc_.x[d];
     rmsnorm_inplace(sc_.xn, L.attn_norm, md, c.rms_eps, sc_.deq);
 
     attention(layer, sc_.xn, kv, pos, sc_.q, sc_.hbuf);
-    if(!storage_ok()) return false;
+    if(!storage_ok() || cancelled(ecfg)) return false;
 
     L.o_w.matvec(sc_.hbuf, sc_.att_sum, md, sc_.deq);
     add_bias(sc_.att_sum,L.o_b,md,sc_.deq);
@@ -232,9 +237,11 @@ bool Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t po
     for(u32 d = 0; d < md; ++d) sc_.xn[d] = sc_.x[d];
     rmsnorm_inplace(sc_.xn, L.ffn_norm, md, c.rms_eps, sc_.deq);
     ffn(layer, sc_.xn);
-    if(!storage_ok()) return false;
+    if(!storage_ok() || cancelled(ecfg)) return false;
     if(L.post_ffw_norm.ok) rmsnorm_inplace(sc_.ffw_out, L.post_ffw_norm, md, c.rms_eps, sc_.deq);
     gx_add_to(sc_.x, sc_.ffw_out, md);
+    if(on_layer) on_layer((u32)layer+1,c.num_layers,user);
+    if(cancelled(ecfg)) return false;
     if(want_logits) GX_LOG_ALL("fwd: L%02d %.4f %.4f %.4f", (int)layer,
                                (double)sc_.x[0], (double)sc_.x[1], (double)sc_.x[2]);
   }
@@ -248,11 +255,12 @@ bool Engine::forward(const std::vector<int>& tokens, size_t tok_index, size_t po
     if(c.final_logit_softcapping > 0.0f)
       gx_softcap(sc_.logits, c.vocab_size, c.final_logit_softcapping);
   }
-  return storage_ok();
+  return storage_ok() && !cancelled(ecfg);
 }
 
-int Engine::sample(const EngineCfg& ecfg){
+int Engine::sample(const EngineCfg& ecfg,const std::vector<int>& generated){
   u32 n = weights_.cfg.vocab_size;
+  gx_repeat_penalty(sc_.logits,n,generated,64,ecfg.repeat_penalty);
   if(ecfg.greedy || ecfg.temperature <= 0.0f){
     u32 best = 0;
     f32 bv = sc_.logits[0];
@@ -267,12 +275,13 @@ int Engine::sample(const EngineCfg& ecfg){
   // Top-k order is unchanged by temperature or softmax. Evaluate exponentials
   // only for retained candidates, then sample their conditional distribution.
   f32 maximum = sc_.logits[idx[0]];
-  f64 total = 0.0;
   for(u32 i = 0; i < k; ++i){
     f32 weight=expf((sc_.logits[idx[i]]-maximum)/ecfg.temperature);
     sc_.logits[idx[i]]=weight;
-    total+=weight;
   }
+  // The index buffer is vocabulary-sized; logits now hold retained weights.
+  // Accumulate nucleus mass through indices, without another vocabulary buffer.
+  f64 total=0;k=gx_nucleus_count(sc_.logits,idx,k,ecfg.top_p,total);
   if(total <= 0.0) return (int)idx[0];
   f64 r = ((f64)rand() / (f64)RAND_MAX) * total;
   f64 acc = 0.0;
@@ -283,11 +292,10 @@ int Engine::sample(const EngineCfg& ecfg){
   return (int)idx[k-1];
 }
 
-static bool cancelled(const EngineCfg& c){return (c.stop && *c.stop) || (c.cancel && *c.cancel);}
 int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_tokens,
                      int max_new, KVCache& kv, const EngineCfg& ecfg,
                      void (*on_token)(int, const char*, void*), void* user,
-                     void (*on_prefill)(u32,u32,void*)){
+                     void (*on_prefill)(u32,u32,void*),void (*on_layer)(u32,u32,void*)){
   out_tokens.clear();
   stats_=GenerationStats();
   if(!loaded_ || prompt.empty() || !kv.seq_len || max_new <= 0 ||
@@ -323,12 +331,18 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
 
   for(size_t i = reused; i + 1 < pr.size(); ++i){
     if(cancelled(ecfg)){stats_.end_reason=GE_CANCELLED;out_tokens.clear();return 0;}
-    if(!forward(pr, i, i, false, kv)){stats_.end_reason=GE_ERROR;out_tokens.clear();return 0;}
+    if(!forward(pr,i,i,false,kv,ecfg,on_layer,user)){
+      stats_.end_reason=cancelled(ecfg) ? GE_CANCELLED : GE_ERROR;
+      stats_.prefill_seconds=gx_time_seconds()-started;out_tokens.clear();return 0;
+    }
     kv.tokens.push_back(pr[i]);++stats_.evaluated_tokens;
     if(on_prefill) on_prefill((u32)(i+1),(u32)pr.size(),user);
   }
   if(cancelled(ecfg)){stats_.end_reason=GE_CANCELLED;out_tokens.clear();return 0;}
-  if(!forward(pr, pr.size() - 1, pr.size() - 1, true, kv)){stats_.end_reason=GE_ERROR;out_tokens.clear();return 0;}
+  if(!forward(pr,pr.size()-1,pr.size()-1,true,kv,ecfg,on_layer,user)){
+    stats_.end_reason=cancelled(ecfg) ? GE_CANCELLED : GE_ERROR;
+    stats_.prefill_seconds=gx_time_seconds()-started;out_tokens.clear();return 0;
+  }
   kv.tokens.push_back(pr.back());++stats_.evaluated_tokens;
   stats_.prefill_seconds=gx_time_seconds()-started;
   if(on_prefill) on_prefill((u32)pr.size(),(u32)pr.size(),user);
@@ -339,7 +353,7 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
     for(u32 i = 1; i < n; ++i) if(sc_.logits[i] > bv){ bv = sc_.logits[i]; best = i; }
     GX_LOG_ALL("gen: argmax %d %.2f", (int)best, (double)bv);
   }
-  int next = sample(ecfg);
+  int next = sample(ecfg,out_tokens);
 
   size_t pos = pr.size();
   for(int g = 0; g < max_new; ++g){
@@ -356,10 +370,13 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
     if(g+1>=max_new){stats_.end_reason=GE_LIMIT;break;}
     if(pos>=kv.seq_len){stats_.end_reason=GE_CONTEXT;break;}
     std::vector<int> one(1, next);
-    if(!forward(one, 0, pos, true, kv)){stats_.end_reason=GE_ERROR;out_tokens.clear();return 0;}
+    if(!forward(one,0,pos,true,kv,ecfg,on_layer,user)){
+      if(cancelled(ecfg)){stats_.end_reason=GE_CANCELLED;break;}
+      stats_.end_reason=GE_ERROR;out_tokens.clear();return 0;
+    }
     kv.tokens.push_back(next);++stats_.evaluated_tokens;
     pos++;
-    next = sample(ecfg);
+    next = sample(ecfg,out_tokens);
   }
   stats_.generated_tokens=(u32)out_tokens.size();
   stats_.decode_seconds=gx_time_seconds()-started-stats_.prefill_seconds;
