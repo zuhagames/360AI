@@ -58,6 +58,7 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 
 ## Features
 
+- **360 Assistant (1.6 builds):** press X on the model list for offline keyword commands, calculations, conversions, notes and timers. No weights needed. [Commands](release/ASSISTANT.txt).
 - Console chat with controller and on-screen keyboard support.
 - Saved settings and model selection, chat scrollback, new chat, and USB/HDD export.
 - Long conversations keep recent complete turns in context and show trimming notices.

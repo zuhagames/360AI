@@ -1,7 +1,12 @@
-360AI 1.5 - Xbox 360 USB package
+360AI 1.6 - Xbox 360 USB package
 ================================
 
 INSTALL
+For immediate keyword answers without a model, launch 360AI.xex and press X
+on the model list. Press A, type help, and read ASSISTANT.txt for commands.
+360 Assistant handles calculations, conversions, notes and session timers.
+This mode uses text, not voice. It works even with no GGUF files installed.
+
 1. Extract the ZIP on your PC.
 2. Copy the entire 360AI folder to your USB drive.
 3. Gemma 3 270M, SmolLM2 135M and two TinyStories toys are included.
@@ -22,6 +27,8 @@ Example USB layout:
   USB:/360AI/START_HERE.txt
   USB:/360AI/CHANGELOG.txt
   USB:/360AI/CREDITS.txt
+  USB:/360AI/ASSISTANT.txt
+  USB:/360AI/assistant-rules.example.json
 
 The folder can also be copied to your Xbox HDD. Keep the GGUF beside
 the executable. No SDK, Visual Studio, Node.js or separate shader files

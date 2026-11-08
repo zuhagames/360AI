@@ -5,6 +5,7 @@
 #include "platform.h"
 #include "engine.h"
 #include "chat.h"
+#include "assistant.h"
 
 enum app_screen{
   AS_BROWSE=0,
@@ -71,6 +72,10 @@ private:
   Engine engine_;
   KVCache kv_;
   bool model_loaded_;
+  bool assistant_mode_;
+  Assistant assistant_;
+  std::string timer_notice_;
+  double timer_notice_until_;
 
   volatile bool loading_;
   volatile bool load_ok_;
@@ -106,6 +111,10 @@ private:
   void save_settings();
   void new_chat();
   void export_chat();
+  void open_assistant();
+  void assistant_send(const std::string& text);
+  void assistant_poll();
+  AssistantContext assistant_context() const;
 
   void kb_open(int mode, const char* title, const char* desc, const std::string& initial);
   void kb_draw();

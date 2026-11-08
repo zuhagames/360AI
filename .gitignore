@@ -10,3 +10,8 @@ bridge/*.local.json
 /360AI.json.bak.tmp
 /360AI-chat.txt
 /360AI-chat.txt.tmp
+/360AI-assistant.json
+/360AI-assistant.json.bak
+/360AI-assistant.json.tmp
+/360AI-assistant.json.bak.tmp
+/assistant-rules.json

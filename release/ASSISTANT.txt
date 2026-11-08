@@ -1,0 +1,106 @@
+360 Assistant - native offline keyword and intent mode
+======================================================
+
+OPEN IT
+Launch 360AI.xex. On the model list press X, even if no GGUF files are present.
+Press A to enter text with the existing controller keyboard. Type help.
+This mode runs inside the Xbox app with no model inference, website or PC.
+It is a text assistant: microphone input, speech recognition and voice output
+are not implemented. It matches supported intents, not arbitrary conversation.
+
+CALCULATOR
+  calculate (12 + 8) * 3
+  what is 20 percent of 80
+  calculate sqrt(81) + abs(-5)
+  calculate 2^8
+  calculate ans / 2
+Precedence, parentheses, unary minus, right-associative powers, round, pi and
+e are supported. ans is the last successful answer. % means remainder.
+Division by zero, invalid syntax, overflow and overly complex input fail
+without changing ans. Expressions are bounded to 256 characters.
+
+UNIT CONVERSIONS
+  convert 5 miles to km
+  and 10
+  what is 32 F in C
+  convert 2 kg to lb
+  convert 1 MiB to bytes
+Length, mass, temperature, time and byte storage are supported. Follow-up
+and 10 reuses the last successful unit pair. MB/GB use decimal bytes;
+MiB/GiB use binary bytes. Currency and live exchange rates are unavailable.
+
+TIMERS AND RELATIVE REMINDERS
+  set timer 5 minutes called pizza
+  set timer 1h30m
+  remind me in 10 minutes to check the oven
+  remind me to stretch
+  (then answer 5 minutes)
+  list timers
+  cancel timer 1
+  cancel all timers
+  timer history
+Up to eight timers, 1 second to 7 days, run while 360AI remains open. Half an
+hour, two minutes and compound durations are understood. Completion shows
+a ten-second banner on app screens and records a chat alert. Timer history
+keeps the last eight alerts for this session. Timers/history do not survive
+closing or restarting the app. There is no system alarm or audio alert.
+
+NOTES AND NAME
+  remember to buy batteries
+  remember
+  (then enter the note)
+  list notes
+  delete note 1
+  delete all notes
+  my name is Martin
+  what is my name
+  forget my name
+Up to 32 notes (512 bytes each) and a name (64 bytes) save as plain text in
+360AI-assistant.json beside the app, with a previous valid .bak recovery copy.
+The drive must be writable. A save failure is shown on screen; data stays
+in memory for this session. Updates do not include or overwrite these files.
+Deleting one note requires its exact number. Deleting all notes and clearing
+chat ask yes/no; a different request cancels the pending operation.
+
+XBOX APP COMMANDS AND HELP
+  status | time | date | list models
+  quick preset | balanced preset | creative preset
+  help with GPU | help with memory | help with MCP | help with controls
+  joke | another joke
+  export chat | clear chat | open models
+Presets change saved GGUF settings. They do not change keyword answers.
+Clock/date use the console's configured clock. No current weather, news,
+internet searches or prices are provided. Unknown questions receive a clear
+fallback. Spelling suggestions never automatically execute a command.
+
+FOLLOW-UPS AND CONTROLS
+Use cancel or never mind to leave a follow-up. A recognized new command
+replaces it. Polite prefixes, case differences and normal spacing are handled.
+Use one command per message. Negated commands do not execute; don't forget
+to is treated as a request to save a note. Timer alerts still work after
+returning to models or switching to a GGUF while this app remains open.
+
+A: input. D-pad: scroll. LB/RB: page. Right-stick: latest. X: new chat.
+START: save transcript to 360AI-chat.txt. B: model list.
+New/cleared chat resets dialog, ans and conversion follow-ups. It keeps saved
+notes, your name and session timers. Assistant scrollback is bounded.
+
+CUSTOM ANSWERS
+Copy assistant-rules.example.json to assistant-rules.json to add custom
+answers, then edit that copy and restart. Updates include only the example,
+preserving your custom file. The example is used when no valid custom file
+is available. Optional assistant-rules.json contains version 1 and a rules array. Each rule
+has phrases (1-8 strings, up to 80 bytes each) and response (up to 2000 bytes).
+Up to 64 rules in a 64 KiB file are accepted. Entire phrases match at word
+boundaries; the longest match wins. Equal-length custom answers take priority
+over built-in FAQ entries. Built-in actions take priority over FAQ rules.
+Rules return text only, with no scripts, shell commands or networking.
+Restart after editing. An invalid file is ignored; built-in commands remain.
+
+VALIDATION
+Native tests exercise arithmetic errors/precedence, conversion dimensions,
+follow-up slots, word boundaries, typo suggestions, negation, confirmations,
+timer expiry/cancellation/limits, note limits, persistence/backup recovery and
+custom-rule validation. Xbox SDK compilation is checked. Physical-console
+menus, keyboard behavior, timer banner and storage persistence still need
+hardware validation. No Siri-equivalent language or speech ability is claimed.

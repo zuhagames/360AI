@@ -1,3 +1,24 @@
+360AI 1.6 - native offline keyword assistant
+==========================================
+
+- Press X on the model list to open 360 Assistant with no GGUF weights.
+- Calculations, operator precedence, functions, percentages and ans.
+- Unit conversion and follow-up values across five unit dimensions.
+- Eight session timers, relative reminders, named alerts and timer history.
+- Saved notebook/name with validated JSON, atomic writes and backup recovery.
+- Status, console clock, model list, presets, export and model navigation.
+- Keyword/phrase boundaries, polite prefixes, follow-up slots, negation,
+  confirmations, conservative typo suggestions and clear fallback responses.
+- Optional text-only FAQ rules; bounded input, notes, rules and scrollback.
+- Fallback keyboard now includes parentheses, powers and apostrophes.
+- Assistant chat requires no inference or network. Existing GGUF mode remains.
+
+Text input/output only: no microphone, speech recognition or spoken replies.
+Timers need the app to remain running and do not survive restarting it.
+Personal notes/settings are not bundled. Full model package remains available.
+Native functional checks and Xbox SDK build pass; physical controller/UI,
+alert banner and drive persistence require Xbox validation. See ASSISTANT.txt.
+
 360AI 1.5 - smaller models and native speed defaults
 ===================================================
 
