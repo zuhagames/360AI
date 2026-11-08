@@ -12,6 +12,11 @@ static std::string quoted(const std::string& s){
   for(size_t i=0;i<s.size();++i){
     unsigned char c=(unsigned char)s[i];
     if(c=='"'||c=='\\'){ o+='\\'; o+=c; }
+    else if(c=='\b') o+="\\b";
+    else if(c=='\f') o+="\\f";
+    else if(c=='\n') o+="\\n";
+    else if(c=='\r') o+="\\r";
+    else if(c=='\t') o+="\\t";
     else if(c<32){ char b[7]; snprintf(b,sizeof(b),"\\u%04x",(unsigned)c); o+=b; }
     else o+=c;
   }

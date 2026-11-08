@@ -2,6 +2,60 @@
 
 static AssistantReply ask(Assistant& a,const char* text,AssistantContext& c){return a.respond(text,c);}
 static bool contains(const AssistantReply& r,const char* text){return r.text.find(text)!=std::string::npos;}
+static void assistant_followup_checks(){
+  AssistantContext c;c.now=100;c.clock="12:34:56";c.date="2026-11-08";c.version="test";
+  const char* interrupts[]={"status?","time?","date?","notes","timers","timer history","recent alerts","version","free memory","system status","available models","hello","tell me a joke"};
+  const char* prompts[]={"remember","edit note 1","calculate","search notes","set timer","my name is"};
+  for(size_t p=0;p<sizeof(prompts)/sizeof(prompts[0]);++p) for(size_t i=0;i<sizeof(interrupts)/sizeof(interrupts[0]);++i){
+    Assistant a;ask(a,"remember original content",c);ask(a,prompts[p],c);AssistantReply r=ask(a,interrupts[i],c);
+    assert(r.action==AA_NONE && a.note_count()==1 && a.timer_count()==0);
+    assert(!contains(r,"Saved note ") && !contains(r,"Calculation:") && !contains(r,"What should") && !contains(r,"For how long"));
+    assert(contains(ask(a,"read note 1",c),"original content"));assert(contains(ask(a,"my name",c),"haven't told"));
+  }
+  Assistant a;ask(a,"remember original",c);ask(a,"remember",c);assert(ask(a,"model list",c).action==AA_MODELS);assert(a.note_count()==1);
+  ask(a,"remember",c);assert(ask(a,"save conversation",c).action==AA_EXPORT);assert(a.note_count()==1);
+  ask(a,"remember",c);assert(contains(ask(a,"take a note replacement",c),"note 2: replacement"));
+  ask(a,"edit note 1: status?",c);assert(contains(ask(a,"read note 1",c),"status?")); // Explicit payload stays literal.
+  const char* labels[]={"the tea","my tea","study timer","timer tea","the timer timer","the","my"};
+  for(size_t i=0;i<sizeof(labels)/sizeof(labels[0]);++i){
+    Assistant timers;ask(timers,("set timer 5 minutes called "+std::string(labels[i])).c_str(),c);ask(timers,"set timer 2 minutes called spare",c);
+    assert(contains(ask(timers,("pause timer "+std::string(labels[i])).c_str(),c),"paused"));
+    assert(!contains(ask(timers,"check timer 2",c),"paused"));
+    assert(contains(ask(timers,("resume timer "+std::string(labels[i])).c_str(),c),"running"));
+    assert(contains(ask(timers,("cancel timer "+std::string(labels[i])).c_str(),c),"cancelled"));assert(timers.timer_count()==1);
+  }
+  Assistant timers;ask(timers,"set timer 5 minutes called tea",c);
+  assert(contains(ask(timers,"pause ---",c),"couldn't find"));ask(timers,"cancel",c);
+  assert(contains(ask(timers,"cancel timer ???",c),"couldn't find"));assert(timers.timer_count()==1);ask(timers,"cancel",c);
+  assert(!contains(ask(timers,"check timer 1",c),"paused"));
+  assert(contains(ask(timers,"pause timer?",c),"paused")); // Explicit empty selector may choose the sole timer.
+  ask(timers,"set timer 5 minutes called ---",c);assert(timers.timer_count()==1);
+  ask(timers,"set timer 5 minutes called extra",c);ask(timers,"pause timer",c);
+  assert(contains(ask(timers,"timer history",c),"No completed"));
+  assert(contains(ask(timers,"yes",c),"no confirmation"));
+  ask(timers,"set timer 5 minutes called 1",c);ask(timers,"cancel timer -1",c);assert(timers.timer_count()==3);ask(timers,"cancel",c);
+  const char* triggers[]={"answer to life","round table","half life","one question","2 apples"};
+  for(size_t i=0;i<sizeof(triggers)/sizeof(triggers[0]);++i){ask(a,("teach "+std::string(triggers[i])+": a taught reply").c_str(),c);assert(contains(ask(a,triggers[i],c),"a taught reply"));}
+  assert(contains(ask(a,"what is one plus two",c),"Result: 3"));
+  assert(contains(ask(a,"what is five miles in km",c),"8.04672 km"));
+  assert(contains(ask(a,"ans / 2",c),"Result: 1.5"));
+  assert(contains(ask(a,"pi * 0",c),"Result: 0"));
+  assert(contains(ask(a,"e^0",c),"Result: 1"));
+  assert(contains(ask(a,"sqrt(81)",c),"Result: 9"));
+  assert(contains(ask(a,"1e309",c),"too large"));
+
+  // Valid hand-edited saves may use compact JSON newline/tab escapes. Loading
+  // one must not expand its next save/undo snapshot beyond the 64 KiB limit.
+  const char* file="build/tests/assistant-multiline.json";remove(file);remove("build/tests/assistant-multiline.json.bak");
+  std::string json="{\"version\":1,\"name\":\"Legacy\",\"notes\":[";
+  for(int i=1;i<=32;++i){if(i>1) json+=',';char id[20];snprintf(id,sizeof(id),"%d",i);json+="{\"id\":"+std::string(id)+",\"text\":\"x";
+    for(int n=0;n<511;++n) json+=(n%2 ? "\\t" : "\\n");json+="\"}";}
+  json+="]}";assert(json.size()<65536 && gx_write_text_file(file,json));Assistant saved;assert(saved.load(file));
+  assert(saved.save(file));assert(contains(ask(saved,"delete note 32",c),"deleted"));
+  assert(contains(ask(saved,"undo",c),"Undid") && saved.note_count()==32);assert(saved.save(file));
+  Assistant restored;assert(restored.load(file) && restored.note_count()==32);remove(file);remove("build/tests/assistant-multiline.json.bak");
+  std::cout<<"Assistant follow-up interruption, literal timer labels and multiline save/undo regressions passed\n";
+}
 static void assistant_debug_checks(){
   Assistant a;AssistantContext c;c.now=100;
   assert(contains(ask(a,"calculate twenty-five plus one hundred and five",c),"Result: 130"));
@@ -213,5 +267,6 @@ static void assistant_checks(){
   assert(contains(limits.respond(std::string(513,'x'),c),"512"));
   assert(limits.respond("don't export chat",c).action==AA_NONE);
   assistant_debug_checks();
+  assistant_followup_checks();
   std::cout<<"Keyword assistant intent, math, units, timer, notebook and persistence checks passed\n";
 }

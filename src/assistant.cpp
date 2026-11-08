@@ -200,14 +200,31 @@ std::string remaining(double seconds){
   if(n || s.empty()) s+=integer_text(n)+"s";return trim(s);
 }
 bool mathish(const std::string& s){
-  std::string t=lower(trim(s));double n=0;size_t end=0;bool spelled=english_number(t,0,n,end);
-  std::string first=t.substr(0,t.find(' '));if(first=="a" || first=="an") spelled=false;
-  return !t.empty() && (spelled || isdigit((u8)t[0]) || t[0]=='-' || t[0]=='+' || t[0]=='(' || t[0]=='.' ||
-    t.compare(0,3,"ans")==0 || t=="pi" || t=="e" || t.compare(0,4,"sqrt")==0 || t.compare(0,3,"abs")==0 || t.compare(0,5,"round")==0);
+  std::string t=lower(trim(s));if(t.empty()) return false;
+  if(t[0]=='-' || t[0]=='+' || t[0]=='(' || t[0]=='.') return true;
+  double n=0;size_t end=0;
+  if(!scalar(t,n,end)){
+    if(end) return true; // Numeric overflow is still a calculation error.
+    size_t token=0;while(token<t.size() && isalpha((u8)t[token])) ++token;
+    std::string name=t.substr(0,token),tail=trim(t.substr(token));
+    if(name=="sqrt" || name=="abs" || name=="round") return !tail.empty() && tail[0]=='(';
+    if(name=="ans" || name=="pi" || name=="e") end=token;
+    else if(name=="a" || name=="an" || !english_number(t,0,n,end)) return false;
+  }
+  // A number or function prefix inside a phrase is not an expression:
+  // "answer to life", "half life" and "one question" may be taught answers.
+  std::string tail=trim(t.substr(end)),unused;if(tail.empty()) return true;
+  if(tail[0]=='+' || tail[0]=='-' || tail[0]=='*' || tail[0]=='/' || tail[0]=='%' || tail[0]=='^' || tail[0]=='?' || tail[0]=='!') return true;
+  const char* operators[]={"plus","minus","times","multiplied by","divided by","squared","percent of"};
+  for(size_t i=0;i<sizeof(operators)/sizeof(operators[0]);++i) if(take(words(tail),operators[i],unused)) return true;
+  size_t split=tail.find(" to ");if(split==std::string::npos) split=tail.find(" in ");
+  return split!=std::string::npos && unit(tail.substr(0,split))!=0;
 }
 bool new_request(const std::string& raw){
-  const char* commands[]={"time","date","status","help","list","show","cancel","stop","delete","forget","clear","convert","calculate","compute","work out","remember","remind","my name","call me","open","switch","use","set","quick preset","balanced preset","creative preset","what","what's","whats","who","how","export","save chat","joke","another joke","find notes","search notes","read note","edit note","change note","teach","learn","undo","pause","resume","restart","extend","check timer","timer status","add note","add time"};
-  std::string rest;for(size_t i=0;i<sizeof(commands)/sizeof(commands[0]);++i) if(take(raw,commands[i],rest)) return true;return false;
+  // Use the same punctuation/word normalization as exact command dispatch.
+  // Keep payloads untouched: this only decides whether a follow-up is interrupted.
+  const char* commands[]={"time","date","status","help","list","show","cancel","stop","delete","forget","clear","convert","calculate","compute","work out","remember","remind","my name","call me","open","switch","use","set","quick preset","balanced preset","creative preset","what","whats","who","how","export","save chat","joke","another joke","find notes","search notes","read note","edit note","change note","teach","learn","undo","pause","resume","restart","extend","check timer","timer","add note","add time","note","take a note","notes","timers","version","system status","free memory","available models","model list","save conversation","new chat","recent alerts","hi","hello","hey","thanks","thank you","good morning","good evening","tell me a joke"};
+  std::string normalized=words(raw),rest;for(size_t i=0;i<sizeof(commands)/sizeof(commands[0]);++i) if(take(normalized,commands[i],rest)) return true;return false;
 }
 const char* help_text="360 Assistant works offline without a model. Try:\n"
   "calculate (12 + 8) * 3 | what is 20 percent of 80\n"
@@ -294,7 +311,7 @@ AssistantReply Assistant::add_timer(const std::string& text,const AssistantConte
   input=command_tail(input);
   std::string rest;if(take(input,"for",rest)) input=rest;
   double seconds=0;if(!duration(input,seconds)){pending_=P_TIMER;pending_label_=label;return AssistantReply("For how long? Try 5 minutes, 1h 30m, or half an hour. Range: 1 second to 7 days. Optional: called pizza.");}
-  if(label.empty() || label.size()>64) return AssistantReply("Use a timer label of 1-64 bytes.");
+  if(words(label).empty() || label.size()>64) return AssistantReply("Use a timer label of 1-64 bytes containing a letter or number.");
   if(timers_.size()>=8 || next_timer_>1000000){pending_=P_NONE;return AssistantReply("Eight timers are already active. List timers and cancel one first.");}
   if(!finite_number(context.now) || !finite_number(context.now+seconds)) return AssistantReply("Timer clock unavailable.");
   Timer t;t.id=next_timer_++;t.due=context.now+seconds;t.duration=seconds;t.left=0;t.paused=false;t.label=label;
@@ -313,14 +330,25 @@ AssistantReply Assistant::timer_action(const std::string& selector,TimerAction a
   if(!finite_number(context.now)) return AssistantReply("Timer clock unavailable.");
   if(timers_.empty()) return AssistantReply("No active timers. Try set timer 5 minutes called tea.");
   std::string selection=lower(command_tail(selector)),rest;
-  for(int i=0;i<3;++i){if(take(selection,"the",rest) || take(selection,"my",rest) || take(selection,"timer",rest)) selection=rest;else break;}
-  if(selection.size()>6 && selection.substr(selection.size()-6)==" timer") selection=trim(selection.substr(0,selection.size()-6));
-  std::string key=words(selection);int id=0;bool numeric=id_number(selection,id),pronoun=key=="it" || key=="that" || key=="this";
-  if(pronoun){id=last_timer_;numeric=true;}
+  bool implicit=trim(selector).empty() || selection=="timer";
+  if(implicit) selection.clear();
   size_t found=timers_.size(),matches=0;std::string choices;
-  for(size_t i=0;i<timers_.size();++i){
-    bool match=numeric ? timers_[i].id==id : (key.empty() || words(timers_[i].label)==key);
-    if(match){found=i;++matches;choices+="\n"+integer_text(timers_[i].id)+": "+timers_[i].label;}
+  // Prefer the complete label before removing optional articles or a trailing
+  // "timer". Otherwise labels such as "the tea" and "study timer" disappear.
+  for(int pass=0;pass<5;++pass){
+    std::string key=words(selection);int id=0;bool numeric=id_number(selection,id),all=selection.empty() && implicit;
+    if(key=="it" || key=="that" || key=="this"){id=last_timer_;numeric=true;}
+    bool digits=!key.empty();for(size_t n=0;n<key.size();++n) if(key[n]<'0' || key[n]>'9') digits=false;
+    if(digits && !numeric) break; // A malformed number, such as -1, is not a label guess.
+    for(size_t i=0;i<timers_.size();++i){
+      bool match=numeric ? timers_[i].id==id : (all || (!key.empty() && words(timers_[i].label)==key));
+      if(match){found=i;++matches;choices+="\n"+integer_text(timers_[i].id)+": "+timers_[i].label;}
+    }
+    if(matches || numeric || all) break;
+    if(take(selection,"the",rest) || take(selection,"my",rest) || take(selection,"timer",rest)) selection=rest;
+    else if(selection.size()>6 && selection.substr(selection.size()-6)==" timer") selection=trim(selection.substr(0,selection.size()-6));
+    else break;
+    if(selection.empty()) break; // Unknown selectors never become "all".
   }
   if(matches!=1){pending_=P_TIMER_SELECT;pending_timer_action_=action;pending_extra_=extra;
     return AssistantReply(matches ? "Which timer? Reply with its exact number or label:"+choices : "I couldn't find that timer. Reply with an exact timer number or label, or cancel.");}

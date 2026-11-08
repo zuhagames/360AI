@@ -286,6 +286,9 @@ static void checks(){
   assert(Json::parse("{\"id\":\"x\",\"params\":{\"id\":9},\"x\":\"\\uD83D\\uDE00\\n\"}",j));
   assert(j.get("id").text=="x" && j.get("x").text=="\xF0\x9F\x98\x80\n");
   Json again; assert(Json::parse(j.dump(),again));
+  std::string controls("\b\f\n\r\t\0",6);Json compact(controls),roundtrip;
+  assert(compact.dump()=="\"\\b\\f\\n\\r\\t\\u0000\"");
+  assert(Json::parse(compact.dump(),roundtrip) && roundtrip.text==controls);
   assert(!Json::parse("{\"a\":1,\"a\":2}",j)); assert(!Json::parse("[1,]",j));
   assert(!Json::parse("01",j)); assert(!Json::parse("\"\\uD800\"",j)); assert(!Json::parse("1e999",j));
   f32 gate[]={-100,0,1}, up[]={2,2,2}; gx_silu_mul(gate,up,3);

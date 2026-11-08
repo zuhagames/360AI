@@ -12,6 +12,11 @@
 - Version 2 saves migrate old notes and preserve the next unused note ID.
 - Fixed stale confirmations after oversized input, negative timer IDs and bare
   negation; saved control characters/NUL and duplicate learned phrases reject.
+- Fixed read-only commands being saved/edited as follow-up text, timer history
+  being consumed as a label, and labels containing the/my/timer losing words.
+- Unknown punctuation selectors cannot silently select the only active timer.
+- Taught phrases such as answer to life and half life no longer trigger math.
+- Compact JSON escapes prevent multiline notes overflowing save/undo limits.
 - Status, console clock, model list, presets, export and model navigation.
 - Keyword/phrase boundaries, polite prefixes, follow-up slots, negation,
   confirmations, conservative typo suggestions and clear fallback responses.

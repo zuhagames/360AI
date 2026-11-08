@@ -98,6 +98,8 @@ and name. Phrases use 3-80 bytes after normalization; answers use 1-512 bytes.
 Teaching the same normalized phrase replaces its answer. Forget requires
 that exact phrase. Whole-phrase matches win by length; a taught answer wins
 ties with file-based/built-in FAQ answers. Built-in commands keep priority.
+Ordinary phrases such as answer to life, half life and one question are not
+mistaken for calculator inputs. Explicit calculate commands still take priority.
 Answers are text only: even an answer saying clear chat cannot run a command.
 This is explicit saved knowledge, not neural training or arbitrary reasoning.
 
@@ -124,6 +126,11 @@ Use cancel or never mind to leave a follow-up. A recognized new command
 replaces it. Polite prefixes, case differences and normal spacing are handled.
 Common sentence punctuation works after timer/note numbers. An oversized
 request or an empty message cancels a waiting follow-up/confirmation.
+Read-only commands such as status?, notes and timer history interrupt note,
+name, calculation and timer prompts without becoming saved text or a label.
+Use explicit edit note 1: status? to save command-like text as note content.
+Timer labels keep words such as the, my and timer; punctuation-only labels
+are rejected. Use an ID for a label that is also a command or the Timer keyword.
 Use one command per message. Negated commands do not execute; don't forget
 to is treated as a request to save a note. Timer alerts still work after
 returning to models or switching to a GGUF while this app remains open.
@@ -152,6 +159,10 @@ follow-up slots, word boundaries, typo suggestions, negation, interrupted
 confirmations, timer expiry/pause/resume/restart/extension/ambiguity, note
 search/edit/undo, learned-answer limits, save migration/stable IDs, corrupt
 data and backup recovery. A deterministic 2,000-case malformed-input pass
-checks bounded failure without app actions. Xbox SDK compilation is checked. Physical-console
+checks bounded failure without app actions. Additional regressions cover
+78 prompt/command interruption pairs, literal timer labels, taught phrases
+that resemble math, and multiline note save/undo round-trips. JSON uses compact
+standard control escapes so valid saved notes stay within the file-size bound.
+Xbox SDK compilation is checked. Physical-console
 menus, keyboard behavior, timer banner and storage persistence still need
 hardware validation. No Siri-equivalent language or speech ability is claimed.

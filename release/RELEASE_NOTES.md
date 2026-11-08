@@ -10,6 +10,7 @@ A native offline keyword and intent assistant is now available without loading a
 - **Undo:** restore the last change to notes, your name or taught answers within the current app session.
 - **Xbox commands:** status, console time/date, model list, model reply presets, transcript export and return to models.
 - **Intent handling/debugging:** whole-word/phrase matches, polite prefixes, wake phrases, follow-up questions, negation, confirmation for bulk deletion/clearing, conservative typo suggestions and explicit unknown-question fallback. Fixed punctuation after IDs, bare “do not,” negative timer IDs, stale timer references and pending confirmations surviving oversized requests. Invalid saved control characters are rejected.
+- **Further debugging:** `status?`, `notes` and `timer history` interrupt follow-ups correctly. Timer labels retain words such as “the” and “timer”; unknown punctuation selectors do not select a timer. Ordinary taught phrases no longer trigger the calculator. Compact JSON escapes keep multiline notes saveable and undoable within the file limit.
 - **Custom FAQ answers:** edit assistant-rules.json. Rules return text only; they cannot execute actions, scripts or network calls.
 - **Controller keyboard:** parentheses, powers and apostrophes are available in the fallback keyboard, with the grid/footer sized to fit.
 
@@ -17,6 +18,6 @@ This is a **text-based rule assistant**, not a language model or Siri-equivalent
 
 The full USB package includes the app, assistant guide/rules, all four existing model files, catalog/downloader and required model notices. The assistant itself needs no weights. Personal settings, notes and exports are excluded from updates.
 
-Xbox SDK compilation and native checks cover intent matching, arithmetic errors/precedence, unit dimensions, interrupted follow-ups, timer controls/limits/ambiguity, note edits/undo, taught answers, save migration, corrupt data and backup recovery, plus 2,000 deterministic malformed-input cases. Existing protocol/tokenizer/package checks protect GGUF features. Physical Xbox menus, keyboard behavior, timer banners and drive persistence still need console validation; host processing measurements do not measure Xbox UI latency.
+Xbox SDK compilation and native checks cover intent matching, arithmetic errors/precedence, unit dimensions, 78 prompt/command interruption pairs, timer controls/limits/ambiguity/literal labels, note edits/undo, taught answers, save migration, multiline saves, corrupt data and backup recovery, plus 2,000 deterministic malformed-input cases. Existing protocol/tokenizer/package checks protect GGUF features. Physical Xbox menus, keyboard behavior, timer banners and drive persistence still need console validation; host processing measurements do not measure Xbox UI latency.
 
 Made by **ZuhaGames & Canyons**, expanded from [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex). AI tools assisted development, debugging and documentation.
