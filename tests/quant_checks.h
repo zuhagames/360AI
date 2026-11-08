@@ -112,3 +112,38 @@ static void quant_checks(){
     for(size_t r=0;r<rows;++r) assert(fabs(result[r]-dot)<0.0001+fabs(dot)*0.00001);
   }
 }
+
+static void matrix_speed_checks(){
+  // Distinct, unaligned Q8 rows exercise the paired candidate, the 256-row
+  // calibration sample, parallel-size dispatch and the unpaired final row.
+  for(int type=GXQ_Q8_0;type<=GXQ_Q8_1;++type){
+    const u32 cols=96,rows=259,block=(u32)gxq_type_size(type),stride=3*block;
+    std::vector<u8> matrix(1+rows*stride);std::vector<f32> x(cols),scratch(cols),out(rows+1,12345),decoded(cols);
+    for(u32 i=0;i<cols;++i) x[i]=(int(i%17)-8)*0.03125f;
+    for(u32 r=0;r<rows;++r) for(u32 b=0;b<3;++b){
+      u8* p=&matrix[1+r*stride+b*block];put_half(p,(int((r+b)%11)-5)*0.015625f);
+      for(u32 i=0;i<32;++i) p[(type==GXQ_Q8_0 ? 2 : 4)+i]=(u8)(i8)(int((i*17+r*3+b)%256)-128);
+    }
+    gx_matvec_rows(&matrix[1],type,cols,stride,&x[0],&out[0],rows,&scratch[0]);
+    for(u32 r=0;r<rows;++r){
+      gxq_dequant_row(type,&matrix[1+r*stride],&decoded[0],cols);double expected=0;
+      for(u32 i=0;i<cols;++i) expected+=(double)decoded[i]*x[i];
+      assert(fabs(out[r]-expected)<0.0001+fabs(expected)*0.00001);
+    }
+    assert(out[rows]==12345);
+  }
+  const u32 dimensions[]={1,3,4,15,16,17,64,172};
+  for(size_t d=0;d<sizeof(dimensions)/sizeof(dimensions[0]);++d){
+    u32 cols=dimensions[d],stride=(cols+1)*4;const u32 rows=3;
+    std::vector<u8> matrix(1+rows*stride);std::vector<f32> x(cols),scratch(cols);f32 out[3];
+    for(u32 i=0;i<cols;++i) x[i]=(int(i%13)-6)*0.0625f;
+    for(u32 r=0;r<rows;++r) for(u32 i=0;i<cols;++i){
+      u32 bits=gx_le32(gx_bits_from_f32((int((i+r*3)%19)-9)*0.03125f));memcpy(&matrix[1+r*stride+i*4],&bits,4);
+    }
+    gx_matvec_rows(&matrix[1],GXQ_F32,cols,stride,&x[0],out,rows,&scratch[0]);
+    for(u32 r=0;r<rows;++r){
+      double expected=0;for(u32 i=0;i<cols;++i) expected+=(int((i+r*3)%19)-9)*0.03125*x[i];
+      assert(fabs(out[r]-expected)<0.00001);
+    }
+  }
+}

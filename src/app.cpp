@@ -15,7 +15,7 @@ static const char* kBrowseDir = "game:";
 static const char* kSettingsPath="game:\\360AI.json";
 
 AppSettings::AppSettings(){
-  ctx_size = 512;
+  ctx_size = 256;
   temperature = 0.8f;
   top_p=1.0f;repeat_penalty=1.0f;
   topk = 40;
@@ -24,7 +24,7 @@ AppSettings::AppSettings(){
   chat_on = true;
   backend_mode = 0;
   weight_mode = 0;
-  reply_tokens = 128;
+  reply_tokens = 48;
 }
 
 App::App(){
@@ -117,6 +117,9 @@ int App::run(){
 
   for(size_t i=0;i<files_.size();++i)
     if(files_[i].name==settings_.last_model){file_sel_=(int)i;break;}
+  // A fresh install should start with the smaller conversational model.
+  if(settings_.last_model.empty()) for(size_t i=0;i<files_.size();++i)
+    if(files_[i].name=="SmolLM2-135M-Instruct-Q8_0.gguf"){file_sel_=(int)i;break;}
 
   bool running = true;
   while(running){
@@ -158,6 +161,7 @@ int App::run(){
       load_done_ = false;
       if(load_ok_){
         model_loaded_ = true;
+        if(engine_.tok().completion_only()) chat_notice_="Story toy: continues your text. Try: Once upon a time";
         screen_ = AS_CHAT;
         if(settings_.server_on) server_start(&engine_, &kv_, &settings_, eng_mutex_);
       } else {
@@ -215,9 +219,13 @@ void App::browse_frame(){
   double gb=(double)selected.size/1000000000.0;
   double reserve=gb>=1.0 ? ceil(gb) : ceil(gb*10.0)/10.0;
   gxui_text_shadow(40,720-lh*4,GXRGB(180,200,160),"Needs %.1f GB free on HDD/USB (%.2f GB of model files)",reserve,gb);
-  gxui_text_shadow(40,720-lh*3,GXRGB(150,150,160),selected.size>320u*1024u*1024u ?
+  const char* hint=selected.size>320u*1024u*1024u ?
     "Large model: HDD streaming recommended; generation can be very slow." :
-    "Small model: RAM loading recommended. HDD streaming is optional.");
+    "Small model: RAM loading recommended. HDD streaming is optional.";
+  if(selected.name=="stories260K.gguf") hint="Smallest toy (1.2 MB). Mostly nonsense; continues stories, not a chat assistant.";
+  else if(selected.name=="stories15M-q4_0.gguf") hint="Small story toy (19 MB). Weak English story completion; no instruction chat.";
+  else if(selected.name=="SmolLM2-135M-Instruct-Q8_0.gguf") hint="Recommended for chat. Small instruction model; use RAM or Auto storage.";
+  gxui_text_shadow(40,720-lh*3,GXRGB(150,150,160),"%s",hint);
 
   u32 p = gxui_buttons_pressed();
   if(p & GX_BTN_DUP) file_sel_--;
@@ -518,7 +526,8 @@ void App::chat_frame(){
   } else if(settings_.chat_on && !generating_){
     if(p & GX_BTN_X) new_chat();
     else if(p & GX_BTN_START) export_chat();
-    else if(p & GX_BTN_A) kb_open(KB_CHAT,"Your message","Type your message to the model","");
+    else if(p & GX_BTN_A) kb_open(KB_CHAT,engine_.tok().completion_only() ? "Continue a story" : "Your message",
+      engine_.tok().completion_only() ? "Write a story opening, e.g. Once upon a time" : "Type your message to the model","");
   }
 }
 

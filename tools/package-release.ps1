@@ -1,6 +1,6 @@
 param(
   [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')]
-  [string]$Version = '1.4'
+  [string]$Version = '1.5'
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -21,7 +21,7 @@ $executable = Join-Path $projectRoot '360AI.xex'
 if (-not (Test-Path -LiteralPath $executable)) { throw 'Build 360AI.xex first with build.bat.' }
 Copy-Item -LiteralPath $executable -Destination (Join-Path $usbDirectory '360AI.xex')
 foreach($model in $modelFiles){Copy-Item -LiteralPath (Join-Path $projectRoot ('build/models/'+$model.filename)) -Destination (Join-Path $usbDirectory $model.filename)}
-foreach ($name in @('NOTICE', 'GEMMA_TERMS.txt', 'GEMMA_POLICY.txt', 'MODEL_INFO.txt','APACHE-2.0.txt','SMOLLM2_INFO.txt')) {
+  foreach ($name in @('NOTICE', 'GEMMA_TERMS.txt', 'GEMMA_POLICY.txt', 'MODEL_INFO.txt','APACHE-2.0.txt','SMOLLM2_INFO.txt','TINYSTORIES_LICENSE.txt','TINYSTORIES_INFO.txt')) {
   Copy-Item -LiteralPath (Join-Path $projectRoot "release\model-notices\$name") -Destination (Join-Path $usbDirectory $name)
 }
 foreach ($name in @('START_HERE.txt', 'CHANGELOG.txt', 'CREDITS.txt','MODELS.txt')) {
@@ -39,7 +39,7 @@ $archive = [IO.Compression.ZipFile]::OpenRead($usbZip)
 try {
   $expected = @('360AI/360AI.xex', '360AI/START_HERE.txt', '360AI/CHANGELOG.txt', '360AI/CREDITS.txt')
   $expected += @($modelFiles | ForEach-Object {'360AI/'+$_.filename})
-  $expected += @('360AI/NOTICE', '360AI/GEMMA_TERMS.txt', '360AI/GEMMA_POLICY.txt', '360AI/MODEL_INFO.txt','360AI/APACHE-2.0.txt','360AI/SMOLLM2_INFO.txt','360AI/MODELS.txt','360AI/models.json','360AI/Download-Models.ps1')
+  $expected += @('360AI/NOTICE', '360AI/GEMMA_TERMS.txt', '360AI/GEMMA_POLICY.txt', '360AI/MODEL_INFO.txt','360AI/APACHE-2.0.txt','360AI/SMOLLM2_INFO.txt','360AI/TINYSTORIES_LICENSE.txt','360AI/TINYSTORIES_INFO.txt','360AI/MODELS.txt','360AI/models.json','360AI/Download-Models.ps1')
   $actual = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
   if (Compare-Object $expected $actual) { throw 'USB archive contents do not match the release manifest.' }
   $entry = $archive.Entries | Where-Object { $_.FullName.Replace('\', '/') -eq '360AI/360AI.xex' }

@@ -20,4 +20,7 @@ in the USB ZIP.
 SmolLM2 135M Instruct by Hugging Face, with the lmstudio-community Q8_0 GGUF
 conversion, is also included unchanged. See SMOLLM2_INFO.txt and APACHE-2.0.txt.
 Optional Qwen2.5 model sources/checksums are in models.json (Apache 2.0).
+TinyStories 15M Q4_0 and 260K F32 by Andrej Karpathy, converted to GGUF by
+ggml-org, are included unchanged. See TINYSTORIES_INFO.txt and
+TINYSTORIES_LICENSE.txt (MIT). These are story toys, not chat assistants.
 AI tools assisted with development, debugging and documentation.

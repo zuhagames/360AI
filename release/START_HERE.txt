@@ -1,14 +1,14 @@
-360AI 1.4 - Xbox 360 USB package
+360AI 1.5 - Xbox 360 USB package
 ================================
 
 INSTALL
 1. Extract the ZIP on your PC.
 2. Copy the entire 360AI folder to your USB drive.
-3. Gemma 3 270M and SmolLM2 135M Q8_0 models are included beside 360AI.xex.
+3. Gemma 3 270M, SmolLM2 135M and two TinyStories toys are included.
    No separate download is needed for these models.
 4. Safely eject the USB, connect it to your modded Xbox 360, and open
    the 360AI folder with your existing XEX launcher (Aurora/XEXMenu).
-5. Launch 360AI.xex, select either included GGUF and choose Load model.
+5. Launch 360AI.xex, select an included GGUF and choose Load model.
    Leave Compute backend and Weight storage on Auto. Auto selects RAM
    when the model and working memory fit, and benchmarks CPU/GPU.
    SmolLM2 135M is a good starting point for responsive local chat.
@@ -17,6 +17,8 @@ Example USB layout:
   USB:/360AI/360AI.xex
   USB:/360AI/gemma-3-270m-it-Q8_0.gguf
   USB:/360AI/SmolLM2-135M-Instruct-Q8_0.gguf
+  USB:/360AI/stories15M-q4_0.gguf
+  USB:/360AI/stories260K.gguf
   USB:/360AI/START_HERE.txt
   USB:/360AI/CHANGELOG.txt
   USB:/360AI/CREDITS.txt
@@ -32,6 +34,11 @@ MODEL_INFO.txt for its source and checksum. No account or network is
 needed for local console chat once this ZIP is downloaded.
 SmolLM2 135M Instruct Q8_0 is also included (about 145 MB). It uses less
 weight memory. See SMOLLM2_INFO.txt and APACHE-2.0.txt for its source/license.
+TinyStories 15M Q4_0 (19 MB) and 260K F32 (1.2 MB) are much smaller toys.
+They continue English story openings: try Once upon a time. They do not
+follow instructions or answer questions reliably. 260K may produce nonsense;
+15M has only 128 tokens of context, including prompt and reply work.
+See TINYSTORIES_INFO.txt and TINYSTORIES_LICENSE.txt (MIT).
 
 Read MODELS.txt for optional Qwen models and their HDD space requirements.
 Download-Models.ps1 runs on your Windows PC and verifies pinned checksums.
@@ -60,7 +67,12 @@ correct and at least 20% faster. Forced GPU remains experimental.
 The chat footer and 360AI.log show which backend/storage were selected.
 Matching conversation history is reused. Prompt progress and elapsed time
 are displayed while processing; tokens/second measures generation itself.
-Console replies default to 128 tokens; change Reply token limit if needed.
+New installs default to 256 context and 48 reply tokens. Saved preferences
+are preserved; select Quick to update older settings in one step.
+Q8 CPU kernels compare single/paired rows once per input width and keep the
+paired path only if it agrees numerically and measures at least 10% faster.
+The first use includes this calibration. TinyStories 260K uses a direct F32
+VMX matrix path with endian conversion in registers. Xbox speed needs testing.
 The chat screen also shows layer progress during prompt and reply work.
 Y cancellation is checked between attention, feed-forward and layer work.
 The current matrix, disk read or GPU operation still has to finish.

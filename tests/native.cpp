@@ -136,6 +136,17 @@ static void cancel_after_token(int,const char*,void* user){
 }
 static void checks(){
   {
+    GGUF g;assert(g.load(path("stories-tokenizer").c_str()));Tokenizer tok;assert(tok.load(g) && tok.completion_only());
+    std::vector<std::pair<std::string,std::string> > messages;
+    messages.push_back(std::make_pair(std::string("system"),std::string("ignored instructions")));
+    messages.push_back(std::make_pair(std::string("user"),std::string("Once upon a time")));
+    assert(tok.chat_prompt(messages)=="Once upon a time");
+    messages.push_back(std::make_pair(std::string("assistant"),std::string("there was a cat.")));
+    messages.push_back(std::make_pair(std::string("user"),std::string("The cat")));
+    assert(tok.chat_prompt(messages)=="Once upon a time\nthere was a cat.\nThe cat");
+    assert(g.load(path("llama").c_str()) && tok.load(g) && !tok.completion_only());
+  }
+  {
     const char* file="build/tests/preferences.json";
     remove(file);remove("build/tests/preferences.json.bak");
     AppSettings s;s.ctx_size=2048;s.temperature=0.25f;s.topk=17;s.reply_tokens=96;
@@ -204,6 +215,7 @@ static void checks(){
     for(int i=0;i<5;++i){assert(!gx_utf8_valid(invalid[i]));assert(gx_utf8_valid(gx_utf8_clean(invalid[i])));Json j;assert(!Json::parse(std::string("\"")+invalid[i]+"\"",j));}
   }
   quant_checks();
+  matrix_speed_checks();
   sampling_checks();
   chat_checks();rope_checks();
   assert(gx_gpu_prefer(2,1,true) && !gx_gpu_prefer(1,2,true));
@@ -349,6 +361,8 @@ static void checks(){
       }
     }
     KVCache empty; assert(engine.generate(prompt,out,1,empty,ec)==0);
+    KVCache oversized;oversized.init(cfg.max_seq_len+1,1,2,1);
+    assert(engine.generate(prompt,out,1,oversized,ec)==0);
     prompt[0]=-1; assert(engine.generate(prompt,out,1,kv,ec)==0);
     std::string response;
     assert(gx_mcp_dispatch("{\"jsonrpc\":\"2.0\",\"id\":\"outer\",\"method\":\"tools/call\",\"params\":{\"name\":\"generate\",\"arguments\":{\"prompt\":\"hello\",\"max_tokens\":2}}}",&engine,32,completion,0,response)==200);
@@ -371,14 +385,17 @@ int main(int argc,char** argv){
     const ModelCfg& c=engine.cfg();
     std::cout<<"Loaded real GGUF: "<<c.name<<" layers="<<c.num_layers<<" dim="<<c.model_dim<<std::endl;
     std::vector<std::pair<std::string,std::string> > messages;
-    messages.push_back(std::make_pair(std::string("user"),std::string("Say hello in one short sentence.")));
+    messages.push_back(std::make_pair(std::string("user"),std::string(argc>3 ? argv[3] : "Say hello in one short sentence.")));
     std::vector<int> ids,out; engine.tok().encode_prompt(engine.tok().chat_prompt(messages),ids);
-    KVCache cache; cache.init(256,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
+    u32 context=GX_MIN(256u,c.max_seq_len);
+    KVCache cache; cache.init(context,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
     EngineCfg ec={0,1,true,0}; double start=gx_time_seconds();
     engine.generate(ids,out,12,cache,ec);
     std::string text=engine.tok().decode(out);
     if(text.empty()) return 2;
     std::cout<<"Generated "<<out.size()<<" tokens in "<<gx_time_seconds()-start<<" seconds: "<<text<<std::endl;
+    std::cout<<"First token "<<engine.stats().first_token_seconds<<"s, decode "<<engine.stats().decode_seconds
+      <<"s, prompt "<<engine.stats().prompt_tokens<<" tokens; "<<(engine.tok().completion_only() ? "story completion" : "chat")<<std::endl;
     if(std::string(argv[1])=="--bench-cache"){
       std::vector<int> repeated;engine.generate(ids,repeated,12,cache,ec);
       if(repeated!=out || engine.stats().reused_tokens!=ids.size()-1) return 5;
@@ -388,7 +405,7 @@ int main(int argc,char** argv){
       engine.tok().encode_prompt(engine.tok().chat_prompt(messages),ids);
       engine.generate(ids,repeated,8,cache,ec);GenerationStats warm_stats=engine.stats();
       if(!warm_stats.reused_tokens) return 6;
-      KVCache fresh;fresh.init(256,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
+      KVCache fresh;fresh.init(context,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
       engine.generate(ids,out,8,fresh,ec);
       if(repeated!=out || cache.tokens!=fresh.tokens) return 7;
       for(u32 l=0;l<c.num_layers;++l) for(u32 pos=0;pos<fresh.tokens.size();++pos) for(u32 d=0;d<c.layer.kv_heads*c.layer.qkv_dim;++d){
@@ -399,7 +416,7 @@ int main(int argc,char** argv){
     }
     if(std::string(argv[1])=="--compare-model"){
       Engine disk;if(!disk.load(argv[2],0,true)) return 3;
-      KVCache streamed;streamed.init(256,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
+      KVCache streamed;streamed.init(context,c.layer.kv_heads,c.layer.qkv_dim,c.num_layers);
       std::vector<int> actual;disk.generate(ids,actual,12,streamed,ec);
       if(actual!=out || streamed.k!=cache.k || streamed.v!=cache.v || !disk.storage_ok()) return 4;
       std::cout<<"RAM and 8 MB streamed-cache outputs/KV match exactly\n";

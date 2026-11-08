@@ -1,30 +1,28 @@
-# 360AI 1.4
+# 360AI 1.5
 
-Download **360AI-1.4-USB.zip**, extract it and copy the `360AI` folder to USB/HDD. Launch `360AI.xex` on your modded Xbox 360. **Gemma 3 270M and SmolLM2 135M weights are included.**
+Download **360AI-1.5-USB.zip**, extract it and copy the `360AI` folder to USB/HDD. Launch `360AI.xex` on your modded Xbox 360. All four models and their required notices are included. This update runs in the native Xbox app.
 
-## What's new on Xbox
+## Smaller models for less waiting
 
-- **Reply presets:** select Reply preset in the Xbox Settings menu and press A to cycle Quick, Balanced and Creative. Quick uses context 256 and a 48-token reply cap; Balanced uses 512/128 and Creative uses 512/192. Presets also select sampling values and Auto compute/storage. Manual edits show Custom.
-- **Top-p sampling:** an adjustable probability cutoff within the existing top-k pool, from 0.05 to 1.00. Set 1 to disable it. Greedy sampling still uses the highest adjusted logit.
-- **Repetition control:** an adjustable 1.00-1.50 penalty discourages recently generated reply tokens. It considers the last 64 reply tokens and applies the penalty once per distinct token. Prompt tokens are not penalized. Set 1 to disable it.
-- **Layer progress:** the console chat shows the current layer during prompt processing and reply generation, alongside token progress or decode speed.
-- **More responsive Y cancellation:** stop checks now run between attention, feed-forward and layer operations. Completed reply text is retained. Partly evaluated tokens are excluded from reusable cache history.
-- **Saved preferences:** the new controls persist beside the executable. Existing settings keep previous sampling behavior until you enable a new control or select a preset. Presets preserve your model selection, logging and chat/server toggles.
+- **TinyStories 15M Q4_0 — 19 MB:** a much smaller English story-completion toy. Try `Once upon a time`. It is very limited and has a 128-token context; it is not an instruction/chat assistant.
+- **TinyStories 260K F32 — 1.2 MB:** an even smaller toy for experimenting with minimal computation. Expect nonsense and poor answers.
+- **SmolLM2 135M** remains the recommended chat model, with **Gemma 3 270M** also included. Both existing model files are unchanged.
 
-All new controls run in the Xbox app. Bundled models and their required notices are unchanged.
+TinyStories uses plain text continuation instead of Llama Chat instruction markers. The model menu and keyboard describe this mode, and the cache respects each model's context limit. Model downloads are pinned and checksummed; TinyStories includes MIT license and provenance notices.
 
-## Updating
+## Native performance changes
 
-Replace the executable and guides from the new ZIP. Existing weights may be kept. Settings, recovery copies and chat exports are not bundled, so updating preserves them.
+- Fresh installs use **256 context / 48 reply tokens** and highlight SmolLM2. Shorter replies reduce total waiting. Existing saved preferences are preserved; select **Reply preset: Quick** to apply shorter budgets and Auto compute/storage.
+- A paired-row Q8 CPU candidate shares input-vector loads. Each input width gets a one-time numerical/timing check against the original kernel; paired rows are selected only when they measure at least **10% faster**. Otherwise the original kernel stays active. Initial calibration adds work once per shape.
+- F32 matrices on Xenon swap GGUF floats directly in VMX registers, avoiding a full scratch-row conversion. Float dot products use independent accumulators.
+- Keep **compute/storage Auto**. Unnecessary HDD streaming and forced GPU uploads/readbacks can add substantial latency to every token.
 
-For local chat, start with **SmolLM2 135M** and **Reply preset: Quick** for short replies. Balanced allows a longer conversation and reply budget. The app folder must be writable to save preferences and exports.
+## Validation and updating
 
-## Validation and limits
+Xbox 360 SDK build, native checks and all eight protocol/tokenizer/package groups pass. Tests cover raw story formatting, model context limits, distinct quantized rows and float matrix tails. Real GGUF generation, RAM/streamed output parity and conversation cache reuse are checked on the host.
 
-Xbox 360 SDK build and native tests pass, including preset round trips, old preferences, sampling ranges, nucleus cutoff math, repeat-penalty signs and duplicates, cancellation during prompt/decode layers, partial reply retention and cache recovery. All eight protocol/tokenizer/package groups pass. Both bundled models retain their greedy sample text with the new controls disabled; RAM and streamed outputs and complete KV caches match exactly.
+**Actual Xbox response times and VMX speed still require console testing.** No tokens/second multiplier is promised. TinyStories reduces model workload by sacrificing most capabilities; it does not offer SmolLM2-quality chat. Large HDD models remain extremely slow.
 
-Physical-console menus, controller behavior, sampling quality and performance still need hardware verification. Cancellation waits for the current matrix, disk read or GPU operation to finish. Quick reduces context/reply budgets; no increase in Xbox tokens per second is claimed. Large HDD models can still be extremely slow.
+Copy the entire new folder over the previous installation. Settings, backup settings and chat exports are not bundled. Choose Quick after updating if old settings still use a large context, long replies, forced GPU or HDD streaming.
 
-One complete USB ZIP includes the executable, both models, model catalog/downloader, guides and required licenses/notices.
-
-Made by **ZuhaGames & Canyons**. A fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma. AI tools assisted with development, debugging and documentation.
+One USB ZIP includes the executable, four models, model catalog/downloader, guides and required notices. Made by **ZuhaGames & Canyons**. A fork of [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex), expanded beyond Gemma. AI tools assisted with development, debugging and documentation.

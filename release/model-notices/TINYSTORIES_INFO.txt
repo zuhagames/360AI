@@ -1,0 +1,21 @@
+TinyStories toy models
+
+Original models: Andrej Karpathy, trained on TinyStories, MIT license.
+https://huggingface.co/karpathy/tinyllamas
+https://github.com/karpathy/llama2.c
+
+GGUF conversions: ggml-org, distributed unchanged from revision
+499bc8821c6b12b4e53c5bffcb21ec206f212d81 of:
+https://huggingface.co/ggml-org/models-moved/tree/main/tinyllamas
+
+stories260K.gguf: F32, 1,185,376 bytes, 512-token vocabulary.
+SHA256: 270cba1bd5109f42d03350f60406024560464db173c0e387d91f0426d3bd256d
+stories15M-q4_0.gguf: Q4_0, 19,077,344 bytes, 128-token context.
+SHA256: 66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739
+
+These are deliberately very weak story-completion toys, not instruction-tuned
+assistants. Write a short English story opening, such as Once upon a time.
+260K may produce mostly nonsense. They cannot replace SmolLM2 for conversation.
+360AI uses plain text continuation for their metadata/vocabulary fingerprints,
+without Llama Chat markers. Context still needs RAM. No Xbox speed is promised.
+See TINYSTORIES_LICENSE.txt for the upstream MIT license.

@@ -14,12 +14,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v1.4/360AI-1.4-USB.zip"><strong>Download 360AI 1.4</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v1.5/360AI-1.5-USB.zip"><strong>Download 360AI 1.5</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
 
-<p align="center"><sub>Includes Gemma 3 270M and SmolLM2 135M weights.</sub></p>
+<p align="center"><sub>Includes SmolLM2, Gemma 3 and two tiny story models.</sub></p>
 
 ---
 
@@ -33,7 +33,7 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-1.4-USB.zip](https://github.com/zuhagames/360AI/releases/download/v1.4/360AI-1.4-USB.zip)**.
+1. Download and extract **[360AI-1.5-USB.zip](https://github.com/zuhagames/360AI/releases/download/v1.5/360AI-1.5-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
 4. Select a model, leave compute and weight storage on **Auto**, and select **Load model**.
@@ -44,11 +44,15 @@ Requires a console capable of running unsigned XEX files. No separate model down
 
 | Model | Free disk space to reserve | Loading |
 | --- | --- | --- |
+| TinyStories 260K — included | 0.01 GB | RAM; very weak story toy |
+| TinyStories 15M Q4_0 — included | 0.03 GB | RAM; simple story completion |
 | SmolLM2 135M Q8_0 — included | 0.2 GB | RAM recommended |
 | Gemma 3 270M Q8_0 — included | 0.4 GB | RAM recommended |
 | Qwen2.5 0.5B Q4_K_M — optional | 1 GB | HDD stream |
 | Qwen2.5 1.5B Q4_K_M — experimental | 2 GB | HDD stream |
 | Qwen2.5 7B Q4_K_M — experimental | **5 GB on HDD** | HDD stream, extremely slow |
+
+For speed, use **Auto compute/storage** and **Reply preset: Quick**. SmolLM2 is the recommended chat model. The much smaller [TinyStories models](https://huggingface.co/karpathy/tinyllamas) trade most capabilities for less work: they continue story openings like “Once upon a time,” and are not chat assistants. The 260K toy may produce nonsense; 15M has a 128-token context.
 
 HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still need RAM. Larger models are experimental and have not been benchmarked on an Xbox. See [model downloads and HDD setup](docs/TECHNICAL.md#hdd-streaming-and-model-downloads), or `MODELS.txt` in the ZIP.
 
@@ -60,6 +64,7 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 - Compatible Gemma 2/3, SmolLM2, dense Llama, and Qwen2/2.5 GGUF models.
 - HDD/USB weight streaming, split GGUF support, and model disk-space descriptions.
 - Automatic CPU/GPU selection, RAM loading when it fits, and conversation cache reuse.
+- CPU kernel timing checks and short reply defaults (256 context, 48 reply tokens).
 - Adjustable context size, temperature, and top-k sampling.
 - On-console reply presets, top-p and repetition controls, and layer progress.
 - OpenAI-compatible chat/completions API with streaming.

@@ -298,7 +298,7 @@ int Engine::generate(const std::vector<int>& prompt, std::vector<int>& out_token
                      void (*on_prefill)(u32,u32,void*),void (*on_layer)(u32,u32,void*)){
   out_tokens.clear();
   stats_=GenerationStats();
-  if(!loaded_ || prompt.empty() || !kv.seq_len || max_new <= 0 ||
+  if(!loaded_ || prompt.empty() || !kv.seq_len || kv.seq_len>cfg().max_seq_len || max_new <= 0 ||
      kv.num_layers != cfg().num_layers || kv.kv_heads != cfg().layer.kv_heads ||
      kv.qkv_dim != cfg().layer.qkv_dim) return 0;
   for(size_t ti = 0; ti < prompt.size(); ++ti)

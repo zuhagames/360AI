@@ -25,9 +25,16 @@ static __forceinline __vector4 gx_splat(f32 s){
 f32 gx_dot_f32(const f32* x,const f32* y,size_t n){
   size_t i=0;f64 sum=0;
 #ifdef GX_VMX
-  __vector4 acc=gx_zero4();
-  for(;i+4<=n;i+=4) acc=__vmaddfp(__loadunalignedvector(x+i),__loadunalignedvector(y+i),acc);
-  sum=gx_hsum4(acc);
+  __vector4 a=gx_zero4(),b=a,c=a,d=a;
+  for(;i+16<=n;i+=16){
+    a=__vmaddfp(__loadunalignedvector(x+i),__loadunalignedvector(y+i),a);
+    b=__vmaddfp(__loadunalignedvector(x+i+4),__loadunalignedvector(y+i+4),b);
+    c=__vmaddfp(__loadunalignedvector(x+i+8),__loadunalignedvector(y+i+8),c);
+    d=__vmaddfp(__loadunalignedvector(x+i+12),__loadunalignedvector(y+i+12),d);
+  }
+  a=__vaddfp(__vaddfp(a,b),__vaddfp(c,d));
+  for(;i+4<=n;i+=4) a=__vmaddfp(__loadunalignedvector(x+i),__loadunalignedvector(y+i),a);
+  sum=gx_hsum4(a);
 #endif
   for(;i<n;++i) sum+=(f64)x[i]*y[i];
   return (f32)sum;
@@ -296,11 +303,74 @@ static f32 dot_q45(const u8* row,int type,const f32* x,u32 cols){
 #endif
 }
 
+// Two output rows share each input load. Keep the accumulation order of each
+// Q8 row unchanged; this also works on streamed batches and unaligned blocks.
+static void dot_q8_pair(const u8* row0,const u8* row1,int type,const f32* x,u32 cols,f32* out){
+  const u32 stride=type==GXQ_Q8_0 ? 34 : 36,offset=type==GXQ_Q8_0 ? 2 : 4;
+#ifdef GX_VMX
+  __vector4 total0=gx_zero4(),total1=total0;
+  for(u32 b=0;b<cols/32;++b){
+    const u8* p=row0+b*stride;const u8* q=row1+b*stride;u16 h0,h1;
+    memcpy(&h0,p,2);memcpy(&h1,q,2);
+    __vector4 scale0=gx_splat(gx_f16_to_f32(gx_le16(h0))),scale1=gx_splat(gx_f16_to_f32(gx_le16(h1)));
+    __vector4 a0=gx_zero4(),c0=a0,a1=a0,c1=a0;
+    for(u32 half=0;half<2;++half){
+      const f32* input=x+b*32+half*16;
+      __vector4 x0=__loadunalignedvector(input),x1=__loadunalignedvector(input+4);
+      __vector4 x2=__loadunalignedvector(input+8),x3=__loadunalignedvector(input+12);
+      __vector4 bytes=__loadunalignedvector(p+offset+half*16),hi=__vupkhsb(bytes),lo=__vupklsb(bytes);
+      a0=__vmaddfp(__vcfsx(__vupkhsh(hi),0),x0,a0);c0=__vmaddfp(__vcfsx(__vupklsh(hi),0),x1,c0);
+      a0=__vmaddfp(__vcfsx(__vupkhsh(lo),0),x2,a0);c0=__vmaddfp(__vcfsx(__vupklsh(lo),0),x3,c0);
+      bytes=__loadunalignedvector(q+offset+half*16);hi=__vupkhsb(bytes);lo=__vupklsb(bytes);
+      a1=__vmaddfp(__vcfsx(__vupkhsh(hi),0),x0,a1);c1=__vmaddfp(__vcfsx(__vupklsh(hi),0),x1,c1);
+      a1=__vmaddfp(__vcfsx(__vupkhsh(lo),0),x2,a1);c1=__vmaddfp(__vcfsx(__vupklsh(lo),0),x3,c1);
+    }
+    total0=__vmaddfp(__vaddfp(a0,c0),scale0,total0);total1=__vmaddfp(__vaddfp(a1,c1),scale1,total1);
+  }
+  out[0]=gx_hsum4(total0);out[1]=gx_hsum4(total1);
+#else
+  f64 total0=0,total1=0;
+  for(u32 b=0;b<cols/32;++b){
+    const u8* p=row0+b*stride;const u8* q=row1+b*stride;u16 h0,h1;
+    memcpy(&h0,p,2);memcpy(&h1,q,2);
+    const i8* w0=(const i8*)(p+offset);const i8* w1=(const i8*)(q+offset);const f32* input=x+b*32;
+    f64 a=0,c=0,d=0,e=0,f=0,g=0,h=0,k=0;
+    for(u32 i=0;i<32;i+=4){
+      f32 x0=input[i],x1=input[i+1],x2=input[i+2],x3=input[i+3];
+      a+=(f64)w0[i]*x0;c+=(f64)w0[i+1]*x1;d+=(f64)w0[i+2]*x2;e+=(f64)w0[i+3]*x3;
+      f+=(f64)w1[i]*x0;g+=(f64)w1[i+1]*x1;h+=(f64)w1[i+2]*x2;k+=(f64)w1[i+3]*x3;
+    }
+    total0+=(a+c+d+e)*gx_f16_to_f32(gx_le16(h0));total1+=(f+g+h+k)*gx_f16_to_f32(gx_le16(h1));
+  }
+  out[0]=(f32)total0;out[1]=(f32)total1;
+#endif
+}
+
 static f32 dot_row(const u8* row, int type, const f32* x, u32 cols, f32* buf){
   if((type==GXQ_Q4_0 || type==GXQ_Q4_1 || type==GXQ_Q5_0 || type==GXQ_Q5_1) && cols%32==0) return dot_q45(row,type,x,cols);
   if((type==GXQ_Q8_0 || type==GXQ_Q8_1) && cols%32==0) return dot_q8(row,type,x,cols);
 #ifndef GX_BIG_ENDIAN
   if(type==GXQ_F32) return gx_dot_f32((const f32*)row,x,cols);
+#elif defined(GX_VMX)
+  if(type==GXQ_F32){
+    // GGUF floats are little endian. Swap four floats in registers instead of
+    // converting and writing an entire scratch row before reading it again.
+    static const __declspec(align(16)) u8 reverse[16]={3,2,1,0,7,6,5,4,11,10,9,8,15,14,13,12};
+    __vector4 perm=__lvx(reverse,0),a=gx_zero4(),b=a,c=a,d=a;u32 i=0;
+    for(;i+16<=cols;i+=16){
+      __vector4 w0=__loadunalignedvector(row+i*4),w1=__loadunalignedvector(row+(i+4)*4);
+      __vector4 w2=__loadunalignedvector(row+(i+8)*4),w3=__loadunalignedvector(row+(i+12)*4);
+      a=__vmaddfp(__vperm(w0,w0,perm),__loadunalignedvector(x+i),a);
+      b=__vmaddfp(__vperm(w1,w1,perm),__loadunalignedvector(x+i+4),b);
+      c=__vmaddfp(__vperm(w2,w2,perm),__loadunalignedvector(x+i+8),c);
+      d=__vmaddfp(__vperm(w3,w3,perm),__loadunalignedvector(x+i+12),d);
+    }
+    a=__vaddfp(__vaddfp(a,b),__vaddfp(c,d));
+    for(;i+4<=cols;i+=4){__vector4 w=__loadunalignedvector(row+i*4);a=__vmaddfp(__vperm(w,w,perm),__loadunalignedvector(x+i),a);}
+    f64 sum=gx_hsum4(a);
+    for(;i<cols;++i){u32 bits;memcpy(&bits,row+i*4,4);sum+=(f64)gx_f32_from_bits(gx_le32(bits))*x[i];}
+    return (f32)sum;
+  }
 #endif
   gxq_dequant_row(type, row, buf, cols);
   f64 sum = 0.0;
@@ -326,11 +396,16 @@ struct gx_mv_ctx{
   const f32* x;
   f32* out;
   f32* scratch[3];
+  bool paired;
 };
 
 static void gx_mv_part(int part, size_t lo, size_t hi, void* user){
   gx_mv_ctx* c = (gx_mv_ctx*)user;
-  for(size_t r = lo; r < hi; ++r){
+  size_t r=lo;
+  if(c->paired){
+    for(;r+1<hi;r+=2) dot_q8_pair(c->data+r*c->row_stride,c->data+(r+1)*c->row_stride,c->type,c->x,c->cols,c->out+r);
+  }
+  for(; r < hi; ++r){
     c->out[r] = dot_row(c->data + (size_t)r * c->row_stride, c->type,
                         c->x, c->cols, c->scratch[part]);
   }
@@ -339,12 +414,41 @@ static void gx_mv_part(int part, size_t lo, size_t hi, void* user){
 static f32* gx_mv_deq[3] = {0, 0, 0};
 static size_t gx_mv_deq_n[3] = {0, 0, 0};
 
+static void gx_mv_execute(gx_mv_ctx& c,size_t rows){
+  if(rows>=256 && c.scratch[1] && c.scratch[2]) gx_parallel_range(rows,gx_mv_part,&c);
+  else gx_mv_part(0,0,rows,&c);
+}
+struct gx_q8_choice{int type;u32 cols;bool paired;};
+static gx_q8_choice gx_q8_choices[16];
+static size_t gx_q8_choice_count=0;
+static bool gx_choose_q8(gx_mv_ctx& c,size_t rows){
+  if(rows<256 || c.cols%32 || (c.type!=GXQ_Q8_0 && c.type!=GXQ_Q8_1)) return false;
+  for(size_t i=0;i<gx_q8_choice_count;++i)
+    if(gx_q8_choices[i].type==c.type && gx_q8_choices[i].cols==c.cols) return gx_q8_choices[i].paired;
+  if(gx_q8_choice_count==16) return false;
+  const size_t sample=256;f32 reference[sample];double old_best=1e30,new_best=1e30;
+  c.paired=false;gx_mv_execute(c,sample);
+  for(int trial=0;trial<3;++trial){double t=gx_time_seconds();gx_mv_execute(c,sample);old_best=GX_MIN(old_best,gx_time_seconds()-t);}
+  memcpy(reference,c.out,sizeof(reference));
+  c.paired=true;gx_mv_execute(c,sample);
+  for(int trial=0;trial<3;++trial){double t=gx_time_seconds();gx_mv_execute(c,sample);new_best=GX_MIN(new_best,gx_time_seconds()-t);}
+  bool match=true;
+  for(size_t i=0;i<sample;++i)
+    if(!(fabsf(c.out[i]-reference[i])<=0.0001f+fabsf(reference[i])*0.00001f)) match=false;
+  bool paired=match && new_best<old_best*0.9;
+  gx_q8_choice& choice=gx_q8_choices[gx_q8_choice_count++];choice.type=c.type;choice.cols=c.cols;choice.paired=paired;
+  GX_LOG_WARN("CPU: %s %u columns: %s rows (baseline %.2fms, paired %.2fms, parity %s)",
+    gxq_name(c.type),c.cols,paired ? "paired" : "single",old_best*1000,new_best*1000,match ? "OK" : "failed");
+  return paired;
+}
+
 void gx_matvec_rows(const u8* data, int type, u32 cols, u32 row_stride,
                     const f32* x, f32* out, size_t out_dim, f32* scratch){
   if(gx_gpu_matvec(data,type,cols,row_stride,x,out,out_dim,scratch)) return;
   gx_mv_ctx c;
   c.data = data; c.type = type; c.cols = cols; c.row_stride = row_stride;
-  c.x = x; c.out = out;
+  c.x = x; c.out = out;c.paired=false;
+  c.scratch[0]=scratch;c.scratch[1]=c.scratch[2]=0;
   if(out_dim >= 256){
     for(int i = 1; i < 3; ++i){
       if(gx_mv_deq_n[i] < cols){
@@ -353,14 +457,9 @@ void gx_matvec_rows(const u8* data, int type, u32 cols, u32 row_stride,
         gx_mv_deq_n[i] = cols;
       }
     }
-    c.scratch[0] = scratch;
     c.scratch[1] = gx_mv_deq[1];
     c.scratch[2] = gx_mv_deq[2];
-    if(c.scratch[1] && c.scratch[2]){
-      gx_parallel_range(out_dim, gx_mv_part, &c);
-      return;
-    }
   }
-  c.scratch[0] = scratch;
-  gx_mv_part(0, 0, out_dim, &c);
+  c.paired=gx_choose_q8(c,out_dim);
+  gx_mv_execute(c,out_dim);
 }

@@ -1,14 +1,21 @@
-360AI 1.4 - local model choices
+360AI 1.5 - local model choices
 ==============================
 
 Model                              Model files   Reserve free   Mode
+TinyStories 260K F32 toy             1.2 MB        0.01 GB        RAM
+TinyStories 15M Q4_0 toy             19 MB         0.03 GB        RAM
 SmolLM2 135M Instruct Q8_0           145 MB        0.2 GB         RAM
 Gemma 3 270M Instruct Q8_0           292 MB        0.4 GB         RAM
 Qwen2.5 0.5B Instruct Q4_K_M         491 MB        1 GB           HDD stream
 Qwen2.5 1.5B Instruct Q4_K_M         1.12 GB       2 GB           HDD stream
 Qwen2.5 7B Instruct Q4_K_M           4.68 GB       5 GB           HDD stream
 
-SmolLM2 and Gemma weights are included. Qwen models are optional downloads.
+All four small models are included. Qwen models are optional downloads.
+For chat choose SmolLM2. For very limited story completion, try TinyStories
+15M, or 260K for a minimal toy. Write Once upon a time, not a chat question.
+260K often produces nonsense. 15M supports only 128 context tokens; 360AI
+clamps the cache to this limit. These models are much less capable than chat
+models. Use Auto/RAM, compute Auto and the Quick preset for short outputs.
 The reserve column is for the extracted model, not extra RAM. To keep all
 models, add their file sizes together and leave room for the app and logs.
 
@@ -43,6 +50,8 @@ cause loading to fail. GGUF shards are not ZIP or arbitrary file fragments.
 LICENSES AND SOURCES
 Gemma: see NOTICE, GEMMA_TERMS.txt, GEMMA_POLICY.txt and MODEL_INFO.txt.
 SmolLM2 by Hugging Face, GGUF conversion by lmstudio-community: Apache 2.0.
+TinyStories by Andrej Karpathy, GGUF conversion by ggml-org: MIT.
+See TINYSTORIES_INFO.txt and TINYSTORIES_LICENSE.txt.
 Qwen2.5 models by the Qwen team: Apache 2.0.
 See APACHE-2.0.txt and SMOLLM2_INFO.txt. models.json pins all source revisions,
 download URLs, exact file lengths and SHA-256 checksums.

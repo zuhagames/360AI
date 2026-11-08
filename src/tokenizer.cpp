@@ -31,7 +31,7 @@ static char ascii_lower(char c){ return c >= 'A' && c <= 'Z' ? c+32 : c; }
 
 Tokenizer::Tokenizer(){
   bos_=eos_=unk_=-1; bpe_=false; add_bos_=true; add_space_prefix_=true;
-  llama3_=qwen_=smollm_=false;
+  llama3_=qwen_=smollm_=completion_only_=false;
   for(int b=0, extra=0; b<256; ++b){
     bool direct = (b>=33 && b<=126)||(b>=161 && b<=172)||(b>=174);
     byte_chars_[b]=utf8_cp(direct ? b : 256+extra++);
@@ -48,6 +48,13 @@ bool Tokenizer::load(GGUF& g){
   std::string model=g.str_val("tokenizer.ggml.model", "llama");
   std::string pre=g.str_val("tokenizer.ggml.pre", "");
   std::string arch=g.str_val("general.architecture", "");
+  // These published TinyStories checkpoints are base models, not Llama Chat.
+  // Recognize their complete shape/vocabulary fingerprint even if renamed.
+  u64 dim=g.u64_val("llama.embedding_length"),layers=g.u64_val("llama.block_count");
+  u64 heads=g.u64_val("llama.attention.head_count"),kvheads=g.u64_val("llama.attention.head_count_kv",heads);
+  completion_only_=model=="llama" && arch=="llama" && !g.find("tokenizer.chat_template") &&
+    ((dim==64 && layers==5 && heads==8 && kvheads==4 && tk->arr_s.size()==512) ||
+     (dim==288 && layers==6 && heads==6 && kvheads==6 && tk->arr_s.size()==32000));
   bpe_=model=="gpt2"; qwen_=arch=="qwen2";
   if(!bpe_ && model!="llama"){
     GX_LOG_ERROR("tokenizer: unsupported model %s", model.c_str()); return false;
@@ -233,6 +240,14 @@ std::string Tokenizer::decode(const std::vector<int>& tokens) const{
 }
 std::string Tokenizer::chat_prompt(const std::vector<std::pair<std::string,std::string> >& msgs) const{
   std::string p;
+  if(completion_only_){
+    for(size_t i=0;i<msgs.size();++i){
+      if(msgs[i].first=="system" || msgs[i].first=="developer") continue;
+      if(!p.empty()) p+='\n';
+      p+=msgs[i].second;
+    }
+    return p;
+  }
   bool gemma=ids_.find("<start_of_turn>")!=ids_.end();
   bool chatml=ids_.find("<|im_start|>")!=ids_.end();
   bool headers=ids_.find("<|start_header_id|>")!=ids_.end();

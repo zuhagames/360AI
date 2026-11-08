@@ -1,6 +1,16 @@
 {
   "models": [
     {
+      "id": "stories260k", "name": "TinyStories 260K toy (F32)", "bundled": true,
+      "description": "Smallest speed-first toy. Mostly nonsense; continues English story openings, not an instruction/chat assistant. Use RAM.", "recommended_free_gb": 0.01, "mode": "RAM", "license": "MIT",
+      "files": [{"filename":"stories260K.gguf","url":"https://huggingface.co/ggml-org/models-moved/resolve/499bc8821c6b12b4e53c5bffcb21ec206f212d81/tinyllamas/stories260K.gguf?download=true","size":1185376,"sha256":"270cba1bd5109f42d03350f60406024560464db173c0e387d91f0426d3bd256d"}]
+    },
+    {
+      "id": "stories15m", "name": "TinyStories 15M toy Q4_0", "bundled": true,
+      "description": "Weak English story completion with a 128-token context. Try Once upon a time. Not a chat assistant; use RAM.", "recommended_free_gb": 0.03, "mode": "RAM", "license": "MIT",
+      "files": [{"filename":"stories15M-q4_0.gguf","url":"https://huggingface.co/ggml-org/models-moved/resolve/499bc8821c6b12b4e53c5bffcb21ec206f212d81/tinyllamas/stories15M-q4_0.gguf?download=true","size":19077344,"sha256":"66967fbece6dbe97886593fdbb73589584927e29119ec31f08090732d1861739"}]
+    },
+    {
       "id": "gemma3-270m", "name": "Gemma 3 270M Instruct", "bundled": true,
       "description": "General chat. RAM loading recommended.", "recommended_free_gb": 0.4, "mode": "RAM", "license": "Gemma Terms of Use",
       "files": [{"filename":"gemma-3-270m-it-Q8_0.gguf","url":"https://huggingface.co/second-state/gemma-3-270m-it-GGUF/resolve/5ac77b3c443cfd6ed0d1e3d83c2aaf2f72897c7d/gemma-3-270m-it-Q8_0.gguf?download=true","size":291545600,"sha256":"0ef57d2c838458a1952664260dcba38e5bdda37494f3af732f06e4add24068e3"}]

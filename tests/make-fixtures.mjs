@@ -79,4 +79,9 @@ fixture('split-qwen2','qwen2',{},true,{split:true});
 fixture('missing-split','qwen2',{},true,{split:true,missing:true});
 fixture('bad-split','qwen2',{},true,{split:true,badIndex:true});
 fixture('stream-cache','qwen2',{},true,{cache:true});
+fixture('stories-tokenizer','llama',{
+  'llama.embedding_length':64,'llama.block_count':5,
+  'llama.attention.head_count':8,'llama.attention.head_count_kv':4,
+  'tokenizer.ggml.tokens':['<unk>','<s>','</s>',...Array.from({length:509},(_,i)=>String.fromCharCode(33+i))],
+},false);
 console.log('GGUF fixtures: '+fileURLToPath(root));

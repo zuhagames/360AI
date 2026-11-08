@@ -12,7 +12,7 @@ After launching the app:
 2. Leave **Compute backend: Auto** and **Weight storage: Auto** selected. Auto compares a small real-weight matrix on CPU/GPU and uses the GPU only if its result matches and it is at least 20% faster. Storage Auto keeps the model in RAM when weights, scratch/KV buffers and a memory reserve fit. CPU, forced GPU and explicit RAM/streaming overrides remain available.
 3. Enable **OpenAI / MCP server** before loading the model to access the console over your LAN. The chat screen displays its actual address and port (80, or 8080 if 80 cannot be bound).
 
-A console capable of running unsigned XEX files is required. The default context is 512 tokens. RAM mode keeps all weights in memory; HDD/USB streaming keeps matrix weights on disk with an 8 MB cache. The tokenizer, scratch buffers, small norm/bias tensors, KV cache, UI and GPU buffers still share the console's 512 MB RAM. Start at context 256–512 and raise it only when memory allows.
+A console capable of running unsigned XEX files is required. New installs default to a 256-token context and 48-token reply cap; saved preferences are preserved. RAM mode keeps all weights in memory; HDD/USB streaming keeps matrix weights on disk with an 8 MB cache. The tokenizer, scratch buffers, small norm/bias tensors, KV cache, UI and GPU buffers still share the console's 512 MB RAM. Start at context 256–512 and raise it only when memory allows. The model's own context limit still applies.
 
 ## Saved settings and chat controls
 
@@ -44,10 +44,12 @@ The console footer shows layer progress during prompt and decode work. **Y** is 
 
 ## HDD streaming and model downloads
 
-The 1.4 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0**. Load either through RAM mode for normal use. Their source revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
+The 1.5 USB ZIP includes **Gemma 3 270M Q8_0**, **SmolLM2 135M Instruct Q8_0**, **TinyStories 15M Q4_0** and **TinyStories 260K F32**. Use Auto/RAM for these models. Their pinned revisions, exact sizes and checksums are in `release/models.json` and the ZIP's `models.json`.
 
 | Model | Exact model file size | Reserve free disk space | Status |
 | --- | --- | --- | --- |
+| TinyStories 260K F32 | 1,185,376 bytes | 0.01 GB | Bundled story toy; mostly nonsense; not an assistant |
+| TinyStories 15M Q4_0 | 19,077,344 bytes | 0.03 GB | Bundled simple story completion; 128-token context |
 | SmolLM2 135M Q8_0 | 144,811,072 bytes | 0.2 GB | Bundled; RAM/streaming host output parity verified |
 | Gemma 3 270M Q8_0 | 291,545,600 bytes | 0.4 GB | Bundled; RAM/streaming host output parity verified |
 | Qwen2.5 0.5B Q4_K_M | 491,400,032 bytes | 1 GB | Optional HDD model |
@@ -55,6 +57,8 @@ The 1.4 USB ZIP includes **Gemma 3 270M Q8_0** and **SmolLM2 135M Instruct Q8_0*
 | Qwen2.5 7B Q4_K_M | 4,683,073,632 bytes across two files | **5 GB on HDD** | Experimental; extremely slow; not console-benchmarked |
 
 Disk sizes use decimal GB. Reservations are for each extracted model, not extra RAM; add file sizes together if keeping several models. Larger models are optional downloads rather than bundled weights.
+
+The [TinyStories checkpoints](https://huggingface.co/karpathy/tinyllamas) are Llama-architecture base models trained for simple stories, not instruction-following chat. The unchanged [ggml-org GGUFs](https://huggingface.co/ggml-org/models-moved/tree/499bc8821c6b12b4e53c5bffcb21ec206f212d81/tinyllamas) are bundled with MIT license/provenance notices. 360AI recognizes their shape/vocabulary fingerprints and formats turns as plain text continuation without `[INST]` markers. Try **Once upon a time**. The model menu and keyboard explain their limited purpose. 15M clamps the cache to 128 tokens even when Settings requests more; shortening the prompt/reply budget leaves more room. Use SmolLM2 for ordinary conversation.
 
 On a Windows PC, use the included `Download-Models.ps1 -List` to see the catalog, then `Download-Models.ps1 -Model qwen25-05b` (or `qwen25-15b`, `qwen25-7b`). Run it through PowerShell with `-ExecutionPolicy Bypass -File` if needed. In a source checkout, use `tools/fetch-model.ps1` instead. Every download is pinned to a source revision and verified against SHA-256 before activation.
 
@@ -93,7 +97,9 @@ This backend is experimental. Uploads, GPU/CPU synchronization and readbacks may
 
 ## Performance and response delay
 
-For normal chat, start with **SmolLM2 135M**, context **512**, and compute/storage **Auto**. The included Q8 models normally fit RAM; streaming them unnecessarily adds disk latency to every token. Large HDD models trade memory capacity for speed and can remain extremely slow.
+For normal chat, start with **SmolLM2 135M**, **Reply preset: Quick**, and compute/storage **Auto**. Fresh installs highlight SmolLM2 and use context 256/reply cap 48. Upgrades preserve your selected model/settings; select Quick to reduce old budgets and reset forced GPU/streaming to Auto. TinyStories offers much lower capability for less computation. The included models normally fit RAM; streaming them unnecessarily adds disk latency to every token. Large HDD models can remain extremely slow.
+
+Version 1.5 adds a two-row Q8 CPU candidate that shares input-vector loads. On first CPU use of each quantization/input width, it compares 256 rows using both kernels, checks numerical agreement and takes the best of three warm runs. It selects paired rows only with a measured improvement of at least 10%; otherwise the original kernel is retained. The result is cached for the process (up to 16 shapes) and reported as `CPU:` log lines. Initial calibration adds one-time work. F32 matrix rows on Xenon now swap little-endian floats in VMX registers instead of writing/reading an intermediate float row; float dot products use independent accumulators. Actual console speed must be measured on hardware.
 
 The 1.1.1 CPU Q4/Q5/Q8 kernels multiply signed quantized weights directly, avoiding a full float row conversion and intermediate buffer on every dot product. Xenon uses VMX unpack/conversion operations. Q4_K/Q5_K decoding reuses group scales. Attention dot products, weighted sums and RMS normalization use vector operations. Inference and its two workers run on hardware threads 0, 2 and 4, one per physical core; worker completion uses an event instead of polling/yielding. The old workers inherited their parent's hardware-thread assignment, as described in [Microsoft's Xbox threading guidance](https://learn.microsoft.com/en-us/windows/win32/dxtecharts/coding-for-multiple-cores#creating-threads).
 
@@ -101,7 +107,7 @@ Version 1.3 computes rotary sine/cosine tables once per token position (local an
 
 Each KV cache retains the token sequence it has actually evaluated. Subsequent requests reuse the matching prefix and recompute the final prompt token for fresh logits. Changed/truncated prefixes, model reloads, backend changes and explicit cache clearing invalidate the appropriate data. Cancelled generation retains only completed token evaluations. History that no longer fits the context must still be processed again after trimming.
 
-Disk cache misses read the requested matrix batch rounded to 64 KiB, bounded by the 8 MiB cache. A single embedding row no longer causes an 8 MiB read. The chat screen shows prompt tokens processed and elapsed time, followed by decode tokens/second. One `perf:` log line records prompt/cache counts, first-token time, decode time, backend and storage per request. Console replies default to 128 tokens, adjustable from 16 to 512 in Settings; API token limits are unchanged.
+Disk cache misses read the requested matrix batch rounded to 64 KiB, bounded by the 8 MiB cache. A single embedding row no longer causes an 8 MiB read. The chat screen shows prompt tokens processed and elapsed time, followed by decode tokens/second. One `perf:` log line records prompt/cache counts, first-token time, decode time, backend and storage per request. Console replies default to 48 tokens, adjustable from 16 to 512 in Settings; API token limits are unchanged.
 
 Windows host measurements with the same compiler, weights, 16-token prompt and greedy output:
 
@@ -215,7 +221,7 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 
 This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch both pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.4`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and both GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
+Fetch all four pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.5`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and all four GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
 
 Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
@@ -250,7 +256,7 @@ Developed by **ZuhaGames & Canyons**. 360AI is a fork of [Canyons' gemma.xex](ht
 The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), and **SmolLM2 135M Instruct**, created by Hugging Face, using [lmstudio-community's GGUF conversion](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF). Their attribution, provenance, and terms are included in the download.
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.4">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.5">Get 360AI</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>

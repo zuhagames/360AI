@@ -1,3 +1,26 @@
+360AI 1.5 - smaller models and native speed defaults
+===================================================
+
+- Bundled TinyStories 15M Q4_0 (19 MB) and 260K F32 (1.2 MB) story toys.
+- Clearly labeled very limited completion models; plain-text prompts, not INST.
+- Existing SmolLM2 and Gemma weights are unchanged. Four models in one USB ZIP.
+- New installs: 256 context / 48 reply tokens; SmolLM2 highlighted for chat.
+- Upgrades preserve saved settings. Select Quick to shorten old budgets and
+  reset forced GPU/HDD streaming to Auto.
+- Q8 paired-row CPU candidate shares inputs. A per-width numerical/timing
+  check selects it only with >=10% measured improvement, otherwise single rows.
+- Xenon F32 rows swap bytes in VMX registers, avoiding scratch row conversion.
+- Float vector dots use independent accumulators; context limits are enforced.
+
+VALIDATION
+Xbox SDK build, native inference/tokenizer/settings/matrix checks and all eight
+protocol/tokenizer/package groups pass. Real models generate on the host;
+RAM and streamed output/KV parity and conversation cache reuse are verified.
+Physical-console VMX speed and controller behavior still need testing. Initial
+Q8 calibration adds one-time work. TinyStories is not a chat replacement;
+260K may be nonsense, and 15M has a 128-token context. No Xbox speed multiplier
+is claimed. Use Auto/RAM for small models; HDD streaming can be extremely slow.
+
 360AI 1.4 - native reply controls and cancellation
 ================================================
 
