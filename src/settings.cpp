@@ -31,7 +31,7 @@ static bool parse_settings(const std::string& text,AppSettings& out){
      !decimal(j,"top_p",0.05,1.0,s.top_p) ||
      !decimal(j,"repeat_penalty",1.0,1.5,s.repeat_penalty) ||
      !boolean(j,"server",s.server_on) || !boolean(j,"console_chat",s.chat_on) || !boolean(j,"auto_update",s.auto_update) ||
-     !boolean(j,"hub_candidates",s.hub_query.supported_only)) return false;
+     !boolean(j,"hub_candidates",s.hub_query.supported_only) || !boolean(j,"models_smallest_first",s.models_smallest_first)) return false;
   if(j.has("hub_search")){
     const Json& n=j.get("hub_search");if(n.type!=Json::STRING || n.text.size()>96) return false;
     for(size_t i=0;i<n.text.size();++i) if((u8)n.text[i]<32 || (u8)n.text[i]==127) return false;
@@ -83,6 +83,7 @@ bool AppSettings::save(const char* path) const{
   j["top_p"]=Json((double)top_p);j["repeat_penalty"]=Json((double)repeat_penalty);
   j["server"]=Json::boolean(server_on);j["console_chat"]=Json::boolean(chat_on);
   j["auto_update"]=Json::boolean(auto_update);
+  j["models_smallest_first"]=Json::boolean(models_smallest_first);
   j["hub_search"]=Json(hub_query.text);j["hub_max_parameters"]=Json((double)hub_query.max_parameters);
   j["hub_candidates"]=Json::boolean(hub_query.supported_only);
   AppSettings check;std::string next=j.dump()+"\n",previous;

@@ -40,6 +40,7 @@ struct AppSettings{
   bool server_on;
   bool chat_on;
   bool auto_update;
+  bool models_smallest_first;
   int backend_mode; // Auto / CPU / forced GPU
   int weight_mode; // Auto / RAM / HDD stream
   int reply_tokens;
@@ -69,6 +70,8 @@ public:
   void test_ask(const char* text) {assistant_send(text);}
   void test_hub_data(const HubView& data){hub_.test_view(data);screen_=AS_HUB;hub_files_=true;hub_file_sel_=0;hub_confirm_=false;}
   bool test_hub_confirmation() const {return hub_confirm_;}
+  std::string test_model_name(int i) const {return files_[i].name;}
+  int test_model_selection() const {return file_sel_;}
 #endif
 
 private:
@@ -145,6 +148,7 @@ private:
 
   void browse_frame();
   void refresh_models();
+  void sort_models();
   void hub_frame();
   void open_hub();
   void frame();
