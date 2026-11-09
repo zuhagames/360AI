@@ -7,6 +7,7 @@
 #include "chat.h"
 #include "assistant.h"
 #include "assistant_store.h"
+#include "updater.h"
 
 enum app_screen{
   AS_BROWSE=0,
@@ -16,7 +17,8 @@ enum app_screen{
   AS_HOME,
   AS_NOTES,
   AS_TIMERS,
-  AS_TOOLS
+  AS_TOOLS,
+  AS_UPDATES
 };
 
 enum debug_cycle{
@@ -35,6 +37,7 @@ struct AppSettings{
   int debug_level;
   bool server_on;
   bool chat_on;
+  bool auto_update;
   int backend_mode; // Auto / CPU / forced GPU
   int weight_mode; // Auto / RAM / HDD stream
   int reply_tokens;
@@ -90,6 +93,10 @@ private:
   bool assistant_mode_;
   Assistant assistant_;
   AssistantStore assistant_store_;
+  Updater updater_;
+  bool update_auto_checked_;
+  bool update_restart_;
+  double update_auto_at_;
   std::string save_status_;
   std::string timer_notice_;
   double timer_notice_until_;
@@ -132,6 +139,8 @@ private:
   void notes_frame();
   void timers_frame();
   void tools_frame();
+  void updates_frame();
+  void restart_for_update();
   void shell(const char* title,const char* subtitle);
   void home();
   void local_command(const std::string& command);

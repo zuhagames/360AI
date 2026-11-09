@@ -3,6 +3,10 @@
 #include "server.h"
 #include "version.h"
 #include "textstream.h"
+#ifdef _XBOX
+#include <xtl.h>
+#include <xbox.h>
+#endif
 
 static std::string short_text(const std::string& text,size_t chars){
   std::string out;for(size_t i=0;i<text.size();++i){u8 c=(u8)text[i];if((c&0xc0)==0x80) continue;out+=c>=127 ? '?' : (c<32 ? ' ' : c);}
@@ -46,10 +50,13 @@ void App::home_frame(){
     gxui_label(x+28,y+158,selected ? GX_ACCENT : GX_MUTED,detail,.65f);
     if(selected) gxui_prompt(x+430,y+145,GX_BTN_A,"Open",GX_PANEL);
   }
-  gxui_prompt(64,658,GX_BTN_A,"Open");gxui_prompt(256,658,GX_BTN_X,"Ask");gxui_prompt(448,658,GX_BTN_Y,"Quick tools");gxui_prompt(984,658,GX_BTN_DUP,"Choose");
+  UpdateStatus update=updater_.status();
+  if(update.state==US_AVAILABLE || update.state==US_READY){gxui_fill(64,604,1152,30,GX_INK);gxui_label(80,606,GX_ACCENT,("360AI "+update.version+" is available. Press START for Updates.").c_str(),.65f);}
+  gxui_prompt(64,658,GX_BTN_A,"Open");gxui_prompt(240,658,GX_BTN_X,"Ask");gxui_prompt(408,658,GX_BTN_Y,"Quick tools");gxui_prompt(736,658,GX_BTN_START,"Updates");gxui_prompt(1010,658,GX_BTN_DUP,"Choose");
   u32 p=gxui_buttons_pressed();if(p&GX_BTN_DLEFT) home_sel_&=~1;if(p&GX_BTN_DRIGHT) home_sel_|=1;
   if(p&GX_BTN_DUP) home_sel_&=1;if(p&GX_BTN_DDOWN) home_sel_|=2;
-  if(p&GX_BTN_X){open_assistant();kb_open(KB_CHAT,"Talk to 360AI","Say hello, ask a question, or type a command","");}
+  if(p&GX_BTN_START) screen_=AS_UPDATES;
+  else if(p&GX_BTN_X){open_assistant();kb_open(KB_CHAT,"Talk to 360AI","Say hello, ask a question, or type a command","");}
   else if(p&GX_BTN_Y){screen_=AS_TOOLS;tool_sel_=0;}
   else if(p&GX_BTN_A){confirm_id_=0;chat_notice_.clear();switch(home_sel_){case 0:open_assistant();break;case 1:screen_=AS_NOTES;break;case 2:screen_=AS_TIMERS;break;case 3:screen_=AS_BROWSE;break;}}
 }
@@ -137,12 +144,49 @@ void App::tools_frame(){
       if(tool_sel_==5) assistant_send("help");else kb_open(KB_CHAT,"360AI tools",tool_sel_==4 ? "teach favorite game: Halo 3" : "Complete the command, then press START",initial[tool_sel_]);}
   }
 }
+void App::restart_for_update(){
+#ifdef _XBOX
+  if(assistant_.dirty()) queue_assistant_save();assistant_store_.stop();poll_assistant_save();
+  if(assistant_.dirty()){chat_notice_="Notes could not be saved. Update restart stopped. Check the drive and try again.";assistant_store_.start("game:\\360AI-assistant.json");return;}
+  updater_.stop();gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;gx_thread_join(load_thread_);load_thread_=0;
+  XLaunchNewImage("game:\\360AI-updater.xex",0);
+  chat_notice_="Installer could not start. Copy the complete USB ZIP again.";assistant_store_.start("game:\\360AI-assistant.json");
+#else
+  chat_notice_="Restart installation is available on the Xbox.";
+#endif
+}
+void App::updates_frame(){
+  shell("Updates","DIRECT FROM GITHUB. RIGHT HERE ON YOUR XBOX.");UpdateStatus update=updater_.status();
+  gxui_fill(64,150,1152,396,GX_PANEL);gxui_label(92,178,GX_MUTED,"INSTALLED",.70f);gxui_label(92,214,GX_INK,GX_VERSION,1.5f);
+  gxui_label(632,178,GX_MUTED,"LATEST RELEASE",.70f);gxui_label(632,214,GX_INK,update.version.empty() ? "--" : update.version.c_str(),1.5f);
+  const char* action=update.state==US_AVAILABLE ? "Download update" : (update.state==US_READY ? "Restart & install" : "Check now");
+  paragraph(92,292,update.message,74,3);
+  if(update.state==US_DOWNLOADING && update.total){f32 ratio=(f32)GX_MIN(update.received,update.total)/(f32)update.total;gxui_fill(92,390,1096,12,GXRGB(207,214,198));gxui_fill(92,390,1096*ratio,12,GX_ACCENT);char progress[80];snprintf(progress,sizeof(progress),"%.1f / %.1f MB",update.received/1048576.0,update.total/1048576.0);gxui_label(92,416,GX_MUTED,progress,.75f);}
+  gxui_label(92,482,GX_MUTED,settings_.auto_update ? "Check on launch: ON (background)" : "Check on launch: OFF",.8f);
+  paragraph(64,566,chat_notice_.empty() ? "App updates keep your models, notes and settings. Keep 32 MB free. Restarting ends session timers." : chat_notice_,85,2,GX_MUTED);
+  bool busy=update.state==US_CHECKING || update.state==US_DOWNLOADING;
+  if(!busy) gxui_prompt(64,658,GX_BTN_A,action);
+  if(busy || update.state==US_READY || update.state==US_ERROR) gxui_prompt(440,658,GX_BTN_X,busy ? "Cancel" : "Discard");
+  gxui_prompt(680,658,GX_BTN_Y,"Auto-check");gxui_prompt(1010,658,GX_BTN_B,"Home");
+  u32 p=gxui_buttons_pressed();
+  if(p&GX_BTN_Y){settings_.auto_update=!settings_.auto_update;save_settings();update_auto_checked_=true;}
+  if(p&GX_BTN_X){if(busy) updater_.cancel();else if(update.state==US_READY || update.state==US_ERROR) updater_.discard();}
+  if(!busy && (p&GX_BTN_A)){chat_notice_.clear();update_auto_checked_=true;
+    if(update.state==US_READY) update_restart_=true;
+    else updater_.start("game:\\",update.state==US_AVAILABLE);
+  }
+}
 void App::frame(){
+#ifdef _XBOX
+  if(!update_auto_checked_ && gx_time_seconds()>=update_auto_at_){update_auto_checked_=true;if(settings_.auto_update) updater_.start("game:\\");}
+#endif
   poll_assistant_save();assistant_poll();gxui_begin_frame(GX_PAPER);
   switch(screen_){case AS_HOME:home_frame();break;case AS_NOTES:notes_frame();break;case AS_TIMERS:timers_frame();break;case AS_TOOLS:tools_frame();break;
-    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;}
+    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;case AS_UPDATES:updates_frame();break;}
   if(!timer_notice_.empty() && gx_time_seconds()<timer_notice_until_ && !kb_mode_){gxui_fill(64,110,1152,40,GX_INK);gxui_label(80,115,GX_PANEL,short_text(timer_notice_,90).c_str(),.75f);}
   gxui_end_frame();u32 p=gxui_buttons_pressed();bool swallowed=kb_swallow_;kb_swallow_=false;
+  // Join inference/server workers only after releasing the renderer's GPU lock.
+  if(update_restart_){update_restart_=false;restart_for_update();}
   if(!swallowed && !kb_mode_ && (p&(GX_BTN_B|GX_BTN_BACK))){
     confirm_id_=0;
     if(screen_==AS_CHAT && !assistant_mode_){gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;engine_.reset();kv_=KVCache();model_loaded_=false;turns_.clear();chat_log_.clear();screen_=AS_BROWSE;}
@@ -163,7 +207,7 @@ void App::test_seed(){
 }
 bool App::test_capture(const char* name,const char* path){
   test_seed();if(!strcmp(name,"notes")) screen_=AS_NOTES;else if(!strcmp(name,"timers")) screen_=AS_TIMERS;else if(!strcmp(name,"tools")) screen_=AS_TOOLS;
-  else if(!strcmp(name,"models")) screen_=AS_BROWSE;else if(!strcmp(name,"chat")){open_assistant();assistant_send("hello");assistant_send("what do you think about the xbox 360");}
+  else if(!strcmp(name,"updates")) screen_=AS_UPDATES;else if(!strcmp(name,"models")) screen_=AS_BROWSE;else if(!strcmp(name,"chat")){open_assistant();assistant_send("hello");assistant_send("what do you think about the xbox 360");}
   else if(!strcmp(name,"keyboard")){open_assistant();kb_open(KB_CHAT,"Talk to 360AI","Say hello, ask a question, or type a command","");}
   test_frame(0);return gxui_capture(path);
 }
