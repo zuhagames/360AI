@@ -250,7 +250,7 @@ const char* help_text="360 Assistant works offline without a model. Try:\n"
   "teach favorite game: Halo 3 | list learned answers | forget answer favorite game\n"
   "my name is Martin | what is my name | time | date | status\n"
   "quick preset | balanced preset | creative preset\n"
-  "help with GPU | help with models | open updates | joke | export chat | clear chat\n"
+  "help with GPU | help with models | find models | open updates | joke | export chat | clear chat\n"
   "Use cancel to leave a follow-up question. Timers run only while this app is open.";
 struct Fact {const char* phrases;const char* response;};
 const Fact facts[]={
@@ -429,6 +429,9 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
   if(norm=="cancel" || norm=="never mind" || norm=="nevermind" || norm=="stop"){
     bool had=pending_!=P_NONE;pending_=P_NONE;pending_label_.clear();return AssistantReply(had ? "Cancelled the follow-up. Existing notes and timers are unchanged." : "No follow-up is waiting. Use cancel timer followed by its number to stop a timer.");}
   if(norm=="help" || norm=="commands" || norm=="show commands" || norm=="what can you do"){pending_=P_NONE;pending_label_.clear();return AssistantReply(help_text);}
+  if(norm=="find models" || norm=="get models" || norm=="open model library" || norm=="open hugging face"){
+    pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening the Hugging Face model library. Search GGUF text-generation models and choose a file to download.",AA_MODEL_LIBRARY);
+  }
   if(norm=="open updates" || norm=="check for updates" || norm=="update 360ai" || norm=="update the app"){
     pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening Updates. Press A to check or download; installation needs a restart.",AA_UPDATES);
   }

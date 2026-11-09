@@ -1,4 +1,5 @@
 #include "gguf.h"
+#include "platform.h"
 #include "quant.h"
 
 static int seek64(FILE* fp,i64 offset,int origin){
@@ -77,11 +78,13 @@ bool GGUF::read_f64(f64* v){
 bool GGUF::read_string(std::string& s){
   u64 len;
   if(!read_u64(&len)) return false;
-  if(len > (1u<<30)) return false;
+  i64 pos=tell64(fp_);
+  if(pos<0 || (u64)pos>file_size_ || len>file_size_-(u64)pos || len>16u*1024u*1024u || !metadata_spend(len*2)) return false;
   s.resize((size_t)len);
   if(len == 0) return true;
   return read_raw(&s[0], (size_t)len);
 }
+bool GGUF::metadata_spend(u64 bytes){if(bytes>metadata_left_) return false;metadata_left_-=bytes;return true;}
 
 static size_t type_size(int t){
   switch(t){
@@ -127,6 +130,7 @@ bool GGUF::load_single(const char* path){
   }
   if(seek64(fp_,0,SEEK_END) || tell64(fp_)<0){ close(); return false; }
   file_size_=(u64)tell64(fp_);
+  size_t available=gx_physical_free();metadata_left_=GX_MIN(96ull*1024*1024,available>16u*1024*1024 ? (u64)(available-16u*1024*1024)/2 : 0);
   if(seek64(fp_,0,SEEK_SET)){ close(); return false; }
 
   u32 magic;
@@ -142,12 +146,12 @@ bool GGUF::load_single(const char* path){
   if(!read_u64(&tensor_count) || !read_u64(&kv_count)){
     close(); return false;
   }
-  if(version_<2 || version_>3 || tensor_count>100000 || kv_count>100000){ close(); return false; }
+  if(version_<2 || version_>3 || tensor_count>100000 || kv_count>100000 || !metadata_spend(tensor_count*sizeof(gguf_tensor)*2+kv_count*sizeof(gguf_kv)*2)){ close(); return false; }
 
   kv_.reserve((size_t)kv_count);
   for(u64 k = 0; k < kv_count; ++k){
     gguf_kv kv;
-    memset(&kv, 0, sizeof(kv));
+    kv.type=kv.arr_type=0;kv.u=0;kv.i=0;kv.f=0;kv.b=false;
     if(!read_string(kv.key)){
       GX_LOG_ERROR("gguf: kv key read fail at %d", (int)k);
       close(); return false;
@@ -180,7 +184,7 @@ bool GGUF::load_single(const char* path){
         }
         kv.arr_type = (int)at;
         u32 alen = 0;
-        if(alen64 > (1u<<28)){
+        if(alen64 > 1048576 || !metadata_spend(alen64*(kv.arr_type==GGUF_TYPE_STRING ? sizeof(std::string)*2 : 48))){
           GX_LOG_ERROR("gguf: array too big %s len=%u", kv.key.c_str(), (unsigned)alen64);
           close(); return false;
         }

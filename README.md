@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v2.1/360AI-2.1-USB.zip"><strong>Download 360AI 2.1</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v2.2/360AI-2.2-USB.zip"><strong>Download 360AI 2.2</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
@@ -33,12 +33,12 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-2.1-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.1/360AI-2.1-USB.zip)**.
+1. Download and extract **[360AI-2.2-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.2/360AI-2.2-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
 4. Select **Assistant** for instant replies, or **Models** for GGUF chat. Leave model compute/storage on **Auto**.
 
-Press **START on Home** for Updates. The app checks GitHub on launch; download and restart from this screen to install future app updates. Install the full 2.1 ZIP once to get the updater. [Update help](release/UPDATES.txt).
+Press **START on Home** for Updates. The app checks GitHub on launch; download and restart from this screen to install future app updates. Install the full ZIP once when upgrading from 2.0 or earlier to get the updater. [Update help](release/UPDATES.txt).
 
 Requires a console capable of running unsigned XEX files. No separate model download is needed.
 
@@ -54,6 +54,8 @@ Requires a console capable of running unsigned XEX files. No separate model down
 | Qwen2.5 1.5B Q4_K_M — experimental | 2 GB | HDD stream |
 | Qwen2.5 7B Q4_K_M — experimental | **5 GB on HDD** | HDD stream, extremely slow |
 
+In **Models**, press **Y** to browse Hugging Face. Files under **200 MB** show green **Comfortable**, 200–300 MB show yellow **Tight**, and larger files show **Disk stream**. These are file-size guides; RAM, architecture and tensor-format limits still apply. Disk streaming does not support every model.
+
 For speed, use **Auto compute/storage** and **Reply preset: Quick**. SmolLM2 is the recommended chat model. The much smaller [TinyStories models](https://huggingface.co/karpathy/tinyllamas) trade most capabilities for less work: they continue story openings like “Once upon a time,” and are not chat assistants. The 260K toy may produce nonsense; 15M has a 128-token context.
 
 HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still need RAM. Larger models are experimental and have not been benchmarked on an Xbox. See [model downloads and HDD setup](docs/TECHNICAL.md#hdd-streaming-and-model-downloads), or `MODELS.txt` in the ZIP.
@@ -62,6 +64,7 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 
 - **360 Assistant:** 106 predefined phrases, calculations, conversions, saved notes, taught answers and timers. No weights needed. [Commands](release/ASSISTANT.txt).
 - GitHub update checks, small verified app downloads and a recovery copy; models and personal files stay in place.
+- **Hugging Face model library:** search GGUF text-generation models, filter parameter counts/families, inspect file sizes and download on Xbox. Models → Y, or `find models`. [Guide](release/MODEL_LIBRARY.txt).
 - Native dashboard, Quick tools, dedicated Notes/Timers screens and Xbox 360 button artwork.
 - Batched text rendering, cached chat layout and background assistant saves.
 - Console chat with controller and on-screen keyboard support.

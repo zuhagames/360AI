@@ -148,7 +148,7 @@ void App::restart_for_update(){
 #ifdef _XBOX
   if(assistant_.dirty()) queue_assistant_save();assistant_store_.stop();poll_assistant_save();
   if(assistant_.dirty()){chat_notice_="Notes could not be saved. Update restart stopped. Check the drive and try again.";assistant_store_.start("game:\\360AI-assistant.json");return;}
-  updater_.stop();gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;gx_thread_join(load_thread_);load_thread_=0;
+  hub_.stop();updater_.stop();gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;gx_thread_join(load_thread_);load_thread_=0;
   XLaunchNewImage("game:\\360AI-updater.xex",0);
   chat_notice_="Installer could not start. Copy the complete USB ZIP again.";assistant_store_.start("game:\\360AI-assistant.json");
 #else
@@ -177,12 +177,16 @@ void App::updates_frame(){
   }
 }
 void App::frame(){
+  HubState previous_hub=hub_view_.state;hub_.view(hub_view_);
+  if(previous_hub!=HS_FILES && hub_view_.state==HS_FILES){hub_files_=true;hub_file_sel_=0;}
+  if(previous_hub!=HS_MODELS && hub_view_.state==HS_MODELS){hub_files_=false;hub_sel_=0;}
+  if(previous_hub!=HS_DONE && hub_view_.state==HS_DONE) refresh_models();
 #ifdef _XBOX
   if(!update_auto_checked_ && gx_time_seconds()>=update_auto_at_){update_auto_checked_=true;if(settings_.auto_update) updater_.start("game:\\");}
 #endif
   poll_assistant_save();assistant_poll();gxui_begin_frame(GX_PAPER);
   switch(screen_){case AS_HOME:home_frame();break;case AS_NOTES:notes_frame();break;case AS_TIMERS:timers_frame();break;case AS_TOOLS:tools_frame();break;
-    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;case AS_UPDATES:updates_frame();break;}
+    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;case AS_UPDATES:updates_frame();break;case AS_HUB:hub_frame();break;}
   if(!timer_notice_.empty() && gx_time_seconds()<timer_notice_until_ && !kb_mode_){gxui_fill(64,110,1152,40,GX_INK);gxui_label(80,115,GX_PANEL,short_text(timer_notice_,90).c_str(),.75f);}
   gxui_end_frame();u32 p=gxui_buttons_pressed();bool swallowed=kb_swallow_;kb_swallow_=false;
   // Join inference/server workers only after releasing the renderer's GPU lock.
@@ -190,6 +194,8 @@ void App::frame(){
   if(!swallowed && !kb_mode_ && (p&(GX_BTN_B|GX_BTN_BACK))){
     confirm_id_=0;
     if(screen_==AS_CHAT && !assistant_mode_){gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;engine_.reset();kv_=KVCache();model_loaded_=false;turns_.clear();chat_log_.clear();screen_=AS_BROWSE;}
+    else if(screen_==AS_HUB){if(hub_confirm_){hub_confirm_=false;}
+      else if(hub_files_){hub_files_=false;}else screen_=AS_BROWSE;}
     else if(screen_==AS_SETTINGS) screen_=AS_BROWSE;
     else if(screen_!=AS_LOADING) home();
   }
@@ -206,6 +212,13 @@ void App::test_seed(){
   gx_file_entry f;f.name="SmolLM2-135M-Instruct-Q8_0.gguf";f.size=144811072;files_.push_back(f);f.name="gemma-3-270m-it-Q8_0.gguf";f.size=291545600;files_.push_back(f);
 }
 bool App::test_capture(const char* name,const char* path){
+  if(!strcmp(name,"hub") || !strcmp(name,"hub-files")){
+    HubView v;v.revision=10;v.state=!strcmp(name,"hub") ? HS_MODELS : HS_FILES;v.message="Choose a quantization. All shards are downloaded together.";
+    HubModel m;m.id="example/SmolLM2-135M-Instruct-GGUF";m.revision=std::string(40,'a');m.architecture="llama";m.parameters=135000000;m.license="apache-2.0";v.models.push_back(m);v.model=m;
+    const char* labels[]={"SmolLM2-135M-Q4_K_M.gguf","Gemma-270M-Q8_0.gguf","Qwen2.5-0.5B-Q4_K_M.gguf","GLM-MoE-Q4.gguf"};const u64 sizes[]={105454144,291545600,491400032,5000000000ull};
+    for(int i=0;i<4;++i){HubChoice c;c.name=labels[i];c.bytes=sizes[i];c.downloadable=i!=3;c.reason=i==3 ? "Unsupported architecture: MoE is not implemented." : "Candidate architecture. GGUF and memory checks still apply.";HubFile f;f.path=c.name;f.bytes=c.bytes;c.files.push_back(f);v.choices.push_back(c);}
+    hub_.test_view(v);hub_files_=v.state==HS_FILES;screen_=AS_HUB;test_frame(0);return gxui_capture(path);
+  }
   test_seed();if(!strcmp(name,"notes")) screen_=AS_NOTES;else if(!strcmp(name,"timers")) screen_=AS_TIMERS;else if(!strcmp(name,"tools")) screen_=AS_TOOLS;
   else if(!strcmp(name,"updates")) screen_=AS_UPDATES;else if(!strcmp(name,"models")) screen_=AS_BROWSE;else if(!strcmp(name,"chat")){open_assistant();assistant_send("hello");assistant_send("what do you think about the xbox 360");}
   else if(!strcmp(name,"keyboard")){open_assistant();kb_open(KB_CHAT,"Talk to 360AI","Say hello, ask a question, or type a command","");}

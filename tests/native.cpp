@@ -15,6 +15,7 @@
 #include "assistant_checks.h"
 #include "dashboard_checks.h"
 #include "updater_checks.h"
+#include "hub_checks.h"
 
 static std::string path(const char* name){ return std::string("build/tests/")+name+".gguf"; }
 static std::string completion(const std::string& prompt,int n,void*){
@@ -145,6 +146,7 @@ static void checks(){
   assistant_checks();
   dashboard_checks();
   updater_checks();
+  hub_checks();
   {
     GGUF g;assert(g.load(path("stories-tokenizer").c_str()));Tokenizer tok;assert(tok.load(g) && tok.completion_only());
     std::vector<std::pair<std::string,std::string> > messages;
@@ -391,6 +393,18 @@ static void checks(){
 }
 int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
+  if(argc>2 && (std::string(argv[1])=="--hub-search" || std::string(argv[1])=="--hub-download")){
+    ModelHub hub;HubView view;bool search=std::string(argv[1])=="--hub-search";
+    if(search){HubQuery q;q.text=argv[2];if(!hub.search(q)) return 2;}else {HubModel m;m.id="ggml-org/models-moved";if(!hub.details(m)) return 2;}
+    double until=gx_time_seconds()+120;for(;;){hub.view(view);if(view.state==HS_MODELS || view.state==HS_FILES || view.state==HS_ERROR || gx_time_seconds()>until) break;gx_sleep_ms(20);}
+    hub.stop();if(view.state==HS_ERROR){std::cerr<<view.message<<std::endl;return 3;}
+    if(search){std::cout<<"Live Hub search: "<<view.models.size()<<" filtered models; next page="<<!view.next.empty()<<std::endl;return view.models.empty() ? 4 : 0;}
+    size_t which=view.choices.size();for(size_t i=0;i<view.choices.size();++i) if(view.choices[i].name=="tinyllamas/stories260K.gguf") which=i;
+    if(which==view.choices.size()){std::cerr<<"TinyStories fixture not found: "<<view.message<<std::endl;return 4;}
+    if(!hub.download(argv[2],view.model,view.choices[which])) return 5;
+    until=gx_time_seconds()+180;for(;;){hub.view(view);if(view.state==HS_DONE || view.state==HS_ERROR || gx_time_seconds()>until) break;gx_sleep_ms(20);}
+    hub.stop();std::cout<<view.message<<" / "<<view.installed<<std::endl;return view.state==HS_DONE ? 0 : 6;
+  }
   if(argc>2 && std::string(argv[1])=="--https-check"){
     std::string body,error;struct Collect{static bool append(const void* data,size_t n,void* user){((std::string*)user)->append((const char*)data,n);return true;}};
     if(!gx_https_get(argv[2],argc>3 ? 16u*1024u*1024u : 262144u,Collect::append,&body,0,error)){std::cerr<<error<<std::endl;return 2;}

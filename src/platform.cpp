@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <time.h>
+#include <sys/statvfs.h>
 #endif
 #endif
 
@@ -76,6 +77,15 @@ size_t gx_physical_free(){
 #else
   return 512u * 1024u * 1024u;
 #endif
+}
+bool gx_disk_free(const char* directory,u64& bytes){
+  bytes=0;
+#if defined(_XBOX) || defined(_WIN32)
+  ULARGE_INTEGER available,total,free;if(!GetDiskFreeSpaceExA(directory,&available,&total,&free)) return false;bytes=available.QuadPart;
+#else
+  struct statvfs s;if(statvfs(directory,&s)!=0) return false;bytes=(u64)s.f_bavail*s.f_frsize;
+#endif
+  return true;
 }
 
 static bool has_ext(const std::string& name, const char* ext){

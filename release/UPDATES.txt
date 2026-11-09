@@ -35,5 +35,5 @@ required. The console clock must be correct for certificate verification.
 DashLaunch or router rules may block GitHub/Internet traffic. An update error
 does not alter the installed app. GitHub can also rate-limit update checks.
 
-2.0 and earlier have no updater: install the complete 2.1 USB ZIP once.
+2.0 and earlier have no updater: install the latest complete USB ZIP once.
 Later compatible releases can then be installed from the Xbox Updates screen.

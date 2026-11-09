@@ -1,4 +1,4 @@
-360AI 2.1 - Xbox 360 USB package
+360AI 2.2 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -147,3 +147,12 @@ Press A to download a small app update, then A to restart and install it.
 Keep 360AI-updater.xex beside the app, 32 MB free, and the console clock correct.
 Models, notes and settings stay in place. Read UPDATES.txt for recovery/help.
 Install this complete ZIP once when upgrading from 2.0 or earlier.
+
+HUGGING FACE MODEL LIBRARY
+Open Models and press Y, or type find models in Assistant.
+Search public GGUF text-generation models and inspect their individual files.
+Under 200 MB: Comfortable (green). 200-300 MB: Tight (yellow).
+300 MB or more: Disk stream (orange). These are file-size estimates.
+Use Y for parameter limits, LB for candidate/all families, RB for the next page.
+Downloads check free space, SHA-256 and GGUF architecture/tensor formats.
+HDD streaming still needs RAM and does not enable every model. See MODEL_LIBRARY.txt.

@@ -45,6 +45,7 @@ App::App(){
   assistant_mode_ = false;
   timer_notice_until_ = 0;
   update_auto_checked_=false;update_restart_=false;update_auto_at_=0;
+  hub_sel_=hub_file_sel_=0;hub_files_=hub_confirm_=false;
   loading_ = false;
   load_ok_ = false;
   load_done_ = false;
@@ -67,6 +68,7 @@ App::App(){
 }
 
 App::~App(){
+  hub_.stop();
   updater_.stop();
   assistant_store_.stop();
   gen_stop_ = true;
@@ -105,6 +107,21 @@ int App::run(){
   if(!assistant_store_.start(kAssistantPath)) save_status_="Saving unavailable";
   update_auto_at_=gx_time_seconds()+2;
 
+  refresh_models();
+
+  bool running = true;
+  while(running){frame();gx_sleep_ms(10);}
+
+  server_stop();
+  gen_stop_ = true;
+  gx_thread_join(gen_thread_); gen_thread_ = 0;
+  gx_thread_join(load_thread_); load_thread_ = 0;
+  gxui_shutdown();
+  return 0;
+}
+
+void App::refresh_models(){
+  files_.clear();file_sel_=file_scroll_=0;
   std::vector<gx_file_entry> all_files;
   gx_list_dir(kBrowseDir, ".gguf", all_files);
   for(size_t i=0;i<all_files.size();++i){
@@ -136,20 +153,12 @@ int App::run(){
   if(settings_.last_model.empty()) for(size_t i=0;i<files_.size();++i)
     if(files_[i].name=="SmolLM2-135M-Instruct-Q8_0.gguf"){file_sel_=(int)i;break;}
 
-  bool running = true;
-  while(running){frame();gx_sleep_ms(10);}
-
-  server_stop();
-  gen_stop_ = true;
-  gx_thread_join(gen_thread_); gen_thread_ = 0;
-  gx_thread_join(load_thread_); load_thread_ = 0;
-  gxui_shutdown();
-  return 0;
 }
 
 void App::browse_frame(){
   shell("Models","PICK A MODEL. SET IT UP. MAKE IT YOURS.");
   u32 buttons=gxui_buttons_pressed();if(buttons&GX_BTN_X){open_assistant();return;}
+  if(buttons&GX_BTN_Y){open_hub();return;}
   if(files_.empty()){gxui_label(92,184,GX_INK,"No models on this drive.",1.2f);gxui_label(92,250,GX_MUTED,"Copy a GGUF beside 360AI.xex, or open Assistant.",.85f);}
   else {
     file_sel_=GX_CLAMP(file_sel_,0,(int)files_.size()-1);
@@ -161,17 +170,18 @@ void App::browse_frame(){
     }
     const gx_file_entry& selected=files_[file_sel_];char hint[128];double reserve=ceil(selected.size/100000000.0)/10;
     snprintf(hint,sizeof(hint),"Reserve %.2f GB on HDD/USB. %s",reserve,selected.size>320u*1024u*1024u ? "HDD stream: very slow." : "RAM recommended.");
-    gxui_label(64,532,GX_MUTED,hint,.75f);
+    gxui_label(64,532,GX_MUTED,hint,.75f);gxui_label(848,532,gx_hub_size_color(selected.size),gx_hub_size_label(selected.size),.75f);
     const char* tip=selected.name=="stories260K.gguf" ? "Tiny story toy: mostly nonsense; not a chat assistant." : (selected.name=="stories15M-q4_0.gguf" ? "Small story toy: simple completions; not instruction chat." : "Leave compute/storage on Auto. Quick preset gives shorter replies.");
     gxui_label(64,576,GX_MUTED,tip,.7f);
   }
-  gxui_prompt(64,658,GX_BTN_A,"Set up");gxui_prompt(288,658,GX_BTN_X,"Assistant");gxui_prompt(1010,658,GX_BTN_B,"Home");
+  gxui_prompt(64,658,GX_BTN_A,"Set up");gxui_prompt(288,658,GX_BTN_X,"Assistant");gxui_prompt(572,658,GX_BTN_Y,"Get models");gxui_prompt(1010,658,GX_BTN_B,"Home");
   if(files_.empty()) return;
   u32 p = gxui_buttons_pressed();
   if(p & GX_BTN_DUP) file_sel_--;
   if(p & GX_BTN_DDOWN) file_sel_++;
   file_sel_=GX_CLAMP(file_sel_,0,(int)files_.size()-1);
   if(p & GX_BTN_A){
+    if(hub_view_.state==HS_DOWNLOADING){chat_notice_="Wait for the model download/check, or cancel it in Get models.";return;}
     model_path_ = std::string(kBrowseDir) + "\\" + files_[file_sel_].name;
     model_name_ = files_[file_sel_].name;
     settings_.last_model=model_name_;
@@ -463,6 +473,7 @@ void App::assistant_send(const std::string& text){
   else if(reply.action==AA_CLEAR_CHAT) new_chat();
   else if(reply.action==AA_MODELS){assistant_mode_=false;chat_log_.clear();turns_.clear();chat_view_=ChatView();screen_=AS_BROWSE;return;}
   else if(reply.action==AA_UPDATES) screen_=AS_UPDATES;
+  else if(reply.action==AA_MODEL_LIBRARY) open_hub();
   queue_assistant_save();
   append_chat("Assistant: ",reply.text);
   if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}
@@ -687,6 +698,9 @@ void App::kb_commit(){
   } else if(mode == KB_REPEAT){
     f32 value=(f32)atof(kb_text_.c_str());if(value!=value) value=1;
     settings_.repeat_penalty=GX_CLAMP(value,1.0f,1.5f);
+  } else if(mode==KB_HUB_SEARCH){
+    hub_query_.text=kb_text_.substr(0,96);hub_confirm_=false;hub_files_=false;
+    if(gx_hub_id(hub_query_.text)){HubModel model;model.id=hub_query_.text;hub_.details(model);}else hub_.search(hub_query_);return;
   } else if(mode == KB_NOTE_NEW || mode == KB_NOTE_EDIT || mode == KB_TIMER_NEW){
     if(!kb_text_.empty()){
       if(mode==KB_TIMER_NEW) local_command("set timer "+kb_text_);

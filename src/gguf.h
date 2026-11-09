@@ -74,12 +74,14 @@ private:
   bool read_i64(i64* v);
   bool read_f64(f64* v);
   bool read_string(std::string& s);
+  bool metadata_spend(u64 bytes);
 
   FILE* fp_;
   u32 version_;
   u64 alignment_;
   u64 data_start_;
   u64 file_size_;
+  u64 metadata_left_;
   std::vector<gguf_kv> kv_;
   std::vector<gguf_tensor> tensors_;
   std::vector<GGUF*> shards_;

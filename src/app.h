@@ -8,6 +8,7 @@
 #include "assistant.h"
 #include "assistant_store.h"
 #include "updater.h"
+#include "hub.h"
 
 enum app_screen{
   AS_BROWSE=0,
@@ -18,7 +19,8 @@ enum app_screen{
   AS_NOTES,
   AS_TIMERS,
   AS_TOOLS,
-  AS_UPDATES
+  AS_UPDATES,
+  AS_HUB
 };
 
 enum debug_cycle{
@@ -26,7 +28,7 @@ enum debug_cycle{
 };
 
 enum kb_kind{
-  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_NOTE_NEW, KB_NOTE_EDIT, KB_TIMER_NEW, KB_SYS=0x100
+  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_NOTE_NEW, KB_NOTE_EDIT, KB_TIMER_NEW, KB_HUB_SEARCH, KB_SYS=0x100
 };
 
 struct AppSettings{
@@ -64,6 +66,8 @@ public:
   const Assistant& test_assistant() const {return assistant_;}
   bool test_keyboard() const {return kb_mode_!=KB_NONE;}
   void test_ask(const char* text) {assistant_send(text);}
+  void test_hub_data(const HubView& data){hub_.test_view(data);screen_=AS_HUB;hub_files_=true;hub_file_sel_=0;hub_confirm_=false;}
+  bool test_hub_confirmation() const {return hub_confirm_;}
 #endif
 
 private:
@@ -94,6 +98,11 @@ private:
   Assistant assistant_;
   AssistantStore assistant_store_;
   Updater updater_;
+  ModelHub hub_;
+  HubQuery hub_query_;
+  HubView hub_view_;
+  int hub_sel_,hub_file_sel_;
+  bool hub_files_,hub_confirm_;
   bool update_auto_checked_;
   bool update_restart_;
   double update_auto_at_;
@@ -134,6 +143,9 @@ private:
   int note_view_id_;
 
   void browse_frame();
+  void refresh_models();
+  void hub_frame();
+  void open_hub();
   void frame();
   void home_frame();
   void notes_frame();

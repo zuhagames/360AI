@@ -55,3 +55,10 @@ See TINYSTORIES_INFO.txt and TINYSTORIES_LICENSE.txt.
 Qwen2.5 models by the Qwen team: Apache 2.0.
 See APACHE-2.0.txt and SMOLLM2_INFO.txt. models.json pins all source revisions,
 download URLs, exact file lengths and SHA-256 checksums.
+
+ON-CONSOLE HUGGING FACE LIBRARY (2.2+)
+In Models press Y to search public GGUF text-generation repositories.
+Inspect individual files, parameter counts and required disk space before downloading.
+Green Comfortable <200 MB; yellow Tight 200-300 MB; orange Disk stream >=300 MB.
+These are size guides. Architecture, tokenizer, KV cache and RAM limits still apply.
+See MODEL_LIBRARY.txt for controls, verification and split-file downloads.
