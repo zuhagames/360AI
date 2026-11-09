@@ -29,6 +29,9 @@ public:
   bool details(const HubModel&);
   bool download(const std::string& directory,const HubModel&,const HubChoice&);
   void cancel();void stop();void view(HubView&);
+#ifndef _XBOX
+  void test_view(const HubView& data){gx_mutex_lock(mutex_);data_=data;++data_.revision;gx_mutex_unlock(mutex_);}
+#endif
 private:
   gx_mutex_t mutex_;gx_thread_t thread_;bool busy_,cancel_;int job_;
   HubView data_;HubQuery query_;HubModel model_;HubChoice choice_;std::string url_,directory_,body_;FILE* output_;u64 file_bytes_;

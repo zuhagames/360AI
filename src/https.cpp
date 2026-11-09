@@ -28,9 +28,9 @@ struct GxTrustInit {GxTrustInit(){gx_init_trust();}};static GxTrustInit gx_trust
 
 static std::string hex_hash(const u8* hash){const char* digits="0123456789abcdef";std::string out;for(int i=0;i<32;++i){out+=digits[hash[i]>>4];out+=digits[hash[i]&15];}return out;}
 std::string gx_sha256(const void* data,size_t n){br_sha256_context c;br_sha256_init(&c);br_sha256_update(&c,data,n);u8 hash[32];br_sha256_out(&c,hash);return hex_hash(hash);}
-bool gx_file_sha256(const std::string& path,std::string& hash,u64 limit){
+bool gx_file_sha256(const std::string& path,std::string& hash,u64 limit,GxHttpCancel cancel,void* user){
   hash.clear();FILE* f=fopen(path.c_str(),"rb");if(!f) return false;br_sha256_context c;br_sha256_init(&c);u8 block[16384];size_t n;u64 total=0;bool ok=true;
-  while((n=fread(block,1,sizeof(block),f))!=0){if(n>limit-total){ok=false;break;}total+=n;br_sha256_update(&c,block,n);}
+  while((n=fread(block,1,sizeof(block),f))!=0){if(n>limit-total || (cancel && cancel(user))){ok=false;break;}total+=n;br_sha256_update(&c,block,n);}
   if(ferror(f)) ok=false;fclose(f);if(!ok) return false;u8 h[32];br_sha256_out(&c,h);hash=hex_hash(h);return true;
 }
 bool gx_https_url(const std::string& url,std::string& host,std::string& path,GxHttpPolicy policy){

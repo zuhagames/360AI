@@ -130,13 +130,13 @@ void ModelHub::transfer(){
   std::vector<std::string> created;std::string error,part;bool ok=true;
   // Promote shard 1 last so the local model browser cannot open partial groups.
   for(size_t step=0;step<choice_.files.size() && ok;++step){size_t i=choice_.files.size()==1 ? 0 : (step+1)%choice_.files.size();const HubFile& f=choice_.files[i];std::string dest=at(directory_,gx_hub_local_name(model_,choice_,f));part=dest+".part";std::string hash;
-    if(exists(dest)){if(!gx_file_sha256(dest,hash,f.bytes) || hash!=f.sha256){error="A different file already uses this download name. It was left in place.";ok=false;break;}
+    if(exists(dest)){if(!gx_file_sha256(dest,hash,f.bytes,cancelled,this) || hash!=f.sha256){error="A different file already uses this download name. It was left in place.";ok=false;break;}
       gx_mutex_lock(mutex_);data_.received+=f.bytes;gx_mutex_unlock(mutex_);continue;}
     if(cancelled(this)){ok=false;break;}set(HS_DOWNLOADING,"Downloading "+f.path.substr(f.path.find_last_of('/')+1));output_=fopen(part.c_str(),"wb");if(!output_){error="Could not create the model download. Check the drive.";ok=false;break;}
     file_bytes_=0;job_=(int)i+10;std::string url="https://huggingface.co/"+gx_hub_encode(model_.id,true)+"/resolve/"+model_.revision+"/"+gx_hub_encode(f.path,true)+"?download=true";
     ok=gx_https_get(url,f.bytes,sink,this,cancelled,error,GX_HTTP_HUGGINGFACE);if(fflush(output_)!=0) ok=false;if(fclose(output_)!=0) ok=false;output_=0;
     if(ok && file_bytes_!=f.bytes){ok=false;error="Model download was truncated.";}
-    if(ok){set(HS_DOWNLOADING,"Verifying SHA-256 on disk...");ok=gx_file_sha256(part,hash,f.bytes) && hash==f.sha256;if(!ok) error="Model checksum failed. The partial download was removed.";}
+    if(ok){set(HS_DOWNLOADING,"Verifying SHA-256 on disk...");ok=gx_file_sha256(part,hash,f.bytes,cancelled,this) && hash==f.sha256;if(!ok) error="Model checksum failed. The partial download was removed.";}
     if(ok && !cancelled(this)){ok=rename(part.c_str(),dest.c_str())==0;if(ok) created.push_back(dest);else error="Could not finish the model file on this drive.";}else ok=false;
     if(!ok) remove(part.c_str());
   }
