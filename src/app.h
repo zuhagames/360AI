@@ -66,6 +66,8 @@ public:
   const Assistant& test_assistant() const {return assistant_;}
   bool test_keyboard() const {return kb_mode_!=KB_NONE;}
   void test_ask(const char* text) {assistant_send(text);}
+  void test_hub_data(const HubView& data){hub_.test_view(data);screen_=AS_HUB;hub_files_=true;hub_file_sel_=0;hub_confirm_=false;}
+  bool test_hub_confirmation() const {return hub_confirm_;}
 #endif
 
 private:

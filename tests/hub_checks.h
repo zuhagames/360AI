@@ -43,6 +43,10 @@ static void hub_checks(){
     else if(mode==4) assert(gx_read_text_file(dest.c_str(),text,64) && text=="existing file");
     else {FILE* check=fopen(dest.c_str(),"rb");assert(!check);check=fopen((dest+".part").c_str(),"rb");assert(!check);}
   }
-  assert(gxui_init());App app;app.test_seed();tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_DRIGHT);tap(app,GX_BTN_A);assert(app.test_screen()==AS_BROWSE);tap(app,GX_BTN_Y);assert(app.test_screen()==AS_HUB);tap(app,GX_BTN_B);assert(app.test_screen()==AS_BROWSE);gxui_shutdown();
+  assert(gxui_init());App app;app.test_seed();tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_DRIGHT);tap(app,GX_BTN_A);assert(app.test_screen()==AS_BROWSE);tap(app,GX_BTN_Y);assert(app.test_screen()==AS_HUB);tap(app,GX_BTN_B);assert(app.test_screen()==AS_BROWSE);
+  HubView ui;ui.state=HS_FILES;ui.revision=99;ui.model=expected;HubChoice pick;pick.name="small.gguf";pick.downloadable=true;HubFile f;f.path=pick.name;f.bytes=1024;pick.files.push_back(f);pick.bytes=1024;ui.choices.push_back(pick);pick.name="other.gguf";pick.files[0].path=pick.name;ui.choices.push_back(pick);
+  app.test_hub_data(ui);tap(app,GX_BTN_A);assert(app.test_hub_confirmation());tap(app,GX_BTN_B);assert(!app.test_hub_confirmation() && app.test_screen()==AS_HUB);
+  tap(app,GX_BTN_DDOWN|GX_BTN_A);assert(app.test_hub_confirmation());tap(app,GX_BTN_B);
+  ui.state=HS_DONE;ui.installed=gx_hub_local_name(ui.model,ui.choices[0],ui.choices[0].files[0]);app.test_hub_data(ui);tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_A);assert(app.test_hub_confirmation());tap(app,GX_BTN_B);gxui_shutdown();
   std::cout<<"2.2 Hub: filters, size labels, SHA metadata, shard grouping, FATX names, unsupported models, cancel hashing, disk checks, bounded GGUF metadata and controller navigation passed\n";
 }
