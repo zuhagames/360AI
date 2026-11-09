@@ -23,6 +23,8 @@ std::string gx_hub_encode(const std::string& s,bool slash){const char* h="012345
     if((c>='a'&&c<='z') || (c>='A'&&c<='Z') || (c>='0'&&c<='9') || c=='-' || c=='_' || c=='.' || c=='~' || (slash&&c=='/')) out+=c;
     else {out+='%';out+=h[c>>4];out+=h[c&15];}}return out;}
 bool gx_hub_supported(const std::string& arch){return arch=="llama" || arch=="qwen2" || arch=="gemma2" || arch=="gemma3" || arch=="gemma-2" || arch=="gemma-3";}
+void gx_hub_next_preset(HubQuery& q){const char* names[]={"SmolLM2","TinyStories","Qwen2.5","Llama","Gemma"};int next=0;
+  for(int i=0;i<5;++i) if(q.text==names[i]) next=(i+1)%5;q.text=names[next];q.max_parameters=next<2 ? 200000000 : 1000000000;q.supported_only=true;}
 std::string gx_hub_search_url(const HubQuery& q){return "https://huggingface.co/api/models?filter=gguf&pipeline_tag=text-generation&sort=downloads&direction=-1&limit=20&expand[]=gguf&expand[]=sha&expand[]=gated&expand[]=pipeline_tag&search="+gx_hub_encode(q.text.substr(0,96));}
 static HubModel model_info(const Json& j){HubModel m;m.id=j.get("id").text;m.revision=j.get("sha").text;m.architecture=j.get("gguf").get("architecture").text;
   const Json& n=j.get("gguf").get("total");if(n.type==Json::NUMBER && n.number>0 && n.number<=1e13 && floor(n.number)==n.number) m.parameters=(u64)n.number;

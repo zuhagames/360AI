@@ -4,11 +4,31 @@ static std::string hub_payload;static int hub_mode=0,hub_requests=0;
 static bool fake_hub_download(const std::string&,GxHttpSink sink,void* user,std::string& error,std::string*){
   ++hub_requests;if(hub_mode==2){size_t first=hub_payload.size()/2;sink(hub_payload.data(),first,user);((ModelHub*)user)->cancel();error="cancelled";return false;}return sink(hub_payload.data(),hub_payload.size(),user);
 }
-static void wait_hub(ModelHub& hub,HubView& view){double until=gx_time_seconds()+10;do {hub.view(view);if(view.state==HS_DONE || view.state==HS_ERROR) break;gx_sleep_ms(5);}while(gx_time_seconds()<until);hub.stop();hub.view(view);}
+static void wait_hub(ModelHub& hub,HubView& view){double until=gx_time_seconds()+10;do {hub.view(view);if(view.state==HS_DONE || view.state==HS_ERROR || view.state==HS_MODELS || view.state==HS_FILES) break;gx_sleep_ms(5);}while(gx_time_seconds()<until);hub.stop();hub.view(view);}
 static Json hub_model(const char* id,const char* arch,double parameters){Json j=Json::object();j["id"]=Json(id);j["sha"]=Json(std::string(40,'a'));j["pipeline_tag"]=Json("text-generation");j["gated"]=Json::boolean(false);j["private"]=Json::boolean(false);j["gguf"]=Json::object();j["gguf"]["architecture"]=Json(arch);j["gguf"]["total"]=Json(parameters);return j;}
 static Json hub_file(const char* name,double size,const std::string& hash=std::string(64,'a')){Json j=Json::object();j["rfilename"]=Json(name);j["size"]=Json(size);j["lfs"]=Json::object();j["lfs"]["sha256"]=Json(hash);return j;}
 static bool hash_cancel(void*){return true;}
+static int search_page=0;static bool search_error=false;
+static bool fake_hub_search(const std::string&,GxHttpSink sink,void* user,std::string& error,std::string* next){
+  ++hub_requests;if(search_error){error="Offline";return false;}
+  Json rows=Json::array();char id[64];snprintf(id,sizeof(id),"owner/page-%d",++search_page);rows.items.push_back(hub_model(id,"llama",135e6));
+  if(next){char url[100];snprintf(url,sizeof(url),"https://huggingface.co/api/models?cursor=%d",search_page);*next=url;}
+  std::string body=rows.dump();return sink(body.data(),body.size(),user);
+}
 static void hub_checks(){
+  {HubQuery q;gx_hub_next_preset(q);assert(q.text=="TinyStories" && q.max_parameters==200000000 && q.supported_only);gx_hub_next_preset(q);assert(q.text=="Qwen2.5" && q.max_parameters==1000000000);
+    q.text="custom";q.supported_only=false;gx_hub_next_preset(q);assert(q.text=="SmolLM2" && q.supported_only);}
+  {ModelHub worker;worker.test_transport(fake_hub_search);HubQuery q;HubView v;hub_requests=search_page=0;search_error=false;
+    assert(!worker.previous());assert(worker.search(q));wait_hub(worker,v);assert(v.page==1 && !v.has_previous && hub_requests==1);
+    assert(!worker.search(q,"https://huggingface.co/api/models?cursor=evil"));
+    assert(worker.search(q,v.next));wait_hub(worker,v);assert(v.page==2 && v.has_previous && v.models[0].id=="owner/page-2");
+    assert(worker.previous());worker.view(v);assert(v.page==1 && !v.has_previous && v.models[0].id=="owner/page-1");
+    assert(worker.search(q,v.next));worker.view(v);assert(v.page==2 && hub_requests==2);
+    search_error=true;assert(worker.search(q,v.next));wait_hub(worker,v);assert(v.state==HS_ERROR && v.page==2 && v.models[0].id=="owner/page-2");
+    search_error=false;for(int i=3;i<=10;++i){assert(worker.search(q,v.next));wait_hub(worker,v);assert(v.page==(u32)i);}
+    for(int i=0;i<7;++i) assert(worker.previous());worker.view(v);assert(v.page==3 && !v.has_previous && !worker.previous());
+    int requests=hub_requests;for(int i=0;i<7;++i){assert(worker.search(q,v.next));worker.view(v);}assert(v.page==10 && hub_requests==requests);
+    q.text="different";search_error=true;assert(worker.search(q));wait_hub(worker,v);assert(v.models.empty() && v.page==0 && !worker.previous());search_error=false;}
   Assistant commands;AssistantContext context;commands.respond("remember",context);assert(commands.respond("find models",context).action==AA_MODEL_LIBRARY && commands.note_count()==0);
   assert(gx_hub_id("Qwen/Qwen2.5-0.5B-Instruct-GGUF"));const char* ids[]={"../repo","a/../b","https://evil/model","a\\b/c","a/b?x","a/b/c","a/"};for(size_t i=0;i<7;++i) assert(!gx_hub_id(ids[i]));
   assert(gx_hub_encode("hello &x=1")=="hello%20%26x%3D1");assert(!gx_hub_path("a/../model.gguf"));assert(gx_hub_path("folder/model Q4.gguf"));

@@ -22,6 +22,7 @@ bool gx_hub_details(const std::string& text,const HubModel& expected,HubModel& m
 const char* gx_hub_size_label(u64 bytes);
 u32 gx_hub_size_color(u64 bytes);
 bool gx_hub_supported(const std::string& arch);
+void gx_hub_next_preset(HubQuery&);
 std::string gx_hub_local_name(const HubModel&,const HubChoice&,const HubFile&);
 class ModelHub {
 public:
