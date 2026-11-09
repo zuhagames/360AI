@@ -10,6 +10,7 @@ void* gx_alloc_physical(size_t bytes);
 void  gx_free_physical(void* p);
 
 size_t gx_physical_free();
+bool gx_disk_free(const char* directory,u64& bytes);
 
 struct gx_file_entry{
   std::string name;
