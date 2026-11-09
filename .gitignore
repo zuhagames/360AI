@@ -15,3 +15,7 @@ bridge/*.local.json
 /360AI-assistant.json.tmp
 /360AI-assistant.json.bak.tmp
 /assistant-rules.json
+/360AI-updater.xex
+/360AI-next.xex
+/360AI-previous.xex
+/360AI-update.*
