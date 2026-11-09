@@ -1,0 +1,39 @@
+360AI - UPDATES FROM GITHUB
+
+From Home, press START for Updates.
+360AI checks the latest stable GitHub release in the background when it starts.
+Y toggles this launch check; the setting is saved. Local tools and models work
+offline. An unavailable network does not block the dashboard.
+
+Press A to check now, or download an available update. After verification,
+press A again to restart and install. X cancels a check/download, or discards
+a staged/failed update. B returns Home; the background worker can keep running.
+
+App-only updates download 360AI-VERSION-Update.zip, a few MB, instead of the
+full model bundle. The small ZIP is for the updater, not a first installation.
+Updates verify TLS certificates, hostname, console date/time, the GitHub asset
+SHA-256 digest, ZIP structure/CRC and the staged XEX before replacing the app.
+Only stable releases from github.com/zuhagames/360AI are accepted.
+
+Keep at least 32 MB free and leave the drive connected while installing.
+The full USB ZIP includes 360AI-updater.xex. Keep it beside 360AI.xex.
+It installs only the verified app XEX, leaving models, notes, settings, exports,
+and custom rules in place. Restarting ends session timers and model sessions.
+The installer does not update models, documentation or itself. For new bundled
+models or installer changes, use the complete USB ZIP and preserve personal files.
+
+RECOVERY
+A recovery copy is kept as 360AI-previous.xex. If the app is missing after a
+power cut, launch 360AI-updater.xex to finish the verified staged install.
+If necessary, launch 360AI-previous.xex or copy the full USB ZIP again.
+Never disconnect the drive or power off while files are being installed.
+
+NETWORK TROUBLESHOOTING
+Use normal Xbox network settings with Internet/DNS access. The updater uses
+its own TLS 1.2 client; no browser, PC bridge, Xbox Live login or API key is
+required. The console clock must be correct for certificate verification.
+DashLaunch or router rules may block GitHub/Internet traffic. An update error
+does not alter the installed app. GitHub can also rate-limit update checks.
+
+2.0 and earlier have no updater: install the complete 2.1 USB ZIP once.
+Later compatible releases can then be installed from the Xbox Updates screen.
