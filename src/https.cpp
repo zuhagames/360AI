@@ -1,5 +1,6 @@
 #include "https.h"
 #include "platform.h"
+#include "network.h"
 #include "bearssl.h"
 #include <time.h>
 #ifdef _XBOX
@@ -40,26 +41,10 @@ namespace {
 struct Network{
   bool ready;
   Network():ready(false){
-#ifdef _XBOX
-    XNetStartupParams p;memset(&p,0,sizeof(p));p.cfgSizeOfStruct=sizeof(p);p.cfgFlags=XNET_STARTUP_BYPASS_SECURITY;
-    if(XNetStartup(&p)!=0) return;
-#endif
-#if defined(_XBOX) || defined(_WIN32)
-    WSADATA w;if(WSAStartup(MAKEWORD(2,2),&w)!=0){
-#ifdef _XBOX
-      XNetCleanup();
-#endif
-      return;}
-#endif
-    ready=true;
+    int error=0;ready=gx_network_acquire(error);
   }
   ~Network(){if(!ready) return;
-#if defined(_XBOX) || defined(_WIN32)
-    WSACleanup();
-#endif
-#ifdef _XBOX
-    XNetCleanup();
-#endif
+    gx_network_release();
   }
 };
 struct Connection{
