@@ -1,7 +1,7 @@
 #include "hub.h"
 #include <direct.h>
 static std::string hub_payload;static int hub_mode=0,hub_requests=0;
-static bool fake_hub_download(const std::string&,GxHttpSink sink,void* user,std::string& error){
+static bool fake_hub_download(const std::string&,GxHttpSink sink,void* user,std::string& error,std::string*){
   ++hub_requests;if(hub_mode==2){size_t first=hub_payload.size()/2;sink(hub_payload.data(),first,user);((ModelHub*)user)->cancel();error="cancelled";return false;}return sink(hub_payload.data(),hub_payload.size(),user);
 }
 static void wait_hub(ModelHub& hub,HubView& view){double until=gx_time_seconds()+10;do {hub.view(view);if(view.state==HS_DONE || view.state==HS_ERROR) break;gx_sleep_ms(5);}while(gx_time_seconds()<until);hub.stop();hub.view(view);}

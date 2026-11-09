@@ -75,7 +75,7 @@ std::string gx_hub_local_name(const HubModel& m,const HubChoice& c,const HubFile
 }
 static std::string at(const std::string& dir,const std::string& name){return dir+(dir.empty() || dir[dir.size()-1]=='/' || dir[dir.size()-1]=='\\' ? "" : "/")+name;}
 static bool exists(const std::string& p){FILE* f=fopen(p.c_str(),"rb");if(!f) return false;fclose(f);return true;}
-ModelHub::ModelHub():mutex_(gx_mutex_create()),thread_(0),busy_(false),cancel_(false),job_(0),output_(0),file_bytes_(0){data_.revision=1;
+ModelHub::ModelHub():mutex_(gx_mutex_create()),thread_(0),busy_(false),cancel_(false),job_(0),output_(0),file_bytes_(0),page_at_(0){data_.revision=1;
 #ifndef _XBOX
   test_transport_=0;
 #endif
@@ -89,17 +89,27 @@ void ModelHub::set(HubState state,const std::string& message){gx_mutex_lock(mute
 bool ModelHub::begin(int job){
   gx_mutex_lock(mutex_);bool busy=busy_;gx_mutex_unlock(mutex_);if(busy) return false;if(thread_){gx_thread_join(thread_);thread_=0;}
   job_=job;cancel_=false;busy_=true;body_.clear();gx_mutex_lock(mutex_);data_.received=0;data_.total=job==3 ? choice_.bytes : 0;data_.installed.clear();
-  if(job==1){data_.models.clear();data_.next.clear();++data_.revision;}
   gx_mutex_unlock(mutex_);
   set(job==1 ? HS_SEARCHING : (job==2 ? HS_DETAILS : HS_DOWNLOADING),job==3 ? "Checking disk space..." : "Contacting Hugging Face...");thread_=gx_thread_begin(entry,this);
   if(!thread_){busy_=false;set(HS_ERROR,"Could not start the model browser worker.");return false;}return true;
 }
 bool ModelHub::search(const HubQuery& q,const std::string& next){
   gx_mutex_lock(mutex_);bool busy=busy_;gx_mutex_unlock(mutex_);if(busy) return false;
-  if(q.text.size()>96) return false;query_=q;url_=next.empty() ? gx_hub_search_url(q) : next;
+  if(q.text.size()>96) return false;
+  gx_mutex_lock(mutex_);
+  if(!next.empty()){
+    if(next!=data_.next || q.text!=query_.text || q.max_parameters!=query_.max_parameters || q.supported_only!=query_.supported_only){gx_mutex_unlock(mutex_);return false;}
+    if(page_at_+1<pages_.size() && pages_[page_at_+1].url==next){restore_page(page_at_+1);gx_mutex_unlock(mutex_);return true;}
+  }else {pages_.clear();page_at_=0;data_.models.clear();data_.next.clear();data_.page=0;data_.has_previous=false;++data_.revision;}
+  gx_mutex_unlock(mutex_);
+  query_=q;url_=next.empty() ? gx_hub_search_url(q) : next;
   if(url_.find("https://huggingface.co/api/models?")!=0) return false;
   return begin(1);
 }
+// Caller holds mutex_. Cache at most eight bounded search pages, never weights.
+void ModelHub::restore_page(size_t index){page_at_=index;const Page& p=pages_[index];data_.models=p.models;data_.next=p.next;data_.page=p.number;data_.has_previous=index>0;
+  data_.state=HS_MODELS;data_.received=data_.total=0;data_.installed.clear();data_.message="Cached results. No network request needed.";++data_.revision;}
+bool ModelHub::previous(){gx_mutex_lock(mutex_);if(busy_ || pages_.empty() || !page_at_){gx_mutex_unlock(mutex_);return false;}restore_page(page_at_-1);gx_mutex_unlock(mutex_);return true;}
 bool ModelHub::details(const HubModel& m){
   gx_mutex_lock(mutex_);bool busy=busy_;gx_mutex_unlock(mutex_);if(busy || !gx_hub_id(m.id) || (!m.revision.empty() && !hex(m.revision,40))) return false;model_=m;
   url_="https://huggingface.co/api/models/"+gx_hub_encode(m.id,true)+(m.revision.empty() ? "" : "/revision/"+m.revision)+"?blobs=true";return begin(2);
@@ -124,7 +134,7 @@ bool ModelHub::sink(const void* data,size_t n,void* p){ModelHub* h=(ModelHub*)p;
 void ModelHub::work(){if(job_==3) transfer();else fetch();body_.clear();}
 bool ModelHub::request(const std::string& url,u64 limit,std::string& error,std::string* next){
 #ifndef _XBOX
-  if(test_transport_) return test_transport_(url,sink,this,error);
+  if(test_transport_) return test_transport_(url,sink,this,error,next);
 #endif
   return gx_https_get(url,limit,sink,this,cancelled,error,GX_HTTP_HUGGINGFACE,next);
 }
@@ -132,7 +142,9 @@ void ModelHub::fetch(){
   std::string error,next;if(!request(url_,1024*1024,error,&next)){set(HS_ERROR,cancelled(this) ? "Request cancelled." : error);return;}
   if(job_==1){std::vector<HubModel> models;if(!gx_hub_models(body_,query_,models,error)){set(HS_ERROR,error);return;}
     if(next.find("https://huggingface.co/api/models?")!=0 || next.size()>8192) next.clear();
-    gx_mutex_lock(mutex_);data_.models=models;data_.next=next;++data_.revision;gx_mutex_unlock(mutex_);
+    gx_mutex_lock(mutex_);Page page;page.url=url_;page.models=models;page.next=next;page.number=pages_.empty() ? 1 : pages_[page_at_].number+1;
+    if(!pages_.empty()) pages_.resize(page_at_+1);pages_.push_back(page);if(pages_.size()>8) pages_.erase(pages_.begin());page_at_=pages_.size()-1;
+    data_.models=models;data_.next=next;data_.page=page.number;data_.has_previous=page_at_>0;++data_.revision;gx_mutex_unlock(mutex_);
     set(HS_MODELS,models.empty() ? "No matches on this page. Use Next, raise the parameter limit, or narrow the search." : "GGUF + text generation. Parameter/family filters apply to this page.");
   }else {std::vector<HubChoice> choices;HubModel model;if(!gx_hub_details(body_,model_,model,choices,error)){set(HS_ERROR,error);return;}
     gx_mutex_lock(mutex_);data_.model=model;data_.choices=choices;++data_.revision;gx_mutex_unlock(mutex_);set(HS_FILES,choices.empty() ? "No downloadable GGUF files were found in this repository." : "Choose a quantization. All shards are downloaded together.");}
