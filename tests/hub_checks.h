@@ -9,6 +9,7 @@ static Json hub_model(const char* id,const char* arch,double parameters){Json j=
 static Json hub_file(const char* name,double size,const std::string& hash=std::string(64,'a')){Json j=Json::object();j["rfilename"]=Json(name);j["size"]=Json(size);j["lfs"]=Json::object();j["lfs"]["sha256"]=Json(hash);return j;}
 static bool hash_cancel(void*){return true;}
 static void hub_checks(){
+  Assistant commands;AssistantContext context;commands.respond("remember",context);assert(commands.respond("find models",context).action==AA_MODEL_LIBRARY && commands.note_count()==0);
   assert(gx_hub_id("Qwen/Qwen2.5-0.5B-Instruct-GGUF"));const char* ids[]={"../repo","a/../b","https://evil/model","a\\b/c","a/b?x","a/b/c","a/"};for(size_t i=0;i<7;++i) assert(!gx_hub_id(ids[i]));
   assert(gx_hub_encode("hello &x=1")=="hello%20%26x%3D1");assert(!gx_hub_path("a/../model.gguf"));assert(gx_hub_path("folder/model Q4.gguf"));
   std::string host,path;assert(gx_https_url("https://huggingface.co/a/b",host,path,GX_HTTP_HUGGINGFACE));assert(!gx_https_url("https://huggingface.co/a/b",host,path));
