@@ -24,6 +24,7 @@ AppSettings::AppSettings(){
   debug_level = DC_WARN;
   server_on = false;
   chat_on = true;
+  auto_update = true;
   backend_mode = 0;
   weight_mode = 0;
   reply_tokens = 48;
@@ -43,6 +44,7 @@ App::App(){
   model_loaded_ = false;
   assistant_mode_ = false;
   timer_notice_until_ = 0;
+  update_auto_checked_=false;update_restart_=false;update_auto_at_=0;
   loading_ = false;
   load_ok_ = false;
   load_done_ = false;
@@ -65,6 +67,7 @@ App::App(){
 }
 
 App::~App(){
+  updater_.stop();
   assistant_store_.stop();
   gen_stop_ = true;
   server_stop();
@@ -100,6 +103,7 @@ int App::run(){
   gx_set_debug_level(settings_.debug_level);
   if(!gxui_init()) return 1;
   if(!assistant_store_.start(kAssistantPath)) save_status_="Saving unavailable";
+  update_auto_at_=gx_time_seconds()+2;
 
   std::vector<gx_file_entry> all_files;
   gx_list_dir(kBrowseDir, ".gguf", all_files);
@@ -458,6 +462,7 @@ void App::assistant_send(const std::string& text){
   } else if(reply.action==AA_EXPORT){export_chat();reply.text=chat_notice_;}
   else if(reply.action==AA_CLEAR_CHAT) new_chat();
   else if(reply.action==AA_MODELS){assistant_mode_=false;chat_log_.clear();turns_.clear();chat_view_=ChatView();screen_=AS_BROWSE;return;}
+  else if(reply.action==AA_UPDATES) screen_=AS_UPDATES;
   queue_assistant_save();
   append_chat("Assistant: ",reply.text);
   if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}

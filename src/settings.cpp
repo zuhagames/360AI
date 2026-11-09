@@ -30,7 +30,7 @@ static bool parse_settings(const std::string& text,AppSettings& out){
      !integer(j,"reply_tokens",16,512,s.reply_tokens) ||
      !decimal(j,"top_p",0.05,1.0,s.top_p) ||
      !decimal(j,"repeat_penalty",1.0,1.5,s.repeat_penalty) ||
-     !boolean(j,"server",s.server_on) || !boolean(j,"console_chat",s.chat_on)) return false;
+     !boolean(j,"server",s.server_on) || !boolean(j,"console_chat",s.chat_on) || !boolean(j,"auto_update",s.auto_update)) return false;
   if(j.has("temperature")){
     const Json& n=j.get("temperature");
     if(n.type!=Json::NUMBER || n.number<0 || n.number>2) return false;
@@ -71,6 +71,7 @@ bool AppSettings::save(const char* path) const{
   j["last_model"]=Json(last_model);
   j["top_p"]=Json((double)top_p);j["repeat_penalty"]=Json((double)repeat_penalty);
   j["server"]=Json::boolean(server_on);j["console_chat"]=Json::boolean(chat_on);
+  j["auto_update"]=Json::boolean(auto_update);
   AppSettings check;std::string next=j.dump()+"\n",previous;
   if(!parse_settings(next,check)) return false;
   // Only back up a valid configuration; a damaged main file must never

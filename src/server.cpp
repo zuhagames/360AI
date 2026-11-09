@@ -6,6 +6,7 @@
 #include "textstream.h"
 #include <time.h>
 #include "version.h"
+#include "network.h"
 #include <errno.h>
 
 #ifdef _XBOX
@@ -69,32 +70,11 @@ static bool lan_socket(SOCKET s){
 }
 
 static bool net_init(){
-#ifdef _XBOX
-  XNetStartupParams p; memset(&p,0,sizeof(p)); p.cfgSizeOfStruct=sizeof(p);
-  p.cfgFlags=XNET_STARTUP_BYPASS_SECURITY;
-  int error=XNetStartup(&p);
-  if(error!=0){ net_error("XNetStartup",error); return false; }
-#endif
-#if defined(_XBOX) || defined(_WIN32)
-  WSADATA wsa; int wsa_error=WSAStartup(MAKEWORD(2,2),&wsa);
-  if(wsa_error!=0){
-    net_error("WSAStartup",wsa_error);
-#ifdef _XBOX
-    XNetCleanup();
-#endif
-    return false;
-  }
-#endif
-  return true;
+  int error=0;if(gx_network_acquire(error)) return true;net_error("Network startup",error);return false;
 }
 static void net_shutdown(){
   if(!net_started) return;
-#if defined(_XBOX) || defined(_WIN32)
-  WSACleanup();
-#endif
-#ifdef _XBOX
-  XNetCleanup();
-#endif
+  gx_network_release();
   net_started=false;
 }
 static void fetch_ip(){

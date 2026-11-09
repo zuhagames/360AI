@@ -14,6 +14,7 @@
 #include "quant_checks.h"
 #include "assistant_checks.h"
 #include "dashboard_checks.h"
+#include "updater_checks.h"
 
 static std::string path(const char* name){ return std::string("build/tests/")+name+".gguf"; }
 static std::string completion(const std::string& prompt,int n,void*){
@@ -143,6 +144,7 @@ static void cancel_after_token(int,const char*,void* user){
 static void checks(){
   assistant_checks();
   dashboard_checks();
+  updater_checks();
   {
     GGUF g;assert(g.load(path("stories-tokenizer").c_str()));Tokenizer tok;assert(tok.load(g) && tok.completion_only());
     std::vector<std::pair<std::string,std::string> > messages;
@@ -389,6 +391,17 @@ static void checks(){
 }
 int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
+  if(argc>2 && std::string(argv[1])=="--https-check"){
+    std::string body,error;struct Collect{static bool append(const void* data,size_t n,void* user){((std::string*)user)->append((const char*)data,n);return true;}};
+    if(!gx_https_get(argv[2],argc>3 ? 16u*1024u*1024u : 262144u,Collect::append,&body,0,error)){std::cerr<<error<<std::endl;return 2;}
+    if(argc>3){if(!gx_write_text_file(argv[3],body)) return 4;std::cout<<"HTTPS download OK: "<<body.size()<<" bytes, SHA256="<<gx_sha256(body.data(),body.size())<<std::endl;return 0;}
+    Json j;if(!Json::parse(body,j)){std::cerr<<"Invalid JSON body"<<std::endl;return 3;}std::cout<<"HTTPS OK: "<<body.size()<<" bytes, tag="<<j.get("tag_name").text<<std::endl;return 0;
+  }
+  if(argc>2 && std::string(argv[1])=="--update-package"){
+    std::string directory=argv[2],error;UpdateRelease r;r.version="99.0";FILE* f=fopen((directory+"/360AI-update.zip").c_str(),"rb");if(!f) return 2;fseek(f,0,SEEK_END);r.size=(size_t)ftell(f);fclose(f);
+    if(!gx_file_sha256(directory+"/360AI-update.zip",r.sha256,16u*1024u*1024u) || !gx_update_stage(directory,r,error) || !gx_update_install(directory,error)){std::cerr<<error<<std::endl;return 3;}
+    std::cout<<"Packaged XEX update staged, installed and recovery copy retained\n";return 0;
+  }
   if(argc>3 && std::string(argv[1])=="--ui-preview"){
     if(!gxui_init()) return 2;App app;bool ok=app.test_capture(argv[2],argv[3]);gxui_shutdown();return ok ? 0 : 3;
   }

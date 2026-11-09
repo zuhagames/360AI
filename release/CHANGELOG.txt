@@ -1,3 +1,20 @@
+360AI 2.1 - Updates on your Xbox
+==============================
+
+- Native Updates screen: START from Home, or type open updates in Assistant.
+- Automatic background checks for the latest stable GitHub release.
+- Saved auto-check toggle, manual check, download progress and cancellation.
+- Small app-only ZIP updates; no repeat download of the model bundle.
+- TLS 1.2 with certificate/hostname/date validation and OS entropy.
+- GitHub SHA-256, bounded ZIP structure/CRC and staged XEX checks.
+- Separate restart installer with a recovery XEX and interrupted-install recovery.
+- Models, notes, settings, rules and exports stay in place.
+- Shared XNet/Winsock lifecycle keeps updater/API network use independent.
+- Updates are installed after download and an explicit restart; timers end then.
+- Full USB ZIP required once for 2.0/older; keep 32 MB free for later app updates.
+- Native tests cover malformed packages, tampering, rollback and preserved data.
+- Console HTTPS connectivity, storage power-cut behavior and relaunch need hardware testing.
+
 360AI 2.0 - At your service
 ==========================
 

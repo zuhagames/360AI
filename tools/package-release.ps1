@@ -1,6 +1,7 @@
 param(
   [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')]
-  [string]$Version = '2.0'
+  [string]$Version = '2.1',
+  [string]$Python = 'python'
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -20,11 +21,14 @@ New-Item -ItemType Directory -Path $usbDirectory -Force | Out-Null
 $executable = Join-Path $projectRoot '360AI.xex'
 if (-not (Test-Path -LiteralPath $executable)) { throw 'Build 360AI.xex first with build.bat.' }
 Copy-Item -LiteralPath $executable -Destination (Join-Path $usbDirectory '360AI.xex')
+$installer=Join-Path $projectRoot '360AI-updater.xex'
+if(-not (Test-Path -LiteralPath $installer)){throw 'Build the update installer with build.bat first.'}
+Copy-Item -LiteralPath $installer -Destination (Join-Path $usbDirectory '360AI-updater.xex')
 foreach($model in $modelFiles){Copy-Item -LiteralPath (Join-Path $projectRoot ('build/models/'+$model.filename)) -Destination (Join-Path $usbDirectory $model.filename)}
   foreach ($name in @('NOTICE', 'GEMMA_TERMS.txt', 'GEMMA_POLICY.txt', 'MODEL_INFO.txt','APACHE-2.0.txt','SMOLLM2_INFO.txt','TINYSTORIES_LICENSE.txt','TINYSTORIES_INFO.txt')) {
   Copy-Item -LiteralPath (Join-Path $projectRoot "release\model-notices\$name") -Destination (Join-Path $usbDirectory $name)
 }
-foreach ($name in @('START_HERE.txt', 'CHANGELOG.txt', 'CREDITS.txt','MODELS.txt','ASSISTANT.txt','assistant-rules.example.json','INPUT_ICONS.txt')) {
+foreach ($name in @('START_HERE.txt', 'CHANGELOG.txt', 'CREDITS.txt','MODELS.txt','ASSISTANT.txt','assistant-rules.example.json','INPUT_ICONS.txt','UPDATES.txt','NETWORK_LICENSES.txt')) {
   Copy-Item -LiteralPath (Join-Path $projectRoot "release\$name") -Destination (Join-Path $usbDirectory $name)
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'release/models.json') -Destination (Join-Path $usbDirectory 'models.json')
@@ -37,7 +41,7 @@ Compress-Archive -LiteralPath $usbDirectory -DestinationPath $usbZip -Force
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($usbZip)
 try {
-  $expected = @('360AI/360AI.xex', '360AI/START_HERE.txt', '360AI/CHANGELOG.txt', '360AI/CREDITS.txt','360AI/ASSISTANT.txt','360AI/assistant-rules.example.json','360AI/INPUT_ICONS.txt')
+  $expected = @('360AI/360AI.xex','360AI/360AI-updater.xex', '360AI/START_HERE.txt', '360AI/CHANGELOG.txt', '360AI/CREDITS.txt','360AI/ASSISTANT.txt','360AI/assistant-rules.example.json','360AI/INPUT_ICONS.txt','360AI/UPDATES.txt','360AI/NETWORK_LICENSES.txt')
   $expected += @($modelFiles | ForEach-Object {'360AI/'+$_.filename})
   $expected += @('360AI/NOTICE', '360AI/GEMMA_TERMS.txt', '360AI/GEMMA_POLICY.txt', '360AI/MODEL_INFO.txt','360AI/APACHE-2.0.txt','360AI/SMOLLM2_INFO.txt','360AI/TINYSTORIES_LICENSE.txt','360AI/TINYSTORIES_INFO.txt','360AI/MODELS.txt','360AI/models.json','360AI/Download-Models.ps1')
   $actual = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
@@ -50,6 +54,10 @@ try {
   if ($archiveHash -ne (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash) {
     throw 'Archived executable does not match the built executable.'
   }
+  $helperEntry=$archive.Entries | Where-Object {$_.FullName.Replace('\','/') -eq '360AI/360AI-updater.xex'}
+  $stream=$helperEntry.Open();$sha=[Security.Cryptography.SHA256]::Create()
+  try {$helperHash=[BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','')} finally {$stream.Dispose();$sha.Dispose()}
+  if($helperHash -ne (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash){throw 'Archived installer does not match the built installer.'}
   foreach($model in $modelFiles){
   $modelEntry = $archive.Entries | Where-Object { $_.FullName.Replace('\', '/') -eq ('360AI/' + $model.filename) }
   if ($modelEntry.Length -ne $model.size) { throw 'Archived model size mismatch.' }
@@ -62,6 +70,8 @@ try {
 } finally { $archive.Dispose() }
 
 $zipInfo = Get-Item -LiteralPath $usbZip
+& $Python (Join-Path $projectRoot 'tools/package-update.py') $executable (Join-Path $outputDirectory "360AI-$Version-Update.zip")
+if($LASTEXITCODE -ne 0){throw 'App update ZIP packaging failed.'}
 [PSCustomObject]@{
   Name = $zipInfo.Name
   Length = $zipInfo.Length

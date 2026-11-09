@@ -1,4 +1,4 @@
-360AI 2.0 - Xbox 360 USB package
+360AI 2.1 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -22,6 +22,7 @@ This mode uses text, not voice. It works even with no GGUF files installed.
 
 Example USB layout:
   USB:/360AI/360AI.xex
+  USB:/360AI/360AI-updater.xex
   USB:/360AI/gemma-3-270m-it-Q8_0.gguf
   USB:/360AI/SmolLM2-135M-Instruct-Q8_0.gguf
   USB:/360AI/stories15M-q4_0.gguf
@@ -139,3 +140,10 @@ PROJECT
 https://github.com/zuhagames/360AI
 This is a fork of Canyons' gemma.xex, expanded beyond Gemma:
 https://gitlab.com/canyons0/gemma.xex
+
+GITHUB UPDATES
+On Home press START for Updates. Checks run in the background on launch.
+Press A to download a small app update, then A to restart and install it.
+Keep 360AI-updater.xex beside the app, 32 MB free, and the console clock correct.
+Models, notes and settings stay in place. Read UPDATES.txt for recovery/help.
+Install this complete ZIP once when upgrading from 2.0 or earlier.

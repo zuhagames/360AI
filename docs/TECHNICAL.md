@@ -202,7 +202,7 @@ GET streams and DELETE sessions return 405; this stateless endpoint does not iss
 
 ## Connect external MCP servers
 
-The included companion bridge runs on a PC with **Node.js 22 or later**, with no npm dependencies. It connects to desktop **stdio** servers or **HTTP/HTTPS Streamable HTTP** servers, including servers that respond with SSE. It performs initialization, keeps session headers, follows tool-list pagination, and cleans up processes/sessions.
+The optional source-only companion bridge runs on a PC with **Node.js 22 or later**, with no npm dependencies. It connects to desktop **stdio** servers or **HTTP/HTTPS Streamable HTTP** servers, including servers that respond with SSE. It performs initialization, keeps session headers, follows tool-list pagination, and cleans up processes/sessions.
 
 The Xbox continues to run the model. The PC handles external server processes, TLS and tool execution. This does not run stdio executables directly on the Xbox.
 
@@ -229,6 +229,20 @@ node bridge/cli.mjs --config bridge/mcp.json --prompt "What is 2 plus 3?" --allo
 
 Replace `local/add` with names from `--list`. Multiple allowed tools are comma-separated. A tool absent from this list cannot be executed by model output. The loop permits four tool rounds, passes tool results back to Xbox inference, and prints the final answer. Small models may produce invalid tool JSON; the bridge does not promise reliable tool use. Configuration files containing tokens are ignored by Git.
 
+## GitHub updates on Xbox
+
+Press **START on Home** or type `open updates` in Assistant. Automatic checks run once per app launch after the dashboard is ready; Y saves an on/off preference. The worker runs at below-normal priority on hardware thread 5. A checks/downloads, then A on the verified staged update restarts into the installer. X cancels network work or discards a staged/failed download. Offline failures leave local app features usable. There is no unattended restart.
+
+Install the complete 2.1 USB bundle once when coming from 2.0 or earlier. Keep its `360AI-updater.xex` beside the app and at least 32 MB free. Later compatible releases provide a `360AI-VERSION-Update.zip` alongside the complete USB ZIP. This deliberately small, uncompressed, single-entry ZIP contains only `360AI.xex`; it is not a first-install bundle. Models, documentation and the installer itself are updated through the complete USB ZIP when needed.
+
+The native client uses vendored [BearSSL](https://bearssl.org/) TLS 1.2 with OS cryptographic entropy, certificate chain/hostname/time validation and checked-in [Mozilla CA roots via curl](https://curl.se/docs/caextract.html). It requires a correct console clock. HTTPS redirects are limited to GitHub's API, release and asset hosts; HTTP fallback and arbitrary hosts are refused. The [latest stable release API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release) supplies the exact app-package URL, bounded size and GitHub SHA-256 digest. Drafts, prereleases, invalid versions, downgrades and missing checksums are rejected. No account, API key, PC bridge or Xbox Live login is needed. Router/DashLaunch rules can still block Internet access; the updater does not change those settings.
+
+Downloads are capped at 16 MiB and streamed to the drive. The worker verifies SHA-256 before parsing the allowlisted ZIP entry, CRC and XEX magic. It stages `360AI-next.xex` and atomically writes `360AI-update.json` containing candidate/current hashes. The app flushes assistant saves and ends model/server work before launching the separate installer, after releasing the GPU frame lock. Installation verifies the candidate again, renames the current app to `360AI-previous.xex`, promotes the candidate, and verifies the installed result. Errors attempt rollback. Timers and model sessions end at restart; notes/settings remain on disk.
+
+If power is lost between renames, launch `360AI-updater.xex` to finish or recover the staged transaction. If necessary, launch `360AI-previous.xex` or copy the full USB ZIP again. This is recovery logic, not a claim of an atomic two-file transaction on FATX. Physical-console TLS, DashLaunch compatibility, file replacement, power-loss recovery and relaunch still need hardware validation. See [UPDATES.txt](../release/UPDATES.txt).
+
+Builds use pinned, checked-in crypto sources and trust anchors without fetching dependencies. `tools/build-trust-anchors.py` regenerates the header from the reviewed bundle and requires Python's `cryptography`; ordinary builds use the generated header. `tools/package-update.py` uses Python's standard library. `tools/build-bearssl.ps1` caches separately compiled host and Xenon libraries. Third-party notices are in the bundle's NETWORK_LICENSES.txt.
+
 ## Build
 
 Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SDK at its default installation path.
@@ -237,15 +251,15 @@ Requirements: Windows, Visual Studio 2010 Professional, and the full Xbox 360 SD
 .\build.bat
 ```
 
-This compiles and packages `360AI.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
+This compiles and packages `360AI.xex` and `360AI-updater.xex` in the project root. Shader source is embedded and compiled by D3DX on the console; startup numerical validation guards the GPU path.
 
-Fetch all four pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. The single release ZIP is written to `build/releases/v1.5`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and all four GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
+Fetch all four pinned bundled models with `powershell -ExecutionPolicy Bypass -File tools/fetch-bundled-model.ps1`, then install Python 3 and create and verify the USB ZIP with `powershell -ExecutionPolicy Bypass -File tools/package-release.ps1`. Model sources, sizes and hashes are in `release/models.json`; weights are stored under the ignored `build/models` directory. Release ZIPs are written to `build/releases/v2.1`, with weights, notices, model catalog and optional-model PC downloader. Packaging verifies the executable and all four GGUFs inside the ZIP and prints its SHA-256 for the release notes. The optional MCP PC bridge remains available as source in `bridge/`.
 
 Top-k sampling selects candidates directly from logits and calculates exponentials only for the retained tokens. Generation stops before an unused forward pass once its token limit is reached or cancellation is requested. The default debug level is **warning**; select **everything** when collecting detailed diagnostic logs.
 
 ## Verification
 
-With Node.js and the Windows compiler installed:
+With Node.js, Python 3 and the Windows compiler installed (set `GX_PYTHON` to your Python executable if it is not on PATH):
 
 ```powershell
 node tests/make-fixtures.mjs
@@ -274,7 +288,7 @@ Developed by **ZuhaGames & Canyons**. 360AI is a fork of [Canyons' gemma.xex](ht
 The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Second State's GGUF conversion](https://huggingface.co/second-state/gemma-3-270m-it-GGUF), and **SmolLM2 135M Instruct**, created by Hugging Face, using [lmstudio-community's GGUF conversion](https://huggingface.co/lmstudio-community/SmolLM2-135M-Instruct-GGUF). Their attribution, provenance, and terms are included in the download.
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/tag/v1.5">Get 360AI</a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/latest">Get 360AI</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>

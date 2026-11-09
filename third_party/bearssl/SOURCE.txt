@@ -1,0 +1,14 @@
+BearSSL portable TLS and cryptography
+https://www.bearssl.org/git/BearSSL
+Pinned upstream commit: 7bea48e5e850ab4cafbe68d3765cdaba13a86d6f
+Retrieved 2026-11-09. inc/ and src/ are unchanged upstream files.
+MIT license: LICENSE.txt. Compiled as portable C for Xenon and host tests;
+OS entropy/time auto-detection is disabled in tools/build-bearssl.ps1.
+The caller supplies cryptographic OS entropy and a certificate validation time.
+
+CA roots: https://curl.se/ca/cacert.pem
+Mozilla bundle dated 2026-11-05, retrieved 2026-11-09.
+Source information is retained in cacert.pem. Mozilla source material is
+licensed under MPL-2.0: https://www.mozilla.org/en-US/MPL/2.0/
+tools/build-trust-anchors.py converts this reviewed, checked-in bundle without
+network access. Its SHA-256 is recorded in the generated src/trust_anchors.h.
