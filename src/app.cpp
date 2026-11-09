@@ -10,9 +10,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <wchar.h>
+#include <time.h>
 
 static const char* kBrowseDir = "game:";
 static const char* kSettingsPath="game:\\360AI.json";
+static const char* kAssistantPath="game:\\360AI-assistant.json";
 
 AppSettings::AppSettings(){
   ctx_size = 256;
@@ -28,15 +30,19 @@ AppSettings::AppSettings(){
 }
 
 App::App(){
-  screen_ = AS_BROWSE;
+  screen_ = AS_HOME;
   file_sel_ = 0;
   file_scroll_ = 0;
   set_sel_ = 0;
+  home_sel_=tool_sel_=note_sel_=timer_sel_=confirm_id_=edit_id_=0;
+  note_view_id_=0;
   kb_mode_ = KB_NONE;
   kb_cur_ = 0;
   kb_upper_ = false;
   kb_swallow_ = false;
   model_loaded_ = false;
+  assistant_mode_ = false;
+  timer_notice_until_ = 0;
   loading_ = false;
   load_ok_ = false;
   load_done_ = false;
@@ -51,6 +57,7 @@ App::App(){
   gen_count_ = 0;
   gen_last_ms_ = 0;
   gen_tps_ = 0;
+  chat_revision_=1;view_revision_=0;view_tokens_=-1;view_generating_=false;
   load_label_[0] = 0;
   gen_mutex_ = gx_mutex_create();
   eng_mutex_ = gx_mutex_create();
@@ -58,6 +65,7 @@ App::App(){
 }
 
 App::~App(){
+  assistant_store_.stop();
   gen_stop_ = true;
   server_stop();
   gx_thread_join(gen_thread_); gx_thread_join(load_thread_);
@@ -87,8 +95,11 @@ static void utf8_truncate_scroll(const std::string& s, size_t max_chars,
 
 int App::run(){
   settings_.load(kSettingsPath);
+  assistant_.load(kAssistantPath);
+  if(!assistant_.load_rules("game:\\assistant-rules.json")) assistant_.load_rules("game:\\assistant-rules.example.json");
   gx_set_debug_level(settings_.debug_level);
   if(!gxui_init()) return 1;
+  if(!assistant_store_.start(kAssistantPath)) save_status_="Saving unavailable";
 
   std::vector<gx_file_entry> all_files;
   gx_list_dir(kBrowseDir, ".gguf", all_files);
@@ -122,55 +133,7 @@ int App::run(){
     if(files_[i].name=="SmolLM2-135M-Instruct-Q8_0.gguf"){file_sel_=(int)i;break;}
 
   bool running = true;
-  while(running){
-    gxui_begin_frame(0xFF101018);
-    switch(screen_){
-      case AS_BROWSE:    browse_frame();    break;
-      case AS_SETTINGS:  settings_frame();  break;
-      case AS_LOADING:   loading_frame();   break;
-      case AS_CHAT:      chat_frame();      break;
-    }
-    gxui_end_frame();
-
-    u32 p = gxui_buttons_pressed();
-    bool kb_sw = kb_swallow_;
-    kb_swallow_ = false;
-    if(!kb_sw && kb_mode_ == KB_NONE && screen_ == AS_CHAT){
-      if(p & (GX_BTN_B | GX_BTN_BACK)){
-        gen_stop_ = true;
-        server_stop();
-        gx_thread_join(gen_thread_); gen_thread_ = 0;
-        engine_.reset();
-        kv_ = KVCache();
-        gx_log(GX_DEBUG_ALL, "unload: free memory %.0f MB",
-               gx_physical_free() / (1024.0f * 1024.0f));
-        model_loaded_ = false;
-        turns_.clear();
-        chat_log_.clear();
-        chat_notice_.clear();
-        chat_view_=ChatView();
-        screen_ = AS_BROWSE;
-      }
-    }
-    if(!kb_sw && kb_mode_ == KB_NONE &&
-       (p & (GX_BTN_B | GX_BTN_BACK)) &&
-       screen_ != AS_CHAT && screen_ != AS_LOADING){
-      if(screen_ == AS_SETTINGS) screen_ = AS_BROWSE;
-    }
-    if(!loading_ && load_done_ && screen_ == AS_LOADING){
-      load_done_ = false;
-      if(load_ok_){
-        model_loaded_ = true;
-        if(engine_.tok().completion_only()) chat_notice_="Story toy: continues your text. Try: Once upon a time";
-        screen_ = AS_CHAT;
-        if(settings_.server_on) server_start(&engine_, &kv_, &settings_, eng_mutex_);
-      } else {
-        if(chat_notice_.empty()) chat_notice_="Model load failed. Check 360AI.log for details.";
-        screen_ = AS_SETTINGS;
-      }
-    }
-    gx_sleep_ms(10);
-  }
+  while(running){frame();gx_sleep_ms(10);}
 
   server_stop();
   gen_stop_ = true;
@@ -181,52 +144,25 @@ int App::run(){
 }
 
 void App::browse_frame(){
-  f32 cw = gxui_char_w(), lh = gxui_line_h();
-  gxui_text_shadow(40, 30, GX_ACCENT, "360AI %s", GX_VERSION);
-  gxui_text_shadow(40, 30 + lh, GXRGB(180,180,190),
-                   "Gemma, SmolLM2, Llama, Qwen2/2.5 from %s", kBrowseDir);
-
-  if(files_.empty()){
-    gxui_text_shadow(40, 30 + lh*3, GXRGB(220,120,120),
-                     "No .gguf files found next to 360AI.xex.");
-    gxui_text_shadow(40, 30 + lh*4, GXRGB(150,150,160),
-                     "Copy a model .gguf onto the same folder and restart.");
-    return;
-  }
-
-  if(file_sel_ >= (int)files_.size()) file_sel_ = (int)files_.size() - 1;
-  if(file_sel_ < 0) file_sel_ = 0;
-
-  int visible = 12;
-  if(file_sel_ < file_scroll_) file_scroll_ = file_sel_;
-  if(file_sel_ >= file_scroll_ + visible) file_scroll_ = file_sel_ - visible + 1;
-
-  f32 y = 30 + lh*3;
-  for(int i = file_scroll_; i < (int)files_.size() && i < file_scroll_ + visible; ++i){
-    u32 col = (i == file_sel_) ? GXRGB(255,255,255) : GXRGB(150,150,160);
-    if(i == file_sel_){
-      gxui_fill(36, y - 2, 900, lh + 2, GX_ACCENT_A(60));
-      gxui_text_shadow(40, y, GXRGB(255,255,255), "> %s", files_[i].name.c_str());
-    } else {
-      gxui_text_shadow(40, y, col, "  %s", files_[i].name.c_str());
+  shell("Models","PICK A MODEL. SET IT UP. MAKE IT YOURS.");
+  u32 buttons=gxui_buttons_pressed();if(buttons&GX_BTN_X){open_assistant();return;}
+  if(files_.empty()){gxui_label(92,184,GX_INK,"No models on this drive.",1.2f);gxui_label(92,250,GX_MUTED,"Copy a GGUF beside 360AI.xex, or open Assistant.",.85f);}
+  else {
+    file_sel_=GX_CLAMP(file_sel_,0,(int)files_.size()-1);
+    if(file_sel_<file_scroll_) file_scroll_=file_sel_;if(file_sel_>=file_scroll_+7) file_scroll_=file_sel_-6;
+    for(int i=file_scroll_;i<(int)files_.size() && i<file_scroll_+7;++i){f32 y=146+(i-file_scroll_)*52;bool selected=i==file_sel_;
+      gxui_fill(64,y,1152,48,selected ? GX_INK : GX_PANEL);std::string name=files_[i].name;if(name.size()>63) name=name.substr(0,60)+"...";
+      gxui_label(86,y+10,selected ? GX_PANEL : GX_INK,name.c_str(),.85f);char size[40];snprintf(size,sizeof(size),"%.0f MB",files_[i].size/1048576.0);
+      gxui_label(1080,y+12,selected ? GX_ACCENT : GX_MUTED,size,.7f);
     }
-    f32 mb = (f32)files_[i].size / (1024.0f*1024.0f);
-    gxui_text_shadow(1030, y, GXRGB(120,140,120), "%.0f MB", mb);
-    y += lh;
+    const gx_file_entry& selected=files_[file_sel_];char hint[128];double reserve=ceil(selected.size/100000000.0)/10;
+    snprintf(hint,sizeof(hint),"Reserve %.2f GB on HDD/USB. %s",reserve,selected.size>320u*1024u*1024u ? "HDD stream: very slow." : "RAM recommended.");
+    gxui_label(64,532,GX_MUTED,hint,.75f);
+    const char* tip=selected.name=="stories260K.gguf" ? "Tiny story toy: mostly nonsense; not a chat assistant." : (selected.name=="stories15M-q4_0.gguf" ? "Small story toy: simple completions; not instruction chat." : "Leave compute/storage on Auto. Quick preset gives shorter replies.");
+    gxui_label(64,576,GX_MUTED,tip,.7f);
   }
-
-  const gx_file_entry& selected=files_[file_sel_];
-  double gb=(double)selected.size/1000000000.0;
-  double reserve=gb>=1.0 ? ceil(gb) : ceil(gb*10.0)/10.0;
-  gxui_text_shadow(40,720-lh*4,GXRGB(180,200,160),"Needs %.1f GB free on HDD/USB (%.2f GB of model files)",reserve,gb);
-  const char* hint=selected.size>320u*1024u*1024u ?
-    "Large model: HDD streaming recommended; generation can be very slow." :
-    "Small model: RAM loading recommended. HDD streaming is optional.";
-  if(selected.name=="stories260K.gguf") hint="Smallest toy (1.2 MB). Mostly nonsense; continues stories, not a chat assistant.";
-  else if(selected.name=="stories15M-q4_0.gguf") hint="Small story toy (19 MB). Weak English story completion; no instruction chat.";
-  else if(selected.name=="SmolLM2-135M-Instruct-Q8_0.gguf") hint="Recommended for chat. Small instruction model; use RAM or Auto storage.";
-  gxui_text_shadow(40,720-lh*3,GXRGB(150,150,160),"%s",hint);
-
+  gxui_prompt(64,658,GX_BTN_A,"Set up");gxui_prompt(288,658,GX_BTN_X,"Assistant");gxui_prompt(1010,658,GX_BTN_B,"Home");
+  if(files_.empty()) return;
   u32 p = gxui_buttons_pressed();
   if(p & GX_BTN_DUP) file_sel_--;
   if(p & GX_BTN_DDOWN) file_sel_++;
@@ -241,10 +177,7 @@ void App::browse_frame(){
 }
 
 void App::settings_frame(){
-  f32 lh = gxui_line_h();
-  gxui_text_shadow(40, 30, GX_ACCENT, "Settings");
-  gxui_text_shadow(40, 30 + lh, GXRGB(150,150,160), "Model: %s", model_name_.c_str());
-
+  f32 lh=30; shell("Model setup",model_name_.c_str());
   static const char* dbg_names[DC_COUNT] = {
     "everything", "warning", "error", "nothing"
   };
@@ -267,22 +200,20 @@ void App::settings_frame(){
   snprintf(line[11],192,"Reply preset        %s",profiles[settings_.profile()]);
   snprintf(line[12],192,"Load model");
 
-  f32 y = 30 + lh*3;
+  f32 y = 138;
   for(int i = 0; i < 13; ++i){
     if(i == set_sel_){
-      gxui_fill(36, y - 2, 700, lh + 2, GX_ACCENT_A(60));
-      gxui_text_shadow(40, y, GXRGB(255,255,255), "> %s", line[i]);
+      gxui_fill(64,y,1152,30,GX_INK);
+      gxui_label(80,y,GX_PANEL,line[i],.80f);
     } else {
-      gxui_text_shadow(40, y, GXRGB(160,160,170), "  %s", line[i]);
+      gxui_label(80,y,GX_INK,line[i],.80f);
     }
     y += lh;
   }
 
-  f32 my = gx_physical_free() / (1024.0f*1024.0f);
-  if(!chat_notice_.empty()) gxui_text_shadow(40,720-lh*5,GXRGB(220,180,120),"%s",chat_notice_.c_str());
-  else if(set_sel_==11) gxui_text_shadow(40,720-lh*5,GXRGB(160,200,140),"Quick: 256 ctx/48 reply | Balanced: 512/128 | Creative: 512/192");
-  gxui_text_shadow(40,720-lh*4,GXRGB(150,150,160),"GPU: %s",gx_gpu_diagnostic());
-  gxui_text_shadow(40, 720 - lh*3, GXRGB(120,140,120), "Free memory: %.0f MB", my);
+  gxui_label(64,548,GX_MUTED,set_sel_==11 ? "Quick: short replies / Auto compute and storage" : "GPU is experimental. Auto compares measured backends.",.7f);
+  gxui_label(64,582,GX_MUTED,chat_notice_.empty() ? gx_gpu_diagnostic() : chat_notice_.c_str(),.7f);
+  gxui_prompt(64,658,GX_BTN_A,"Change / load");gxui_prompt(1010,658,GX_BTN_B,"Models");
 
   if(kb_mode_){
     kb_draw();
@@ -368,6 +299,7 @@ void App::settings_frame(){
 
 void App::start_load(){
   if(loading_) return;
+  assistant_mode_=false;turns_.clear();chat_log_.clear();chat_view_=ChatView();
   loading_ = true;
   load_ok_ = false;
   load_done_ = false;
@@ -426,108 +358,52 @@ void App::do_load(){
 }
 
 void App::loading_frame(){
-  f32 lh = gxui_line_h();
-  f32 cx = 640, cy = 300;
-  gxui_text_shadow(cx - 120, cy, GX_ACCENT, "Loading model...");
-  gxui_text_shadow(cx - 120, cy + lh*2, GXRGB(180,180,190), "%s", model_name_.c_str());
-
-  f32 bw = 480, bx = cx - bw/2, by = cy + lh*4;
-  gxui_fill(bx, by, bw, 18, GXRGBA(40,40,60,200));
-  f32 frac = 0.0f;
-  if(load_total_ > 0) frac = (f32)load_cur_ / (f32)load_total_;
-  if(frac < 0) frac = 0;
-  if(frac > 1) frac = 1;
-  gxui_fill(bx, by, bw * frac, 18, GXRGBA(80,160,90,220));
-  gxui_text_shadow(cx - 120, by + 26, GXRGB(150,150,160), "%s", load_label_);
-
-  f32 my = gx_physical_free() / (1024.0f*1024.0f);
-  gxui_text_shadow(cx - 120, by + lh*2, GXRGB(120,140,120), "Free memory: %.0f MB", my);
+  shell("Loading",model_name_.c_str());gxui_label(92,230,GX_INK,"Getting things ready.",1.4f);
+  f32 fraction=load_total_>0 ? (f32)load_cur_/load_total_ : 0;fraction=GX_CLAMP(fraction,0.0f,1.0f);
+  gxui_fill(92,338,1096,14,GXRGB(194,203,182));gxui_fill(92,338,1096*fraction,14,GX_ACCENT);
+  gxui_label(92,386,GX_MUTED,load_label_,.9f);gxui_label(92,450,GX_MUTED,"Large models and drive streaming can take a while.",.75f);
 }
 
 void App::append_chat(const std::string& role, const std::string& text){
   chat_log_ += role;
   chat_log_ += text;
   chat_log_ += "\n";
+  ++chat_revision_;
 }
 
 void App::chat_frame(){
-  f32 lh = gxui_line_h(), cw = gxui_char_w();
-  gxui_text_shadow(40, 20, GX_ACCENT, "Chat");
-  gxui_text_shadow(120, 20, GXRGB(150,150,160), "%s", model_name_.c_str());
-  if(settings_.server_on){
-    gxui_text_shadow(400, 20, GXRGB(120,180,120), "%s", server_status_text().c_str());
-  }
-
-  if(gen_mutex_) gx_mutex_lock(gen_mutex_);
-  std::string body = chat_log_,notice=chat_notice_;
-  if(generating_){
-    body += "Model: ";
-    body += gen_text_;
-  }
+  shell(assistant_mode_ ? "Talk" : "Model chat",assistant_mode_ ? "SAY HELLO. ASK A QUESTION. TRY A TOOL." : model_name_.c_str());
+  if(gen_mutex_) gx_mutex_lock(gen_mutex_);std::string body,notice=chat_notice_;
+  bool changed=chat_revision_!=view_revision_ || gen_count_!=view_tokens_ || generating_!=view_generating_;
+  if(changed){body=chat_log_;if(generating_){body+="Model: ";body+=gen_text_;}view_revision_=chat_revision_;view_tokens_=gen_count_;view_generating_=generating_;}
   if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
-
-  int max_lines = (int)((720.0f - (20.0f + lh*2) - lh*5) / lh);
-  if(max_lines < 1) max_lines = 1;
-  chat_view_.update(body,(int)(1180.0f/cw),max_lines);
-  u32 p=gxui_buttons_pressed();
-  if(!kb_mode_){
-    if(p & GX_BTN_DUP) chat_view_.scroll(-1);
-    if(p & GX_BTN_DDOWN) chat_view_.scroll(1);
-    if(p & GX_BTN_LB) chat_view_.scroll(-max_lines);
-    if(p & GX_BTN_RB) chat_view_.scroll(max_lines);
-    if(p & GX_BTN_RTHUMB) chat_view_.latest();
+  const int max_lines=12;if(changed) chat_view_.update(body,79,max_lines);u32 p=gxui_buttons_pressed();
+  if(!kb_mode_){if(p&GX_BTN_DUP) chat_view_.scroll(-1);if(p&GX_BTN_DDOWN) chat_view_.scroll(1);
+    if(p&GX_BTN_LB) chat_view_.scroll(-max_lines);if(p&GX_BTN_RB) chat_view_.scroll(max_lines);if(p&GX_BTN_RTHUMB) chat_view_.latest();}
+  gxui_fill(64,142,1152,398,GX_PANEL);gxui_fill(64,142,4,398,GX_ACCENT);
+  const std::vector<std::string>& lines=chat_view_.lines();int start=chat_view_.top();
+  for(int i=start;i<(int)lines.size() && i<start+max_lines;++i){u32 color=GX_INK;
+    if(lines[i].compare(0,5,"You: ")==0) color=GX_MUTED;
+    gxui_label(88,150+(i-start)*32,color,lines[i].c_str(),.85f);}
+  std::string status=notice;
+  if(status.empty() && !assistant_mode_){
+    if(settings_.server_on) status=server_status_text();
+    else status=std::string(engine_.backend_note())+" / "+(engine_.disk_streaming() ? "HDD/USB stream" : "RAM weights");
   }
-  const std::vector<std::string>& lines=chat_view_.lines();
-  int start=chat_view_.top();
-  gxui_text_shadow(40,20+lh,GXRGB(120,140,150),
-    "UP/DOWN: scroll  LB/RB: page  R-stick: latest | %s",
-    chat_view_.following() ? "following reply" : "reading history");
-  f32 y = 20 + lh*2;
-  for(int i = start; i < (int)lines.size() && i < start+max_lines; ++i){
-    const std::string& L = lines[i];
-    u32 col = GXRGB(200,200,210);
-    if(L.compare(0,5,"You: ")==0) col = GXRGB(140,190,255);
-    else if(L.compare(0,7,"Model: ")==0) col = GXRGB(180,220,160);
-    gxui_text_md(40, y, col, L.c_str());
-    y += lh;
+  if(generating_){char progress[120];if(gen_mutex_) gx_mutex_lock(gen_mutex_);
+    if(gen_count_==0) snprintf(progress,sizeof(progress),"Working: %u/%u prompt tokens | layer %u/%u",gen_prompt_done_,gen_prompt_total_,gen_layer_done_,gen_layer_total_);
+    else snprintf(progress,sizeof(progress),"%.1f tokens/sec | %.0f ms/token | layer %u/%u",(double)gen_tps_,(double)gen_last_ms_,gen_layer_done_,gen_layer_total_);
+    if(gen_mutex_) gx_mutex_unlock(gen_mutex_);status=progress;
   }
-
-  if(!notice.empty()) gxui_text_shadow(40,720-lh*4,GXRGB(180,200,150),"%s",notice.c_str());
-  gxui_text_shadow(40,720-lh,GXRGB(120,130,140),settings_.chat_on ?
-    "A: message   X: new chat   START: save chat   Y: stop   B: models" : "Monitoring API server   B: models");
-  if(generating_){
-    if(gen_mutex_) gx_mutex_lock(gen_mutex_);
-    f32 tps = gen_tps_;
-    f32 lat = gen_last_ms_;
-    int cnt = gen_count_;
-    u32 done=gen_prompt_done_,total=gen_prompt_total_;
-    u32 layer=gen_layer_done_,layers=gen_layer_total_;
-    if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
-    if(cnt == 0){
-      gxui_text_shadow(40,720-lh*2,GX_ACCENT,"Prompt: %u/%u tokens | layer %u/%u | %.0fs",done,total,layer,layers,gx_time_seconds()-gen_start_time_);
-    } else {
-      gxui_text_shadow(40,720-lh*2,GX_ACCENT,"Generating: %.1ft/s %.0fms | layer %u/%u",(double)tps,(double)lat,layer,layers);
-    }
-  } else {
-    gxui_text_shadow(40, 720 - lh*2, GXRGB(90,90,100), "idle");
-  }
-  if(!engine_.storage_ok()) gxui_text_shadow(40,720-lh*3,GXRGB(240,130,120),"Disk read failed. Check HDD/USB and reload the model.");
-  else gxui_text_shadow(40,720-lh*3,GXRGB(140,160,140),"%s | %s",engine_.backend_note(),engine_.disk_streaming() ? "HDD/USB stream" : "RAM weights");
-
-  if(kb_mode_){
-    kb_draw();
-    kb_input();
-    return;
-  }
-
-  if(generating_ && (p & GX_BTN_Y)){
-    gen_stop_ = true;
-    chat_notice_="Stopping after the current operation...";
-  } else if(settings_.chat_on && !generating_){
-    if(p & GX_BTN_X) new_chat();
-    else if(p & GX_BTN_START) export_chat();
-    else if(p & GX_BTN_A) kb_open(KB_CHAT,engine_.tok().completion_only() ? "Continue a story" : "Your message",
-      engine_.tok().completion_only() ? "Write a story opening, e.g. Once upon a time" : "Type your message to the model","");
+  if(status.size()>92) status=status.substr(0,89)+"...";gxui_label(64,554,GX_MUTED,status.c_str(),.75f);
+  gxui_label(64,596,GX_MUTED,chat_view_.following() ? "D-pad scrolls / LB-RB pages / Right stick jumps to latest" : "READING HISTORY / Right stick jumps to latest",.65f);
+  gxui_prompt(64,658,GX_BTN_A,"Write");gxui_prompt(244,658,GX_BTN_X,"New chat");gxui_prompt(468,658,GX_BTN_Y,assistant_mode_ ? "Tools" : "Stop");gxui_prompt(678,658,GX_BTN_START,"Save");gxui_prompt(1010,658,GX_BTN_B,assistant_mode_ ? "Home" : "Models");
+  if(kb_mode_){kb_draw();kb_input();return;}
+  if(assistant_mode_ && (p&GX_BTN_Y)){screen_=AS_TOOLS;return;}
+  if(generating_ && (p&GX_BTN_Y)){gen_stop_=true;chat_notice_="Stopping after the current operation...";}
+  else if((settings_.chat_on || assistant_mode_) && !generating_){
+    if(p&GX_BTN_X) new_chat();else if(p&GX_BTN_START) export_chat();
+    else if(p&GX_BTN_A) kb_open(KB_CHAT,assistant_mode_ ? "Talk to 360AI" : "Your message",assistant_mode_ ? "Say hello, ask a question, or type a command" : "Write to the selected model","");
   }
 }
 
@@ -542,8 +418,10 @@ void App::new_chat(){
   gx_thread_join(gen_thread_);gen_thread_=0;
   if(gen_mutex_) gx_mutex_lock(gen_mutex_);
   kv_.clear();turns_.clear();chat_log_.clear();gen_text_.clear();
+  ++chat_revision_;
   chat_view_=ChatView();
-  chat_notice_="New chat started. Model stays loaded.";
+  if(assistant_mode_) assistant_.reset_conversation();
+  chat_notice_=assistant_mode_ ? "New chat. Saved notes and active timers are kept." : "New chat started. Model stays loaded.";
   if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
   if(eng_mutex_) gx_mutex_unlock(eng_mutex_);
 }
@@ -555,6 +433,45 @@ void App::export_chat(){
   text=gx_utf8_clean("360AI "+std::string(GX_VERSION)+" - "+model_name_+"\n\n"+text);
   chat_notice_=gx_write_text_file("game:\\360AI-chat.txt",text) ?
     "Saved conversation to 360AI-chat.txt." : "Could not save chat. Check HDD/USB is writable.";
+}
+
+AssistantContext App::assistant_context() const{
+  AssistantContext c;c.now=gx_time_seconds();c.free_bytes=gx_physical_free();c.version=GX_VERSION;c.profile=settings_.profile();
+  for(size_t i=0;i<files_.size();++i) c.models.push_back(files_[i].name);
+  time_t now=time(0);struct tm* local=localtime(&now);char text[64];
+  if(local){if(strftime(text,sizeof(text),"%H:%M:%S",local)) c.clock=text;if(strftime(text,sizeof(text),"%Y-%m-%d",local)) c.date=text;}
+  return c;
+}
+void App::open_assistant(){
+  if(assistant_mode_ && !chat_log_.empty()){model_name_="360 Assistant";screen_=AS_CHAT;return;}
+  assistant_mode_=true;model_name_="360 Assistant";
+  turns_.clear();chat_log_.clear();chat_notice_.clear();chat_view_=ChatView();assistant_.reset_conversation();
+  append_chat("Assistant: ","Hello there. Ask me something, or press Y for Quick tools.");
+  screen_=AS_CHAT;
+}
+void App::assistant_send(const std::string& text){
+  chat_view_.latest();chat_notice_.clear();append_chat("You: ",gx_utf8_clean(text));
+  AssistantReply reply=assistant_.respond(text,assistant_context());
+  if(reply.action==AA_PROFILE){
+    settings_.apply_profile(reply.value);save_settings();
+    reply.text="Model preset applied; compute/storage Auto. "+std::string(chat_notice_.empty() ? "Settings saved." : "Could not save preferences to the drive.");
+  } else if(reply.action==AA_EXPORT){export_chat();reply.text=chat_notice_;}
+  else if(reply.action==AA_CLEAR_CHAT) new_chat();
+  else if(reply.action==AA_MODELS){assistant_mode_=false;chat_log_.clear();turns_.clear();chat_view_=ChatView();screen_=AS_BROWSE;return;}
+  queue_assistant_save();
+  append_chat("Assistant: ",reply.text);
+  if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}
+}
+void App::assistant_poll(){
+  std::vector<std::string> alerts;assistant_.poll(gx_time_seconds(),alerts);
+  if(alerts.empty()) return;
+  if(gen_mutex_) gx_mutex_lock(gen_mutex_);
+  for(size_t i=0;i<alerts.size();++i){append_chat("Assistant: ",alerts[i]);chat_notice_=alerts[i];}
+  if(gen_mutex_) gx_mutex_unlock(gen_mutex_);
+  timer_notice_=alerts.size()>1 ? "Several timers finished. Ask timer history in 360 Assistant." : alerts[0];
+  if(timer_notice_.size()>90) timer_notice_=gx_utf8_clean(timer_notice_.substr(0,87))+"...";
+  timer_notice_until_=gx_time_seconds()+10;
+  chat_view_.latest();
 }
 
 void App::start_generate(const std::string& prompt){
@@ -658,14 +575,15 @@ void App::on_layer(u32 done,u32 total,void* user){
   if(a->gen_mutex_) gx_mutex_unlock(a->gen_mutex_);
 }
 
-static const char kKbSet[] = "abcdefghijklmnopqrstuvwxyz0123456789.,-+_:/?@%* ";
+static const char kKbSet[] = "abcdefghijklmnopqrstuvwxyz0123456789.,-+_:/?@%* ()^'";
 static const int kKbCols = 7;
-static const int kKbChars = 48;
-static const int kKbDel = 48;
-static const int kKbOk = 49;
-static const int kKbCells = 50;
-static const f32 kKbCellW = 56;
-static const f32 kKbCellH = 26;
+static const int kKbChars = sizeof(kKbSet)-1;
+static const int kKbDel = kKbChars;
+static const int kKbOk = kKbChars+1;
+static const int kKbCells = kKbChars+2;
+static const int kKbRows = (kKbCells+kKbCols-1)/kKbCols;
+static const f32 kKbCellW = 96;
+static const f32 kKbCellH = 32;
 
 void App::kb_open(int mode, const char* title, const char* desc, const std::string& initial){
   kb_mode_ = mode;
@@ -680,51 +598,19 @@ void App::kb_open(int mode, const char* title, const char* desc, const std::stri
 }
 
 void App::kb_draw(){
-  f32 lh = gxui_line_h(), cw = gxui_char_w();
-  f32 pw = kKbCols * kKbCellW;
-  f32 px = (1280 - pw) * 0.5f;
-  f32 py = 170;
-  if(kb_mode_ & KB_SYS){
-    return;
+  if(kb_mode_ & KB_SYS) return;
+  const f32 px=304,py=138,pw=kKbCols*kKbCellW;
+  gxui_fill(0,0,1280,720,GXRGBA(18,27,23,180));gxui_fill(264,118,752,502,GX_PANEL);gxui_fill(264,118,6,502,GX_ACCENT);
+  gxui_label(px,py,GX_INK,kb_title_.c_str(),1.0f);gxui_label(px,182,GX_MUTED,kb_desc_.c_str(),.65f);
+  gxui_fill(px,224,pw,40,GX_INK);std::string shown=kb_text_;const size_t visible=40;
+  if(shown.size()>visible) shown=shown.substr(shown.size()-visible);gxui_label(px+10,228,GX_PANEL,(shown+"_").c_str(),1.0f);
+  f32 gy=282;
+  for(int i=0;i<kKbCells;++i){f32 x=px+(i%kKbCols)*kKbCellW,y=gy+(i/kKbCols)*kKbCellH;bool selected=i==kb_cur_;
+    gxui_fill(x,y,kKbCellW-5,kKbCellH-4,selected ? GX_INK : GXRGB(220,224,211));u32 col=selected ? GX_ACCENT : GX_INK;
+    char text[8];if(i<kKbChars){char ch=kKbSet[i];if(kb_upper_ && ch>='a' && ch<='z') ch-=32;snprintf(text,sizeof(text),"%c",ch==' ' ? '_' : ch);}
+    else snprintf(text,sizeof(text),"%s",i==kKbDel ? "DEL" : "OK");gxui_label(x+16,y,col,text,.8f);
   }
-  f32 ph = lh * 4 + 7 * kKbCellH + 40;
-  gxui_fill(px - 20, py - 20, pw + 40, ph, GXRGBA(14,16,28,244));
-  gxui_text_shadow(px, py, GX_ACCENT, "%s", kb_title_.c_str());
-  gxui_text_shadow(px, py + lh, GXRGB(180,180,190), "%s", kb_desc_.c_str());
-
-  f32 by = py + lh * 2;
-  gxui_fill(px, by, pw, lh, GXRGBA(36,44,72,235));
-  int vis = (int)((pw - 12) / cw);
-  std::string shown = kb_text_;
-  if((int)shown.size() + 1 > vis){
-    shown = shown.substr(shown.size() + 1 - (size_t)vis);
-  }
-  gxui_text_shadow(px + 6, by + 4, GXRGB(255,255,255), "%s_", shown.c_str());
-
-  f32 gy = by + lh + 8;
-  for(int i = 0; i < kKbCells; ++i){
-    f32 cx = px + (i % kKbCols) * kKbCellW;
-    f32 cy = gy + (i / kKbCols) * kKbCellH;
-    bool sel = (i == kb_cur_);
-    u32 bg = sel ? GX_ACCENT_A(235) : GXRGBA(30,34,50,225);
-    gxui_fill(cx, cy, kKbCellW - 4, kKbCellH - 4, bg);
-    u32 col = sel ? GXRGB(255,255,255) : GXRGB(170,175,190);
-    if(i < kKbChars){
-      char c = kKbSet[i];
-      if(c == ' '){
-        gxui_text_shadow(cx + 18, cy + 3, col, "_");
-      } else {
-        if(kb_upper_ && c >= 'a' && c <= 'z') c = (char)(c - 32);
-        gxui_text_shadow(cx + 18, cy + 3, col, "%c", c);
-      }
-    } else if(i == kKbDel){
-      gxui_text_shadow(cx + 2, cy + 3, col, "DEL");
-    } else {
-      gxui_text_shadow(cx + 10, cy + 3, GXRGB(160,220,160), "OK");
-    }
-  }
-  gxui_text_shadow(px, gy + 7 * kKbCellH + 6, GXRGB(120,120,130),
-                   "A: enter    B: cancel    LB: case    START: done");
+  gxui_prompt(292,566,GX_BTN_A,"Type");gxui_prompt(460,566,GX_BTN_B,"Cancel");gxui_prompt(652,566,GX_BTN_LB,"Case");gxui_prompt(836,566,GX_BTN_START,"Done");
 }
 
 void App::kb_input(){
@@ -736,7 +622,7 @@ void App::kb_input(){
       kb_text_ = buf;
       kb_commit();
     } else {
-      kb_mode_ = KB_NONE;
+      kb_mode_ = KB_NONE;kb_swallow_=true;
     }
     return;
   }
@@ -796,8 +682,14 @@ void App::kb_commit(){
   } else if(mode == KB_REPEAT){
     f32 value=(f32)atof(kb_text_.c_str());if(value!=value) value=1;
     settings_.repeat_penalty=GX_CLAMP(value,1.0f,1.5f);
+  } else if(mode == KB_NOTE_NEW || mode == KB_NOTE_EDIT || mode == KB_TIMER_NEW){
+    if(!kb_text_.empty()){
+      if(mode==KB_TIMER_NEW) local_command("set timer "+kb_text_);
+      else {chat_notice_=assistant_.write_note(mode==KB_NOTE_NEW ? 0 : edit_id_,kb_text_).text;queue_assistant_save();}
+    }return;
   } else if(mode == KB_CHAT){
     if(!kb_text_.empty()){
+      if(assistant_mode_){assistant_send(kb_text_);return;}
       turns_.push_back(std::make_pair(0, kb_text_));
       FittedChat fitted=gx_fit_chat(engine_.tok(),turns_,kv_.seq_len,(u32)settings_.reply_tokens);
       if(!fitted.fits){

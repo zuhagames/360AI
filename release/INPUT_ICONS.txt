@@ -1,0 +1,14 @@
+Xbox 360 controller prompts
+==========================
+Artwork: Nicolae (Xelu) Berbece. Pack updated by Paul Paun (2021).
+Source: https://thoseawesomeguys.com/prompts/
+License: CC0 / public domain, as stated on the source page and pack readme.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+360AI embeds resized versions of the original Xbox 360 A, B, X, Y, LB, RB,
+Start, Back, D-pad and stick prompts in its native UI texture atlas. The
+original PNGs and pack readme are preserved in the source assets/input folder.
+No network connection or separate image files are needed on the console.
+
+The artwork is third-party controller illustration. Xbox and Xbox 360 are
+Microsoft trademarks; this project is not endorsed by Microsoft.

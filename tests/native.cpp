@@ -4,12 +4,16 @@
 #include "mcp.h"
 #include "server.h"
 #include "app.h"
+#include "xboxui.h"
 #include "gpu.h"
 #include "textstream.h"
+#include "version.h"
 #include <assert.h>
 #include <iostream>
 #include <algorithm>
 #include "quant_checks.h"
+#include "assistant_checks.h"
+#include "dashboard_checks.h"
 
 static std::string path(const char* name){ return std::string("build/tests/")+name+".gguf"; }
 static std::string completion(const std::string& prompt,int n,void*){
@@ -86,6 +90,8 @@ static void chat_checks(){
   view.update("abcde\nfghij\n",5,2);
   assert(view.lines().size()==2 && view.lines()[0]=="abcde" && view.lines()[1]=="fghij");
   view.update("abcdef",3,1);assert(view.lines().size()==2 && view.lines()[1]=="def");
+  view.update("one two three four",10,3);assert(view.lines().size()==2 && view.lines()[0]=="one two" && view.lines()[1]=="three four");
+  view.update("one two three",7,3);assert(view.lines().size()==2 && view.lines()[0]=="one two" && view.lines()[1]=="three");
   view.update("A\xc5\xbe\xe4\xb8\xad\xf0\x9f\x98\x80\tB\r\n",20,1);
   assert(view.lines().size()==1 && view.lines()[0]=="A??? B");
   view.update("",1,0);assert(view.top()==0 && view.lines().size()==1);
@@ -135,6 +141,8 @@ static void cancel_after_token(int,const char*,void* user){
   CancelAfterToken* state=(CancelAfterToken*)user; ++state->calls; state->stop=true;
 }
 static void checks(){
+  assistant_checks();
+  dashboard_checks();
   {
     GGUF g;assert(g.load(path("stories-tokenizer").c_str()));Tokenizer tok;assert(tok.load(g) && tok.completion_only());
     std::vector<std::pair<std::string,std::string> > messages;
@@ -283,6 +291,9 @@ static void checks(){
   assert(Json::parse("{\"id\":\"x\",\"params\":{\"id\":9},\"x\":\"\\uD83D\\uDE00\\n\"}",j));
   assert(j.get("id").text=="x" && j.get("x").text=="\xF0\x9F\x98\x80\n");
   Json again; assert(Json::parse(j.dump(),again));
+  std::string controls("\b\f\n\r\t\0",6);Json compact(controls),roundtrip;
+  assert(compact.dump()=="\"\\b\\f\\n\\r\\t\\u0000\"");
+  assert(Json::parse(compact.dump(),roundtrip) && roundtrip.text==controls);
   assert(!Json::parse("{\"a\":1,\"a\":2}",j)); assert(!Json::parse("[1,]",j));
   assert(!Json::parse("01",j)); assert(!Json::parse("\"\\uD800\"",j)); assert(!Json::parse("1e999",j));
   f32 gate[]={-100,0,1}, up[]={2,2,2}; gx_silu_mul(gate,up,3);
@@ -378,6 +389,25 @@ static void checks(){
 }
 int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
+  if(argc>3 && std::string(argv[1])=="--ui-preview"){
+    if(!gxui_init()) return 2;App app;bool ok=app.test_capture(argv[2],argv[3]);gxui_shutdown();return ok ? 0 : 3;
+  }
+  if(argc>1 && std::string(argv[1])=="--assistant"){
+    Assistant assistant;AssistantContext context;context.version=GX_VERSION;context.free_bytes=gx_physical_free();
+    assistant.load_rules("release/assistant-rules.example.json");std::string line;
+    while(std::getline(std::cin,line)){
+      context.now=gx_time_seconds();AssistantReply reply=assistant.respond(line,context);
+      Json result=Json::object();result["text"]=Json(reply.text);result["action"]=Json((double)reply.action);result["value"]=Json((double)reply.value);
+      std::cout<<result.dump()<<std::endl;
+    }return 0;
+  }
+  if(argc>1 && std::string(argv[1])=="--bench-assistant"){
+    Assistant assistant;AssistantContext context;context.version="test";
+    const char* requests[]={"calculate (12 + 8) * 3","convert 5 miles to km","help with GPU","status","what can you do","this"};
+    double started=gx_time_seconds();for(int i=0;i<6000;++i) assert(!assistant.respond(requests[i%6],context).text.empty());
+    double elapsed=gx_time_seconds()-started;
+    std::cout<<"Keyword assistant: 6000 requests in "<<elapsed<<" seconds; mean "<<elapsed/6<<" ms/request (host only)\n";return 0;
+  }
   if(argc>2 && (std::string(argv[1])=="--model" || std::string(argv[1])=="--model-stream" || std::string(argv[1])=="--compare-model" || std::string(argv[1])=="--bench-cache")){
     gx_set_debug_level(GX_DEBUG_WARN);
     bool stream=std::string(argv[1])=="--model-stream";

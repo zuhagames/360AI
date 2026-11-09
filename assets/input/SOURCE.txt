@@ -1,0 +1,6 @@
+Xbox 360 controller prompts by Nicolae (Xelu) Berbece.
+Source: https://thoseawesomeguys.com/prompts/
+Archive: https://thoseawesomeguys.com/prompts/Xelu_Free_Controller%26Key_Prompts.zip
+Downloaded 2026-11-09. CC0 / public domain. Original readme: XELU-LICENSE.txt.
+The original PNGs are included here; the native UI atlas resizes them to 48px.
+These are third-party controller illustrations, not an endorsement by Microsoft.

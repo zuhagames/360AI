@@ -1,6 +1,6 @@
 param(
   [ValidatePattern('^\d+\.\d+(?:\.\d+)?$')]
-  [string]$Version = '1.5'
+  [string]$Version = '2.0'
 )
 $ErrorActionPreference = 'Stop'
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
@@ -24,7 +24,7 @@ foreach($model in $modelFiles){Copy-Item -LiteralPath (Join-Path $projectRoot ('
   foreach ($name in @('NOTICE', 'GEMMA_TERMS.txt', 'GEMMA_POLICY.txt', 'MODEL_INFO.txt','APACHE-2.0.txt','SMOLLM2_INFO.txt','TINYSTORIES_LICENSE.txt','TINYSTORIES_INFO.txt')) {
   Copy-Item -LiteralPath (Join-Path $projectRoot "release\model-notices\$name") -Destination (Join-Path $usbDirectory $name)
 }
-foreach ($name in @('START_HERE.txt', 'CHANGELOG.txt', 'CREDITS.txt','MODELS.txt')) {
+foreach ($name in @('START_HERE.txt', 'CHANGELOG.txt', 'CREDITS.txt','MODELS.txt','ASSISTANT.txt','assistant-rules.example.json','INPUT_ICONS.txt')) {
   Copy-Item -LiteralPath (Join-Path $projectRoot "release\$name") -Destination (Join-Path $usbDirectory $name)
 }
 Copy-Item -LiteralPath (Join-Path $projectRoot 'release/models.json') -Destination (Join-Path $usbDirectory 'models.json')
@@ -37,7 +37,7 @@ Compress-Archive -LiteralPath $usbDirectory -DestinationPath $usbZip -Force
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead($usbZip)
 try {
-  $expected = @('360AI/360AI.xex', '360AI/START_HERE.txt', '360AI/CHANGELOG.txt', '360AI/CREDITS.txt')
+  $expected = @('360AI/360AI.xex', '360AI/START_HERE.txt', '360AI/CHANGELOG.txt', '360AI/CREDITS.txt','360AI/ASSISTANT.txt','360AI/assistant-rules.example.json','360AI/INPUT_ICONS.txt')
   $expected += @($modelFiles | ForEach-Object {'360AI/'+$_.filename})
   $expected += @('360AI/NOTICE', '360AI/GEMMA_TERMS.txt', '360AI/GEMMA_POLICY.txt', '360AI/MODEL_INFO.txt','360AI/APACHE-2.0.txt','360AI/SMOLLM2_INFO.txt','360AI/TINYSTORIES_LICENSE.txt','360AI/TINYSTORIES_INFO.txt','360AI/MODELS.txt','360AI/models.json','360AI/Download-Models.ps1')
   $actual = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })

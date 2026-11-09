@@ -1,14 +1,21 @@
-360AI 1.5 - Xbox 360 USB package
+360AI 2.0 - Xbox 360 USB package
 ================================
 
 INSTALL
+Launch 360AI.xex to open Home. Select Assistant for immediate predefined
+replies, Notes/Timers for controller tools, or Models for GGUF chat.
+On Home, X opens input and Y opens Quick tools. Say hello or type help.
+360 Assistant handles calculations, conversions, notes, session timers and
+taught answers. Search/edit notes, pause/resume timers and undo data changes.
+This mode uses text, not voice. It works even with no GGUF files installed.
+
 1. Extract the ZIP on your PC.
 2. Copy the entire 360AI folder to your USB drive.
 3. Gemma 3 270M, SmolLM2 135M and two TinyStories toys are included.
    No separate download is needed for these models.
 4. Safely eject the USB, connect it to your modded Xbox 360, and open
    the 360AI folder with your existing XEX launcher (Aurora/XEXMenu).
-5. Launch 360AI.xex, select an included GGUF and choose Load model.
+5. For model chat, open Models, select an included GGUF and choose Load model.
    Leave Compute backend and Weight storage on Auto. Auto selects RAM
    when the model and working memory fit, and benchmarks CPU/GPU.
    SmolLM2 135M is a good starting point for responsive local chat.
@@ -22,6 +29,8 @@ Example USB layout:
   USB:/360AI/START_HERE.txt
   USB:/360AI/CHANGELOG.txt
   USB:/360AI/CREDITS.txt
+  USB:/360AI/ASSISTANT.txt
+  USB:/360AI/assistant-rules.example.json
 
 The folder can also be copied to your Xbox HDD. Keep the GGUF beside
 the executable. No SDK, Visual Studio, Node.js or separate shader files
@@ -85,7 +94,11 @@ Scrolling up pauses automatic following, including while a reply streams.
 Scroll to the bottom or click right stick to follow new text again.
 X: start a new conversation without reloading the model (when idle).
 START: save the current conversation to 360AI-chat.txt (when idle).
-Y: stop a running console reply. B: return to the model list.
+Y: Quick tools in Assistant, or stop a running model reply.
+B: Home from Assistant; model list from model chat; Home from model list.
+Notes/Timers have dedicated controller controls; see ASSISTANT.txt.
+Assistant data saves in the background. Wait for Saved before closing after
+an edit. Not saved means the data is still in memory; check drive write access.
 Saving a conversation replaces the previous export; nothing is exported
 automatically. The model and weight files stay loaded for a new chat.
 If an API request is running, new chat reports busy instead of waiting.

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "phrases": ["assistant setup", "keyword assistant setup", "setup"],
+      "response": "Press X on the model list to open 360 Assistant. It works with no GGUF files. Press A to enter text, then type help. B returns to models. Notes and your name save in 360AI-assistant.json; timers are session-only."
+    },
+    {
+      "phrases": ["customize assistant", "customise assistant", "custom rules"],
+      "response": "Copy assistant-rules.example.json to assistant-rules.json beside 360AI.xex, edit it and restart. Each rule has phrases and a text response. Use up to 64 rules, 8 phrases per rule and 2000 bytes per response. These rules supply answers only; they cannot execute commands. Updates ship the example and preserve your custom file."
+    },
+    {
+      "phrases": ["controller cleaning", "clean the controller"],
+      "response": "For a local reminder, type remember to clean the controller. For a timed alert, type remind me in 10 minutes to clean the controller. Keep 360AI open for timer alerts."
+    }
+  ]
+}
