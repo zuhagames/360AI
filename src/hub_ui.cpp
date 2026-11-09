@@ -7,7 +7,7 @@ static bool selected_ready(const HubView& v,int selected){if(v.state!=HS_DONE ||
   return gx_hub_local_name(v.model,v.choices[selected],v.choices[selected].files[0])==v.installed;}
 void App::open_hub(){screen_=AS_HUB;hub_confirm_=false;
 #ifdef _XBOX
-  if(hub_view_.state==HS_IDLE) hub_.search(hub_query_);
+  if(hub_view_.state==HS_IDLE){if(gx_hub_id(hub_query_.text)){HubModel m;m.id=hub_query_.text;hub_.details(m);}else hub_.search(hub_query_);}
 #endif
 }
 void App::hub_frame(){

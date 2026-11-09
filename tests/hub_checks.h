@@ -2,7 +2,10 @@
 #include <direct.h>
 static std::string hub_payload;static int hub_mode=0,hub_requests=0;
 static bool fake_hub_download(const std::string&,GxHttpSink sink,void* user,std::string& error,std::string*){
-  ++hub_requests;if(hub_mode==2){size_t first=hub_payload.size()/2;sink(hub_payload.data(),first,user);((ModelHub*)user)->cancel();error="cancelled";return false;}return sink(hub_payload.data(),hub_payload.size(),user);
+  ++hub_requests;if(hub_mode==2){size_t first=hub_payload.size()/2;sink(hub_payload.data(),first,user);((ModelHub*)user)->cancel();error="cancelled";return false;}
+  if(hub_mode==5){size_t half=hub_payload.size()/2;if(!sink(hub_payload.data(),half,user)) return false;gx_sleep_ms(600);HubView progress;((ModelHub*)user)->view(progress);
+    assert(progress.transferring && progress.received==half && progress.bytes_per_second>0);return sink(hub_payload.data()+half,hub_payload.size()-half,user);}
+  return sink(hub_payload.data(),hub_payload.size(),user);
 }
 static void wait_hub(ModelHub& hub,HubView& view){double until=gx_time_seconds()+10;do {hub.view(view);if(view.state==HS_DONE || view.state==HS_ERROR || view.state==HS_MODELS || view.state==HS_FILES) break;gx_sleep_ms(5);}while(gx_time_seconds()<until);hub.stop();hub.view(view);}
 static Json hub_model(const char* id,const char* arch,double parameters){Json j=Json::object();j["id"]=Json(id);j["sha"]=Json(std::string(40,'a'));j["pipeline_tag"]=Json("text-generation");j["gated"]=Json::boolean(false);j["private"]=Json::boolean(false);j["gguf"]=Json::object();j["gguf"]["architecture"]=Json(arch);j["gguf"]["total"]=Json(parameters);return j;}
@@ -58,12 +61,12 @@ static void hub_checks(){
   std::string bad="GGUF";const u32 version=3;const u64 zero=0,one=1,big=0x40000000;bad.append((const char*)&version,4);bad.append((const char*)&zero,8);bad.append((const char*)&one,8);bad.append((const char*)&big,8);
   assert(gx_write_text_file("build/tests/hostile-metadata.gguf",bad));GGUF gg;assert(!gg.load("build/tests/hostile-metadata.gguf"));
   assert(gx_read_text_file("build/tests/qwen2.gguf",hub_payload,1024*1024));std::string valid_payload=hub_payload;
-  for(int mode=0;mode<5;++mode){hub_mode=mode;hub_payload=valid_payload;if(mode==3) hub_payload.replace(0,4,"NOPE");
+  for(int mode=0;mode<6;++mode){hub_mode=mode;hub_payload=valid_payload;if(mode==3) hub_payload.replace(0,4,"NOPE");
     HubChoice c;c.name="tiny-Q4.gguf";c.downloadable=true;HubFile file;file.path=c.name;file.bytes=hub_payload.size();file.sha256=mode==1 ? std::string(64,'0') : gx_sha256(hub_payload.data(),hub_payload.size());c.files.push_back(file);c.bytes=file.bytes;
     char folder[100];snprintf(folder,sizeof(folder),"build/tests/hub-failure-%d",mode);_mkdir(folder);std::string dir=folder,dest=dir+"/"+gx_hub_local_name(expected,c,file);remove(dest.c_str());remove((dest+".part").c_str());assert(gx_write_text_file((dir+"/private.gguf").c_str(),"private model"));if(mode==4) assert(gx_write_text_file(dest.c_str(),"existing file"));
-    ModelHub worker;worker.test_transport(fake_hub_download);hub_requests=0;assert(worker.download(dir,expected,c));HubView view;wait_hub(worker,view);assert(view.state==(mode==0 ? HS_DONE : HS_ERROR));
+    ModelHub worker;worker.test_transport(fake_hub_download);hub_requests=0;assert(worker.download(dir,expected,c));HubView view;wait_hub(worker,view);assert(view.state==((mode==0 || mode==5) ? HS_DONE : HS_ERROR) && !view.transferring);
     std::string text;assert(gx_read_text_file((dir+"/private.gguf").c_str(),text,64) && text=="private model");
-    if(mode==0){assert(gx_file_sha256(dest,hash,file.bytes) && hash==file.sha256);hub_requests=0;assert(worker.download(dir,expected,c));wait_hub(worker,view);assert(view.state==HS_DONE && hub_requests==0);}
+    if(mode==0 || mode==5){assert(gx_file_sha256(dest,hash,file.bytes) && hash==file.sha256);hub_requests=0;assert(worker.download(dir,expected,c));wait_hub(worker,view);assert(view.state==HS_DONE && hub_requests==0 && view.bytes_per_second==0);}
     else if(mode==4) assert(gx_read_text_file(dest.c_str(),text,64) && text=="existing file");
     else {FILE* check=fopen(dest.c_str(),"rb");assert(!check);check=fopen((dest+".part").c_str(),"rb");assert(!check);}
   }
@@ -74,5 +77,5 @@ static void hub_checks(){
   app.test_hub_data(ui);tap(app,GX_BTN_A);assert(app.test_hub_confirmation());tap(app,GX_BTN_B);assert(!app.test_hub_confirmation() && app.test_screen()==AS_HUB);
   tap(app,GX_BTN_DDOWN|GX_BTN_A);assert(app.test_hub_confirmation());tap(app,GX_BTN_B);
   ui.state=HS_DONE;ui.installed=gx_hub_local_name(ui.model,ui.choices[0],ui.choices[0].files[0]);app.test_hub_data(ui);tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_A);assert(app.test_hub_confirmation());tap(app,GX_BTN_B);gxui_shutdown();
-  std::cout<<"2.2 Hub: filters, size labels, SHA metadata, shard grouping, FATX names, unsupported models, cancel hashing, disk checks, bounded GGUF metadata and controller navigation passed\n";
+  std::cout<<"2.3 Hub: cached paging/eviction/recovery, family presets, progress/rate, local sorting, filters, SHA metadata, shards, FATX names, cancel hashing and controller navigation passed\n";
 }
