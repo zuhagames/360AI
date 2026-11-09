@@ -1,4 +1,4 @@
-HUGGING FACE MODEL LIBRARY - 360AI 2.2
+HUGGING FACE MODEL LIBRARY - 360AI 2.3
 
 Open Models and press Y, or type find models in Assistant.
 
@@ -6,7 +6,14 @@ SEARCH
 X: search a model name, or enter an exact owner/repository.
 Y: maximum parameters - 200M / 500M / 1B / 3B / Any.
 LB: candidate families / all families. RB: next search page.
+D-pad Left: previous cached page. D-pad Right also opens the next page.
+START: cycle SmolLM2, TinyStories, Qwen2.5, Llama and Gemma search presets.
+Presets choose Candidates and a 200M or 1B parameter limit; these are search
+shortcuts, not promises of model compatibility or speed.
 A: inspect files. B: Local models.
+Your search, parameter limit and candidate filter are saved with settings.
+The last eight search pages are cached in RAM until the query/filter changes
+or the app closes. Back/forward through cached pages needs no new request.
 GGUF and text-generation filters are always applied to name searches.
 Parameter filters use Hub GGUF metadata on each page. Unknown counts are
 excluded unless Any is selected. Direct repository entry bypasses name filters.
@@ -27,6 +34,10 @@ Only public, ungated repositories are supported. License metadata is displayed;
 check the model card on Hugging Face for complete terms before using weights.
 
 DOWNLOADS
+Progress includes percentage, average network speed and estimated time left.
+Estimates appear after a transfer sample and exclude local verification time.
+They are approximate; source throttling, disk writes and checks affect waiting.
+100% received still needs SHA-256 and GGUF checks before the model is ready.
 Files are pinned to a repository revision, streamed to disk, checked against
 LFS SHA-256 metadata and inspected for supported GGUF architecture/tensor types.
 No model scripts or remote code are executed. The local loader still performs
@@ -53,3 +64,8 @@ DashLaunch blocking and Hugging Face rate limits may prevent a request.
 There is no PC bridge or browser requirement. Existing offline models and
 assistant tools remain available. Physical Xbox networking/large downloads
 and new-model inference need hardware validation.
+
+LOCAL MODELS
+Models starts in smallest-first order. LB switches to name sorting and back.
+Your selected model stays selected while sorting; the sort preference is saved.
+This helps find smaller files, but file size alone does not predict inference speed.
