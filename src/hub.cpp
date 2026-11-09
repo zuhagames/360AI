@@ -136,7 +136,9 @@ void ModelHub::fetch(){
     gx_mutex_lock(mutex_);data_.model=model;data_.choices=choices;++data_.revision;gx_mutex_unlock(mutex_);set(HS_FILES,choices.empty() ? "No downloadable GGUF files were found in this repository." : "Choose a quantization. All shards are downloaded together.");}
 }
 void ModelHub::transfer(){
-  u64 free=0;if(!gx_disk_free(directory_.c_str(),free) || free<choice_.bytes+32u*1024u*1024u){set(HS_ERROR,"Not enough free disk space, or free space could not be checked. Reserve package size plus 32 MB.");return;}
+  u64 needed=0;for(size_t i=0;i<choice_.files.size();++i){std::string dest=at(directory_,gx_hub_local_name(model_,choice_,choice_.files[i]));if(!exists(dest)) needed+=choice_.files[i].bytes;
+    std::string partial=dest+".part";if(exists(partial) && remove(partial.c_str())!=0){set(HS_ERROR,"Could not replace the interrupted partial download. Check the drive.");return;}}
+  u64 free=0;if(!gx_disk_free(directory_.c_str(),free) || free<needed+32u*1024u*1024u){set(HS_ERROR,"Not enough free disk space, or free space could not be checked. Reserve package size plus 32 MB.");return;}
   std::vector<std::string> created;std::string error,part;bool ok=true;
   // Promote shard 1 last so the local model browser cannot open partial groups.
   for(size_t step=0;step<choice_.files.size() && ok;++step){size_t i=choice_.files.size()==1 ? 0 : (step+1)%choice_.files.size();const HubFile& f=choice_.files[i];std::string dest=at(directory_,gx_hub_local_name(model_,choice_,f));part=dest+".part";std::string hash;
@@ -157,5 +159,9 @@ void ModelHub::transfer(){
   }
   if(!ok || cancelled(this)){for(size_t i=0;i<created.size();++i) remove(created[i].c_str());set(HS_ERROR,cancelled(this) ? "Download cancelled. Existing models were kept." : error);return;}
   gx_mutex_lock(mutex_);data_.installed=gx_hub_local_name(model_,choice_,choice_.files[0]);gx_mutex_unlock(mutex_);
-  set(HS_DONE,"Downloaded and checked. Open it in Local models; memory/tokenizer checks still apply at load time.");
+  Json receipt=Json::object();receipt["repository"]=Json(model_.id);receipt["revision"]=Json(model_.revision);receipt["license"]=Json(model_.license);receipt["files"]=Json::array();
+  for(size_t i=0;i<choice_.files.size();++i){Json f=Json::object();f["source"]=Json(choice_.files[i].path);f["local"]=Json(gx_hub_local_name(model_,choice_,choice_.files[i]));f["sha256"]=Json(choice_.files[i].sha256);receipt["files"].items.push_back(f);}
+  std::string key=model_.id+"@"+model_.revision+":"+choice_.name;std::string note=at(directory_,"HF-"+gx_sha256(key.data(),key.size()).substr(0,16)+".json");
+  bool recorded=exists(note) || gx_write_text_file(note.c_str(),receipt.dump()+"\n");
+  set(HS_DONE,recorded ? "Downloaded and checked. Source receipt saved. Memory/tokenizer checks still apply when loading." : "Model downloaded and checked, but the source receipt could not be saved.");
 }

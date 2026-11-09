@@ -19,7 +19,8 @@ void App::hub_frame(){
     for(int i=start;i<(int)choices.size() && i<start+7;++i){const HubChoice& c=choices[i];f32 y=212+(i-start)*43;bool selected=i==hub_file_sel_;gxui_fill(64,y,1152,39,selected ? GX_INK : GX_PANEL);
       size_t slash=c.name.find_last_of('/');std::string name=c.name.substr(slash==std::string::npos ? 0 : slash+1);gxui_label(80,y+7,selected ? GX_PANEL : GX_INK,short_hub(name,55).c_str(),.70f);
       char size[40];snprintf(size,sizeof(size),"%.1f MB",c.bytes/1000000.0);gxui_label(825,y+9,selected ? GX_PANEL : GX_MUTED,size,.60f);
-      gxui_label(1004,y+9,c.downloadable ? (selected ? GX_ACCENT : gx_hub_size_color(c.bytes)) : GX_MUTED,c.downloadable ? gx_hub_size_label(c.bytes) : "UNSUPPORTED",.57f);
+      u32 size_color=selected ? (c.bytes<200000000 ? GX_ACCENT : (c.bytes<300000000 ? GXRGB(247,199,70) : GXRGB(255,167,104))) : gx_hub_size_color(c.bytes);
+      gxui_label(1004,y+9,c.downloadable ? size_color : GX_MUTED,c.downloadable ? gx_hub_size_label(c.bytes) : "UNSUPPORTED",.57f);
     }
     if(!choices.empty()){const HubChoice& c=choices[hub_file_sel_];char disk[140];snprintf(disk,sizeof(disk),"Needs %.2f GB free / %u file(s) / %s",(c.bytes+32u*1024u*1024u)/1e9,(unsigned)c.files.size(),c.bytes>=300000000 ? "HDD/USB stream recommended" : "RAM candidate");gxui_label(64,528,GX_MUTED,disk,.70f);hub_lines(64,562,c.reason,103,2,GX_MUTED);}
     if(!busy && !hub_confirm_){if(p&GX_BTN_DUP) --hub_file_sel_;if(p&GX_BTN_DDOWN) ++hub_file_sel_;hub_file_sel_=GX_CLAMP(hub_file_sel_,0,GX_MAX(0,(int)choices.size()-1));
