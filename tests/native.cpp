@@ -393,7 +393,8 @@ int main(int argc,char** argv){
   gx_set_debug_level(GX_DEBUG_NONE);
   if(argc>2 && std::string(argv[1])=="--https-check"){
     std::string body,error;struct Collect{static bool append(const void* data,size_t n,void* user){((std::string*)user)->append((const char*)data,n);return true;}};
-    if(!gx_https_get(argv[2],262144,Collect::append,&body,0,error)){std::cerr<<error<<std::endl;return 2;}
+    if(!gx_https_get(argv[2],argc>3 ? 16u*1024u*1024u : 262144u,Collect::append,&body,0,error)){std::cerr<<error<<std::endl;return 2;}
+    if(argc>3){if(!gx_write_text_file(argv[3],body)) return 4;std::cout<<"HTTPS download OK: "<<body.size()<<" bytes, SHA256="<<gx_sha256(body.data(),body.size())<<std::endl;return 0;}
     Json j;if(!Json::parse(body,j)){std::cerr<<"Invalid JSON body"<<std::endl;return 3;}std::cout<<"HTTPS OK: "<<body.size()<<" bytes, tag="<<j.get("tag_name").text<<std::endl;return 0;
   }
   if(argc>2 && std::string(argv[1])=="--update-package"){
