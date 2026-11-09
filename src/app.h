@@ -72,6 +72,7 @@ public:
   bool test_hub_confirmation() const {return hub_confirm_;}
   std::string test_model_name(int i) const {return files_[i].name;}
   int test_model_selection() const {return file_sel_;}
+  void test_add_model(const char* name,u64 bytes){gx_file_entry f;f.name=name;f.size=bytes;files_.push_back(f);}
 #endif
 
 private:

@@ -71,7 +71,8 @@ static void hub_checks(){
     else {FILE* check=fopen(dest.c_str(),"rb");assert(!check);check=fopen((dest+".part").c_str(),"rb");assert(!check);}
   }
   assert(gxui_init());App app;app.test_seed();tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_DRIGHT);tap(app,GX_BTN_A);assert(app.test_screen()==AS_BROWSE);
-  tap(app,GX_BTN_LB);assert(app.test_model_name(0)=="SmolLM2-135M-Instruct-Q8_0.gguf");tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_LB);assert(app.test_model_selection()==1 && app.test_model_name(1)=="gemma-3-270m-it-Q8_0.gguf");
+  app.test_add_model("A-heavy.gguf",600000000);tap(app,GX_BTN_LB);assert(app.test_model_name(0)=="A-heavy.gguf" && app.test_model_selection()==1);
+  tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_LB);assert(app.test_model_selection()==1 && app.test_model_name(1)=="gemma-3-270m-it-Q8_0.gguf" && app.test_model_name(2)=="A-heavy.gguf");
   tap(app,GX_BTN_Y);assert(app.test_screen()==AS_HUB);tap(app,GX_BTN_B);assert(app.test_screen()==AS_BROWSE);
   HubView ui;ui.state=HS_FILES;ui.revision=99;ui.model=expected;HubChoice pick;pick.name="small.gguf";pick.downloadable=true;HubFile f;f.path=pick.name;f.bytes=1024;pick.files.push_back(f);pick.bytes=1024;ui.choices.push_back(pick);pick.name="other.gguf";pick.files[0].path=pick.name;ui.choices.push_back(pick);
   app.test_hub_data(ui);tap(app,GX_BTN_A);assert(app.test_hub_confirmation());tap(app,GX_BTN_B);assert(!app.test_hub_confirmation() && app.test_screen()==AS_HUB);
