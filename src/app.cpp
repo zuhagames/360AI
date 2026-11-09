@@ -462,6 +462,7 @@ void App::assistant_send(const std::string& text){
   } else if(reply.action==AA_EXPORT){export_chat();reply.text=chat_notice_;}
   else if(reply.action==AA_CLEAR_CHAT) new_chat();
   else if(reply.action==AA_MODELS){assistant_mode_=false;chat_log_.clear();turns_.clear();chat_view_=ChatView();screen_=AS_BROWSE;return;}
+  else if(reply.action==AA_UPDATES) screen_=AS_UPDATES;
   queue_assistant_save();
   append_chat("Assistant: ",reply.text);
   if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}

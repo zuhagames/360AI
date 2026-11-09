@@ -3,6 +3,8 @@
 static Json fixture_json(const std::string& file){std::string text;Json j;assert(gx_read_text_file(file.c_str(),text,8192) && Json::parse(text,j));return j;}
 static UpdateRelease fixture_release(const std::string& directory){Json j=fixture_json(directory+"/fixture.json");UpdateRelease r;r.version="99.0";r.size=(size_t)j.get("size").number;r.sha256=j.get("sha256").text;return r;}
 static void updater_checks(){
+  Assistant assistant;AssistantContext context;assistant.respond("remember",context);assert(assistant.respond("check for updates",context).action==AA_UPDATES && assistant.note_count()==0);
+  assistant.respond("delete all notes",context);assert(assistant.respond("open updates",context).action==AA_UPDATES);assert(assistant.respond("yes",context).action==AA_NONE);
   assert(gx_sha256("abc",3)=="ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   std::string host,url;assert(gx_https_url("https://api.github.com/repos/zuhagames/360AI/releases/latest",host,url));
   const char* rejected[]={"http://github.com/x","https://github.com.evil/x","https://github.com@evil/x","https://github.com:443/x","https://github.com\\evil/x","https://api.github.com/x\r\nInjected: header","https://127.0.0.1/x","https://github.com/x#fragment","https://evil.test/x"};
