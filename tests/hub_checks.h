@@ -16,6 +16,10 @@ static bool fake_hub_search(const std::string&,GxHttpSink sink,void* user,std::s
   std::string body=rows.dump();return sink(body.data(),body.size(),user);
 }
 static void hub_checks(){
+  {HubView v;assert(gx_hub_progress(v).empty());v.total=100000000;v.received=25000000;v.transferring=true;v.bytes_per_second=1000000;
+    std::string progress=gx_hub_progress(v);assert(progress.find("25%")!=std::string::npos && progress.find("1000 KB/s")!=std::string::npos && progress.find("~2m left")!=std::string::npos);
+    v.bytes_per_second=0;assert(gx_hub_progress(v).find("left")==std::string::npos);v.bytes_per_second=1000000;v.transferring=false;assert(gx_hub_progress(v).find("KB/s")==std::string::npos);
+    v.transferring=true;v.received=v.total;assert(gx_hub_progress(v).find("left")==std::string::npos);}
   {HubQuery q;gx_hub_next_preset(q);assert(q.text=="TinyStories" && q.max_parameters==200000000 && q.supported_only);gx_hub_next_preset(q);assert(q.text=="Qwen2.5" && q.max_parameters==1000000000);
     q.text="custom";q.supported_only=false;gx_hub_next_preset(q);assert(q.text=="SmolLM2" && q.supported_only);}
   {ModelHub worker;worker.test_transport(fake_hub_search);HubQuery q;HubView v;hub_requests=search_page=0;search_error=false;

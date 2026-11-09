@@ -53,7 +53,8 @@ void App::hub_frame(){
   }
   if(hub_files_ && (busy || hub_view_.state==HS_ERROR || hub_view_.state==HS_DONE)) {gxui_fill(64,562,1152,64,GX_PAPER);hub_lines(64,562,hub_view_.message,103,2,GX_MUTED);}
   if(busy){gxui_fill(64,594,1152,32,GX_INK);std::string text=hub_view_.message;
-    if(hub_view_.total){char progress[80];snprintf(progress,sizeof(progress),"%.1f / %.1f MB",hub_view_.received/1e6,hub_view_.total/1e6);text=progress+std::string(" / ")+text;}
+    if(hub_view_.total) text=gx_hub_progress(hub_view_)+" / "+text;
+    if(hub_view_.total){f32 fraction=GX_CLAMP((f32)((double)hub_view_.received/hub_view_.total),0.0f,1.0f);gxui_fill(64,632,1152,5,GX_PANEL);gxui_fill(64,632,1152*fraction,5,GX_ACCENT);}
     gxui_label(80,596,GX_PANEL,short_hub(text,92).c_str(),.65f);gxui_fill(64,650,1152,54,GX_PAPER);gxui_prompt(64,658,GX_BTN_X,"Cancel request");gxui_prompt(1010,658,GX_BTN_B,"Back");if(p&GX_BTN_X) hub_.cancel();}
   if(hub_confirm_ && !hub_view_.choices.empty()) {const HubChoice& c=hub_view_.choices[hub_file_sel_];gxui_fill(236,224,808,288,GX_INK);gxui_label(268,250,GX_PANEL,"Download this model?",1.1f);
     hub_lines(268,316,"Check the model's license on Hugging Face before use. File-size labels are estimates; disk streaming is slow and still needs RAM.",64,4,GX_PANEL);gxui_prompt(268,454,GX_BTN_A,"Download",GX_PANEL);gxui_prompt(734,454,GX_BTN_B,"Keep browsing",GX_PANEL);
