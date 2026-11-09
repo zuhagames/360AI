@@ -1,0 +1,55 @@
+HUGGING FACE MODEL LIBRARY - 360AI 2.2
+
+Open Models and press Y, or type find models in Assistant.
+
+SEARCH
+X: search a model name, or enter an exact owner/repository.
+Y: maximum parameters - 200M / 500M / 1B / 3B / Any.
+LB: candidate families / all families. RB: next search page.
+A: inspect files. B: Local models.
+GGUF and text-generation filters are always applied to name searches.
+Parameter filters use Hub GGUF metadata on each page. Unknown counts are
+excluded unless Any is selected. Direct repository entry bypasses name filters.
+
+FILES
+Choose a quantization with the D-pad. Split GGUF shards are grouped together.
+Under 200 MB: Comfortable (green).
+200 MB to below 300 MB: Tight (yellow).
+300 MB or more: Disk stream (orange).
+These are decimal file-size guides, not guaranteed RAM fit or performance.
+Architecture/tensor support, tokenizer, KV cache and activations also matter.
+Free space to reserve is package size plus 32 MiB.
+
+A opens a download summary; A again downloads. X cancels active requests.
+After a successful download, A on that file selects it for model setup.
+Larger packages select HDD/USB streaming. B returns to the results.
+Only public, ungated repositories are supported. License metadata is displayed;
+check the model card on Hugging Face for complete terms before using weights.
+
+DOWNLOADS
+Files are pinned to a repository revision, streamed to disk, checked against
+LFS SHA-256 metadata and inspected for supported GGUF architecture/tensor types.
+No model scripts or remote code are executed. The local loader still performs
+tokenizer and memory checks; a completed download can fail those later checks.
+An HF-*.json receipt records the source/revision/file names/checksums.
+Downloaded names are shortened and source-hashed to fit FATX and avoid clashes.
+
+All shards must be present. Each file must be smaller than 4 GiB; the combined
+package limit is 32 GiB. Prefer split files for models larger than the file limit.
+Shard 1 appears last. Existing matching shards can be reused. Mismatched files
+are left in place; failed/cancelled downloads remove only newly created files.
+Interrupted .part files can be replaced by retrying the same model.
+
+DISK STREAMING
+The existing 8 MiB weight cache reads weights from HDD/USB. Tokenizer, working
+memory and KV cache still need RAM. Huge models are extremely slow and can fail
+memory checks. Enough disk space does not make every model runnable.
+Compatible dense Llama/SmolLM2, Qwen2/2.5 and Gemma 2/3 GGUFs are candidates.
+GLM/MoE, unsupported architectures and unsupported quantizations remain unsupported.
+
+NETWORK
+Requires Internet/DNS access and a correct console clock for HTTPS. Router or
+DashLaunch blocking and Hugging Face rate limits may prevent a request.
+There is no PC bridge or browser requirement. Existing offline models and
+assistant tools remain available. Physical Xbox networking/large downloads
+and new-model inference need hardware validation.

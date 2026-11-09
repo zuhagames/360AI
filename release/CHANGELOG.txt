@@ -1,3 +1,23 @@
+360AI 2.2 - A model library on your Xbox
+======================================
+
+- Search Hugging Face GGUF text-generation models from Models > Y.
+- Parameter limits (200M, 500M, 1B, 3B, Any), family filters and next-page browsing.
+- Inspect quantizations, total shard size, license metadata and free-space requirements.
+- Comfortable (<200 MB, green), Tight (200-300 MB, yellow), Disk stream (>=300 MB, orange).
+- Candidate compatibility is separate from file size; unsupported architectures/IQ formats are marked.
+- Pinned revisions, SHA-256 on disk, strict local paths and FATX-safe filenames.
+- Split downloads promote shard 1 last; existing verified shards can be reused.
+- Cancellation removes new partial files and keeps pre-existing models.
+- Validate GGUF metadata/architecture/tensor types before exposing a completed download.
+- Bound metadata allocations before reading unknown GGUF files.
+- Source receipts retain repository, revision, file names, license label and hashes.
+- Select a downloaded model directly; larger files choose HDD streaming in setup.
+- Type find models in Assistant to open the library.
+- Disk streaming is not universal model support; RAM/tokenizer/load limits still apply.
+- Live host HTTPS search/TinyStories download and offline failure/regression tests pass.
+- Physical Xbox TLS, large downloads, FATX and inference still require hardware testing.
+
 360AI 2.1 - Updates on your Xbox
 ==============================
 
