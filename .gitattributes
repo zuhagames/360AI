@@ -1,0 +1,2 @@
+third_party/bearssl/** -text
+src/trust_anchors.h text eol=lf
