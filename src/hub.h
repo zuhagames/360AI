@@ -2,6 +2,7 @@
 #define GX_MODEL_HUB_H
 #include "platform.h"
 #include "json.h"
+#include "https.h"
 struct HubModel {std::string id,revision,architecture,license;u64 parameters;bool gated;HubModel():parameters(0),gated(false){}};
 struct HubFile {std::string path,sha256;u64 bytes;HubFile():bytes(0){}};
 struct HubChoice {std::string name,reason;std::vector<HubFile> files;u64 bytes;bool downloadable;HubChoice():bytes(0),downloadable(false){}};
@@ -31,11 +32,17 @@ public:
   void cancel();void stop();void view(HubView&);
 #ifndef _XBOX
   void test_view(const HubView& data){gx_mutex_lock(mutex_);data_=data;++data_.revision;gx_mutex_unlock(mutex_);}
+  typedef bool (*TestTransport)(const std::string&,GxHttpSink,void*,std::string&);
+  void test_transport(TestTransport fn){test_transport_=fn;}
 #endif
 private:
   gx_mutex_t mutex_;gx_thread_t thread_;bool busy_,cancel_;int job_;
   HubView data_;HubQuery query_;HubModel model_;HubChoice choice_;std::string url_,directory_,body_;FILE* output_;u64 file_bytes_;
   bool begin(int);void set(HubState,const std::string&);void work();void fetch();void transfer();
+  bool request(const std::string&,u64,std::string&,std::string* next=0);
+#ifndef _XBOX
+  TestTransport test_transport_;
+#endif
   static void entry(void*);static bool sink(const void*,size_t,void*);static bool cancelled(void*);
 };
 #endif

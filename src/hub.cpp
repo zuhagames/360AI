@@ -58,7 +58,7 @@ bool gx_hub_details(const std::string& text,const HubModel& expected,HubModel& m
     if(split && c.files.size()!=count){c.reason="Incomplete split model; all shards are required.";c.downloadable=false;}
     for(size_t f=0;f<c.files.size();++f){c.bytes+=c.files[f].bytes;if(c.files[f].bytes>0xfffffffeull){c.reason="A shard exceeds the Xbox/FAT32 file limit. Find smaller shards.";c.downloadable=false;}if(c.files[f].sha256.empty()){c.reason="No LFS SHA-256 checksum; download unavailable.";c.downloadable=false;}}
     if(!model.architecture.empty() && !gx_hub_supported(model.architecture)){c.reason="Unsupported architecture: "+model.architecture;c.downloadable=false;}
-    std::string name=lower(c.name);if(name.find("iq")!=std::string::npos || name.find("bf16")!=std::string::npos || name.find("tq")!=std::string::npos || name.find("mxfp")!=std::string::npos || name.find("q1_")!=std::string::npos){c.reason="This quantization is not supported by 360AI.";c.downloadable=false;}
+    std::string name=lower(c.name);if(name.find("-iq")!=std::string::npos || name.find("_iq")!=std::string::npos || name.find("bf16")!=std::string::npos || name.find("-tq")!=std::string::npos || name.find("mxfp")!=std::string::npos || name.find("q1_")!=std::string::npos){c.reason="This quantization is not supported by 360AI.";c.downloadable=false;}
     if(c.bytes>32ull*1024*1024*1024){c.reason="Package exceeds the 32 GB browser download limit.";c.downloadable=false;}
     if(c.downloadable) c.reason=model.architecture.empty() ? "Architecture unknown; the downloaded GGUF will be checked." : "Candidate architecture. GGUF and memory checks still apply.";
     if(out.size()<256) out.push_back(c);
@@ -75,7 +75,11 @@ std::string gx_hub_local_name(const HubModel& m,const HubChoice& c,const HubFile
 }
 static std::string at(const std::string& dir,const std::string& name){return dir+(dir.empty() || dir[dir.size()-1]=='/' || dir[dir.size()-1]=='\\' ? "" : "/")+name;}
 static bool exists(const std::string& p){FILE* f=fopen(p.c_str(),"rb");if(!f) return false;fclose(f);return true;}
-ModelHub::ModelHub():mutex_(gx_mutex_create()),thread_(0),busy_(false),cancel_(false),job_(0),output_(0),file_bytes_(0){data_.revision=1;}
+ModelHub::ModelHub():mutex_(gx_mutex_create()),thread_(0),busy_(false),cancel_(false),job_(0),output_(0),file_bytes_(0){data_.revision=1;
+#ifndef _XBOX
+  test_transport_=0;
+#endif
+}
 ModelHub::~ModelHub(){stop();if(mutex_) gx_mutex_destroy(mutex_);}
 void ModelHub::cancel(){gx_mutex_lock(mutex_);cancel_=true;gx_mutex_unlock(mutex_);}
 void ModelHub::stop(){cancel();if(thread_){gx_thread_join(thread_);thread_=0;}}
@@ -116,8 +120,14 @@ bool ModelHub::sink(const void* data,size_t n,void* p){ModelHub* h=(ModelHub*)p;
   gx_mutex_lock(h->mutex_);h->data_.received+=n;gx_mutex_unlock(h->mutex_);return true;
 }
 void ModelHub::work(){if(job_==3) transfer();else fetch();body_.clear();}
+bool ModelHub::request(const std::string& url,u64 limit,std::string& error,std::string* next){
+#ifndef _XBOX
+  if(test_transport_) return test_transport_(url,sink,this,error);
+#endif
+  return gx_https_get(url,limit,sink,this,cancelled,error,GX_HTTP_HUGGINGFACE,next);
+}
 void ModelHub::fetch(){
-  std::string error,next;if(!gx_https_get(url_,1024*1024,sink,this,cancelled,error,GX_HTTP_HUGGINGFACE,&next)){set(HS_ERROR,cancelled(this) ? "Request cancelled." : error);return;}
+  std::string error,next;if(!request(url_,1024*1024,error,&next)){set(HS_ERROR,cancelled(this) ? "Request cancelled." : error);return;}
   if(job_==1){std::vector<HubModel> models;if(!gx_hub_models(body_,query_,models,error)){set(HS_ERROR,error);return;}
     if(next.find("https://huggingface.co/api/models?")!=0 || next.size()>8192) next.clear();
     gx_mutex_lock(mutex_);data_.models=models;data_.next=next;++data_.revision;gx_mutex_unlock(mutex_);
@@ -134,7 +144,7 @@ void ModelHub::transfer(){
       gx_mutex_lock(mutex_);data_.received+=f.bytes;gx_mutex_unlock(mutex_);continue;}
     if(cancelled(this)){ok=false;break;}set(HS_DOWNLOADING,"Downloading "+f.path.substr(f.path.find_last_of('/')+1));output_=fopen(part.c_str(),"wb");if(!output_){error="Could not create the model download. Check the drive.";ok=false;break;}
     file_bytes_=0;job_=(int)i+10;std::string url="https://huggingface.co/"+gx_hub_encode(model_.id,true)+"/resolve/"+model_.revision+"/"+gx_hub_encode(f.path,true)+"?download=true";
-    ok=gx_https_get(url,f.bytes,sink,this,cancelled,error,GX_HTTP_HUGGINGFACE);if(fflush(output_)!=0) ok=false;if(fclose(output_)!=0) ok=false;output_=0;
+    ok=request(url,f.bytes,error);if(fflush(output_)!=0) ok=false;if(fclose(output_)!=0) ok=false;output_=0;
     if(ok && file_bytes_!=f.bytes){ok=false;error="Model download was truncated.";}
     if(ok){set(HS_DOWNLOADING,"Verifying SHA-256 on disk...");ok=gx_file_sha256(part,hash,f.bytes,cancelled,this) && hash==f.sha256;if(!ok) error="Model checksum failed. The partial download was removed.";}
     if(ok && !cancelled(this)){ok=rename(part.c_str(),dest.c_str())==0;if(ok) created.push_back(dest);else error="Could not finish the model file on this drive.";}else ok=false;
