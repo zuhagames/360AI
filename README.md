@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v2.0/360AI-2.0-USB.zip"><strong>Download 360AI 2.0</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v2.1/360AI-2.1-USB.zip"><strong>Download 360AI 2.1</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
@@ -33,10 +33,12 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-2.0-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.0/360AI-2.0-USB.zip)**.
+1. Download and extract **[360AI-2.1-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.1/360AI-2.1-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
 4. Select **Assistant** for instant replies, or **Models** for GGUF chat. Leave model compute/storage on **Auto**.
+
+Press **START on Home** for Updates. The app checks GitHub on launch; download and restart from this screen to install future app updates. Install the full 2.1 ZIP once to get the updater. [Update help](release/UPDATES.txt).
 
 Requires a console capable of running unsigned XEX files. No separate model download is needed.
 
@@ -59,6 +61,7 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 ## Features
 
 - **360 Assistant:** 106 predefined phrases, calculations, conversions, saved notes, taught answers and timers. No weights needed. [Commands](release/ASSISTANT.txt).
+- GitHub update checks, small verified app downloads and a recovery copy; models and personal files stay in place.
 - Native dashboard, Quick tools, dedicated Notes/Timers screens and Xbox 360 button artwork.
 - Batched text rendering, cached chat layout and background assistant saves.
 - Console chat with controller and on-screen keyboard support.
