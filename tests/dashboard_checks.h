@@ -46,5 +46,6 @@ static void dashboard_checks(){
   tap(app,GX_BTN_Y);tap(app,GX_BTN_A);assert(app.test_assistant().timer_count()==1);
   tap(app,GX_BTN_B);tap(app,GX_BTN_DRIGHT);tap(app,GX_BTN_A);assert(app.test_screen()==AS_BROWSE);
   tap(app,GX_BTN_A);assert(app.test_screen()==AS_SETTINGS);tap(app,GX_BTN_B);assert(app.test_screen()==AS_BROWSE);tap(app,GX_BTN_B);assert(app.test_screen()==AS_HOME);
+  tap(app,GX_BTN_START);assert(app.test_screen()==AS_UPDATES);tap(app,GX_BTN_B);assert(app.test_screen()==AS_HOME);
   gxui_shutdown();std::cout<<"2.0: "<<variants<<" fixed reply variants, literal notes, background persistence and native controller navigation passed\n";
 }
