@@ -11,6 +11,7 @@
 #include <string.h>
 #include <wchar.h>
 #include <time.h>
+#include <algorithm>
 
 static const char* kBrowseDir = "game:";
 static const char* kSettingsPath="game:\\360AI.json";
@@ -25,6 +26,7 @@ AppSettings::AppSettings(){
   server_on = false;
   chat_on = true;
   auto_update = true;
+  models_smallest_first = true;
   backend_mode = 0;
   weight_mode = 0;
   reply_tokens = 48;
@@ -100,6 +102,7 @@ static void utf8_truncate_scroll(const std::string& s, size_t max_chars,
 
 int App::run(){
   settings_.load(kSettingsPath);
+  hub_query_=settings_.hub_query;
   assistant_.load(kAssistantPath);
   if(!assistant_.load_rules("game:\\assistant-rules.json")) assistant_.load_rules("game:\\assistant-rules.example.json");
   gx_set_debug_level(settings_.debug_level);
@@ -137,15 +140,7 @@ void App::refresh_models(){
     }
     files_.push_back(entry);
   }
-  for(size_t i = 0; i + 1 < files_.size(); ++i){
-    for(size_t j = 0; j + 1 - i < files_.size(); ++j){
-      if(files_[j].name > files_[j+1].name){
-        gx_file_entry t = files_[j];
-        files_[j] = files_[j+1];
-        files_[j+1] = t;
-      }
-    }
-  }
+  sort_models();
 
   for(size_t i=0;i<files_.size();++i)
     if(files_[i].name==settings_.last_model){file_sel_=(int)i;break;}
@@ -155,10 +150,16 @@ void App::refresh_models(){
 
 }
 
+static bool model_name_less(const gx_file_entry& a,const gx_file_entry& b){return a.name<b.name;}
+static bool model_size_less(const gx_file_entry& a,const gx_file_entry& b){return a.size==b.size ? a.name<b.name : a.size<b.size;}
+void App::sort_models(){std::string selected=file_sel_>=0 && file_sel_<(int)files_.size() ? files_[file_sel_].name : "";
+  std::sort(files_.begin(),files_.end(),settings_.models_smallest_first ? model_size_less : model_name_less);file_scroll_=0;
+  for(size_t i=0;i<files_.size();++i) if(files_[i].name==selected){file_sel_=(int)i;break;}}
 void App::browse_frame(){
   shell("Models","PICK A MODEL. SET IT UP. MAKE IT YOURS.");
   u32 buttons=gxui_buttons_pressed();if(buttons&GX_BTN_X){open_assistant();return;}
   if(buttons&GX_BTN_Y){open_hub();return;}
+  if(buttons&GX_BTN_LB){settings_.models_smallest_first=!settings_.models_smallest_first;sort_models();save_settings();}
   if(files_.empty()){gxui_label(92,184,GX_INK,"No models on this drive.",1.2f);gxui_label(92,250,GX_MUTED,"Copy a GGUF beside 360AI.xex, or open Assistant.",.85f);}
   else {
     file_sel_=GX_CLAMP(file_sel_,0,(int)files_.size()-1);
@@ -175,6 +176,7 @@ void App::browse_frame(){
     gxui_label(64,576,GX_MUTED,tip,.7f);
   }
   gxui_prompt(64,658,GX_BTN_A,"Set up");gxui_prompt(288,658,GX_BTN_X,"Assistant");gxui_prompt(572,658,GX_BTN_Y,"Get models");gxui_prompt(1010,658,GX_BTN_B,"Home");
+  gxui_prompt(64,612,GX_BTN_LB,settings_.models_smallest_first ? "Sort: smallest first" : "Sort: name");
   if(files_.empty()) return;
   u32 p = gxui_buttons_pressed();
   if(p & GX_BTN_DUP) file_sel_--;
@@ -700,6 +702,7 @@ void App::kb_commit(){
     settings_.repeat_penalty=GX_CLAMP(value,1.0f,1.5f);
   } else if(mode==KB_HUB_SEARCH){
     hub_query_.text=kb_text_.substr(0,96);hub_confirm_=false;hub_files_=false;
+    settings_.hub_query=hub_query_;save_settings();
     if(gx_hub_id(hub_query_.text)){HubModel model;model.id=hub_query_.text;hub_.details(model);}else hub_.search(hub_query_);return;
   } else if(mode == KB_NOTE_NEW || mode == KB_NOTE_EDIT || mode == KB_TIMER_NEW){
     if(!kb_text_.empty()){

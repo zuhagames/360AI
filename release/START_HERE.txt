@@ -1,4 +1,4 @@
-360AI 2.2 - Xbox 360 USB package
+360AI 2.3 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -154,5 +154,8 @@ Search public GGUF text-generation models and inspect their individual files.
 Under 200 MB: Comfortable (green). 200-300 MB: Tight (yellow).
 300 MB or more: Disk stream (orange). These are file-size estimates.
 Use Y for parameter limits, LB for candidate/all families, RB for the next page.
+START cycles family presets; D-pad Left opens a cached previous page.
+Searches/filters are remembered. Downloads show speed and estimated time left.
+Local Models: LB switches smallest-first/name sorting and keeps your selection.
 Downloads check free space, SHA-256 and GGUF architecture/tensor formats.
 HDD streaming still needs RAM and does not enable every model. See MODEL_LIBRARY.txt.

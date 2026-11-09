@@ -7,7 +7,7 @@ static bool selected_ready(const HubView& v,int selected){if(v.state!=HS_DONE ||
   return gx_hub_local_name(v.model,v.choices[selected],v.choices[selected].files[0])==v.installed;}
 void App::open_hub(){screen_=AS_HUB;hub_confirm_=false;
 #ifdef _XBOX
-  if(hub_view_.state==HS_IDLE) hub_.search(hub_query_);
+  if(hub_view_.state==HS_IDLE){if(gx_hub_id(hub_query_.text)){HubModel m;m.id=hub_query_.text;hub_.details(m);}else hub_.search(hub_query_);}
 #endif
 }
 void App::hub_frame(){
@@ -32,23 +32,29 @@ void App::hub_frame(){
     gxui_prompt(64,658,GX_BTN_A,selected_ready(hub_view_,hub_file_sel_) ? "Use model" : "Download");gxui_prompt(1010,658,GX_BTN_B,"Results");
   }else {
     std::string filter="Search: "+hub_query_.text+" / Max: "+(hub_query_.max_parameters ? parameter_label(hub_query_.max_parameters) : "Any")+" / Families: "+(hub_query_.supported_only ? "Candidates" : "All");gxui_label(64,132,GX_INK,short_hub(filter,99).c_str(),.72f);
-    gxui_label(64,170,GX_MUTED,"File sizes appear after opening a repository. Unknown parameter counts are excluded by size filters.",.64f);
+    char page[160];snprintf(page,sizeof(page),"Page %u / D-pad LEFT: previous / START: family preset / Unknown counts hidden by parameter limits.",hub_view_.page);gxui_label(64,170,GX_MUTED,page,.64f);
     hub_sel_=GX_CLAMP(hub_sel_,0,GX_MAX(0,(int)hub_view_.models.size()-1));int start=GX_MAX(0,hub_sel_-6);
     for(int i=start;i<(int)hub_view_.models.size() && i<start+7;++i){const HubModel& m=hub_view_.models[i];f32 y=210+(i-start)*43;bool selected=i==hub_sel_;gxui_fill(64,y,1152,39,selected ? GX_INK : GX_PANEL);
       gxui_label(80,y+7,selected ? GX_PANEL : GX_INK,short_hub(m.id,76).c_str(),.70f);gxui_label(1080,y+9,selected ? GX_ACCENT : GX_MUTED,parameter_label(m.parameters).c_str(),.65f);}
     if(!busy){if(p&GX_BTN_DUP) --hub_sel_;if(p&GX_BTN_DDOWN) ++hub_sel_;hub_sel_=GX_CLAMP(hub_sel_,0,GX_MAX(0,(int)hub_view_.models.size()-1));
       if((p&GX_BTN_A) && !hub_view_.models.empty()) hub_.details(hub_view_.models[hub_sel_]);
-      if(p&GX_BTN_X) kb_open(KB_HUB_SEARCH,"Find a model","Model name or exact owner/repository",hub_query_.text);
-      if(p&GX_BTN_Y){const u64 limits[]={200000000,500000000,1000000000,3000000000,0};int at=0;for(int i=0;i<5;++i) if(hub_query_.max_parameters==limits[i]) at=i;hub_query_.max_parameters=limits[(at+1)%5];hub_.search(hub_query_);}
-      if(p&GX_BTN_LB){hub_query_.supported_only=!hub_query_.supported_only;hub_.search(hub_query_);}
-      if((p&GX_BTN_RB) && !hub_view_.next.empty()) hub_.search(hub_query_,hub_view_.next);
+      else if(p&GX_BTN_X) kb_open(KB_HUB_SEARCH,"Find a model","Model name or exact owner/repository",hub_query_.text);
+      else if(p&(GX_BTN_Y|GX_BTN_LB|GX_BTN_START)){
+        if(p&GX_BTN_START) gx_hub_next_preset(hub_query_);
+        else if(p&GX_BTN_Y){const u64 limits[]={200000000,500000000,1000000000,3000000000,0};int at=0;for(int i=0;i<5;++i) if(hub_query_.max_parameters==limits[i]) at=i;hub_query_.max_parameters=limits[(at+1)%5];}
+        else hub_query_.supported_only=!hub_query_.supported_only;
+        settings_.hub_query=hub_query_;save_settings();hub_.search(hub_query_);
+      }
+      else if(p&GX_BTN_DLEFT) hub_.previous();
+      else if((p&(GX_BTN_RB|GX_BTN_DRIGHT)) && !hub_view_.next.empty()) hub_.search(hub_query_,hub_view_.next);
     }
     hub_lines(64,536,hub_view_.message,103,2,GX_MUTED);
     gxui_prompt(64,658,GX_BTN_A,"Files");gxui_prompt(226,658,GX_BTN_X,"Search");gxui_prompt(420,658,GX_BTN_Y,"Max params");gxui_prompt(686,658,GX_BTN_LB,"Families");gxui_prompt(912,658,GX_BTN_RB,"Next");gxui_prompt(1100,658,GX_BTN_B,"Local");
   }
   if(hub_files_ && (busy || hub_view_.state==HS_ERROR || hub_view_.state==HS_DONE)) {gxui_fill(64,562,1152,64,GX_PAPER);hub_lines(64,562,hub_view_.message,103,2,GX_MUTED);}
   if(busy){gxui_fill(64,594,1152,32,GX_INK);std::string text=hub_view_.message;
-    if(hub_view_.total){char progress[80];snprintf(progress,sizeof(progress),"%.1f / %.1f MB",hub_view_.received/1e6,hub_view_.total/1e6);text=progress+std::string(" / ")+text;}
+    if(hub_view_.total) text=gx_hub_progress(hub_view_)+" / "+text;
+    if(hub_view_.total){f32 fraction=GX_CLAMP((f32)((double)hub_view_.received/hub_view_.total),0.0f,1.0f);gxui_fill(64,632,1152,5,GX_PANEL);gxui_fill(64,632,1152*fraction,5,GX_ACCENT);}
     gxui_label(80,596,GX_PANEL,short_hub(text,92).c_str(),.65f);gxui_fill(64,650,1152,54,GX_PAPER);gxui_prompt(64,658,GX_BTN_X,"Cancel request");gxui_prompt(1010,658,GX_BTN_B,"Back");if(p&GX_BTN_X) hub_.cancel();}
   if(hub_confirm_ && !hub_view_.choices.empty()) {const HubChoice& c=hub_view_.choices[hub_file_sel_];gxui_fill(236,224,808,288,GX_INK);gxui_label(268,250,GX_PANEL,"Download this model?",1.1f);
     hub_lines(268,316,"Check the model's license on Hugging Face before use. File-size labels are estimates; disk streaming is slow and still needs RAM.",64,4,GX_PANEL);gxui_prompt(268,454,GX_BTN_A,"Download",GX_PANEL);gxui_prompt(734,454,GX_BTN_B,"Keep browsing",GX_PANEL);

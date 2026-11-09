@@ -213,7 +213,7 @@ void App::test_seed(){
 }
 bool App::test_capture(const char* name,const char* path){
   if(!strcmp(name,"hub") || !strcmp(name,"hub-files")){
-    HubView v;v.revision=10;v.state=!strcmp(name,"hub") ? HS_MODELS : HS_FILES;v.message="Choose a quantization. All shards are downloaded together.";
+    HubView v;v.revision=10;v.page=2;v.has_previous=true;v.state=!strcmp(name,"hub") ? HS_MODELS : HS_FILES;v.message=!strcmp(name,"hub") ? "Cached results. No network request needed." : "Choose a quantization. All shards are downloaded together.";
     HubModel m;m.id="example/SmolLM2-135M-Instruct-GGUF";m.revision=std::string(40,'a');m.architecture="llama";m.parameters=135000000;m.license="apache-2.0";v.models.push_back(m);v.model=m;
     const char* labels[]={"SmolLM2-135M-Q4_K_M.gguf","Gemma-270M-Q8_0.gguf","Qwen2.5-0.5B-Q4_K_M.gguf","GLM-MoE-Q4.gguf"};const u64 sizes[]={105454144,291545600,491400032,5000000000ull};
     for(int i=0;i<4;++i){HubChoice c;c.name=labels[i];c.bytes=sizes[i];c.downloadable=i!=3;c.reason=i==3 ? "Unsupported architecture: MoE is not implemented." : "Candidate architecture. GGUF and memory checks still apply.";HubFile f;f.path=c.name;f.bytes=c.bytes;c.files.push_back(f);v.choices.push_back(c);}

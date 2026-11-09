@@ -1,3 +1,20 @@
+360AI 2.3 - Less typing, easier model browsing
+=============================================
+
+- START in Model library cycles SmolLM2/TinyStories/Qwen2.5/Llama/Gemma searches.
+- Remember search text, parameter limits and candidate filters across restarts.
+- D-pad Left opens previous results; eight pages cached for instant back/forward.
+- Failed next-page requests keep the current page available for retry.
+- Show download percentage, average network speed and approximate time left.
+- Keep SHA-256/GGUF verification separate from completed transfer progress.
+- Reused shards and local verification do not inflate transfer speed estimates.
+- Local Models: LB toggles smallest-first/name sorting without losing selection.
+- Replace the local list's quadratic sorting pass with std::sort.
+- Restore saved exact repository searches through the repository details endpoint.
+- Add cache eviction, stale-query, offline retry, progress and settings regressions.
+- App-only updates preserve all four models and personal data.
+- Xbox SDK/host checks pass; physical Xbox networking/inference needs testing.
+
 360AI 2.2 - A model library on your Xbox
 ======================================
 

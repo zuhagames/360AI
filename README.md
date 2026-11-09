@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v2.2/360AI-2.2-USB.zip"><strong>Download 360AI 2.2</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v2.3/360AI-2.3-USB.zip"><strong>Download 360AI 2.3</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
@@ -33,7 +33,7 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-2.2-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.2/360AI-2.2-USB.zip)**.
+1. Download and extract **[360AI-2.3-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.3/360AI-2.3-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
 4. Select **Assistant** for instant replies, or **Models** for GGUF chat. Leave model compute/storage on **Auto**.
@@ -55,6 +55,8 @@ Requires a console capable of running unsigned XEX files. No separate model down
 | Qwen2.5 7B Q4_K_M — experimental | **5 GB on HDD** | HDD stream, extremely slow |
 
 In **Models**, press **Y** to browse Hugging Face. Files under **200 MB** show green **Comfortable**, 200–300 MB show yellow **Tight**, and larger files show **Disk stream**. These are file-size guides; RAM, architecture and tensor-format limits still apply. Disk streaming does not support every model.
+
+Press **START in the library** for family presets, **D-pad Left** for a cached previous page, and **RB** for the next page. Searches and filters are remembered. Downloads show progress, transfer speed and an estimated wait. In local Models, **LB** switches between smallest-first and name sorting.
 
 For speed, use **Auto compute/storage** and **Reply preset: Quick**. SmolLM2 is the recommended chat model. The much smaller [TinyStories models](https://huggingface.co/karpathy/tinyllamas) trade most capabilities for less work: they continue story openings like “Once upon a time,” and are not chat assistants. The 260K toy may produce nonsense; 15M has a 128-token context.
 
