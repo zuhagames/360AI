@@ -165,11 +165,13 @@ static void checks(){
     s.backend_mode=1;s.weight_mode=2;s.server_on=true;s.chat_on=false;s.debug_level=2;
     s.last_model="SmolLM2-135M-Instruct-Q8_0.gguf";
     s.top_p=0.9f;s.repeat_penalty=1.1f;
+    s.hub_query.text="Qwen2.5";s.hub_query.max_parameters=1000000000;s.hub_query.supported_only=false;
     assert(s.save(file));AppSettings loaded;assert(loaded.load(file));
     assert(loaded.ctx_size==2048 && loaded.temperature==0.25f && loaded.topk==17 && loaded.reply_tokens==96);
     assert(loaded.backend_mode==1 && loaded.weight_mode==2 && loaded.server_on && !loaded.chat_on && loaded.debug_level==2);
     assert(loaded.last_model==s.last_model);
     assert(loaded.top_p==s.top_p && loaded.repeat_penalty==s.repeat_penalty);
+    assert(loaded.hub_query.text=="Qwen2.5" && loaded.hub_query.max_parameters==1000000000 && !loaded.hub_query.supported_only);
     s.ctx_size=4096;assert(s.save(file));assert(loaded.load(file) && loaded.ctx_size==4096);
     assert(gx_write_text_file(file,"{broken"));assert(loaded.load(file) && loaded.ctx_size==2048);
     // Repairing a damaged main file must preserve the valid recovery copy.
@@ -182,6 +184,9 @@ static void checks(){
     assert(gx_write_text_file(file,"{\"context\":256}"));
     assert(loaded.load(file) && loaded.ctx_size==256 && loaded.last_model.empty());
     assert(loaded.top_p==1 && loaded.repeat_penalty==1);
+    assert(loaded.hub_query.text=="SmolLM2" && loaded.hub_query.max_parameters==500000000 && loaded.hub_query.supported_only);
+    const char* bad_hub[]={"{\"hub_search\":false}","{\"hub_search\":\"bad\\nquery\"}","{\"hub_candidates\":1}","{\"hub_max_parameters\":-1}","{\"hub_max_parameters\":1.5}","{\"hub_max_parameters\":\"Any\"}"};
+    for(int i=0;i<6;++i){assert(gx_write_text_file(file,bad_hub[i]));assert(!loaded.load(file));}
     assert(gx_write_text_file(file,"{\"top_p\":0.05,\"repeat_penalty\":1.5}"));
     assert(loaded.load(file) && loaded.top_p==0.05f && loaded.repeat_penalty==1.5f);
     const char* bad_sampling[]={"{\"top_p\":0}","{\"top_p\":1.1}","{\"top_p\":\"0.9\"}","{\"repeat_penalty\":0.9}","{\"repeat_penalty\":1.6}","{\"repeat_penalty\":false}"};

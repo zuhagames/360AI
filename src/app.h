@@ -44,6 +44,7 @@ struct AppSettings{
   int weight_mode; // Auto / RAM / HDD stream
   int reply_tokens;
   std::string last_model;
+  HubQuery hub_query;
 
   AppSettings();
   bool load(const char* path);

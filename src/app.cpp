@@ -100,6 +100,7 @@ static void utf8_truncate_scroll(const std::string& s, size_t max_chars,
 
 int App::run(){
   settings_.load(kSettingsPath);
+  hub_query_=settings_.hub_query;
   assistant_.load(kAssistantPath);
   if(!assistant_.load_rules("game:\\assistant-rules.json")) assistant_.load_rules("game:\\assistant-rules.example.json");
   gx_set_debug_level(settings_.debug_level);
@@ -700,6 +701,7 @@ void App::kb_commit(){
     settings_.repeat_penalty=GX_CLAMP(value,1.0f,1.5f);
   } else if(mode==KB_HUB_SEARCH){
     hub_query_.text=kb_text_.substr(0,96);hub_confirm_=false;hub_files_=false;
+    settings_.hub_query=hub_query_;save_settings();
     if(gx_hub_id(hub_query_.text)){HubModel model;model.id=hub_query_.text;hub_.details(model);}else hub_.search(hub_query_);return;
   } else if(mode == KB_NOTE_NEW || mode == KB_NOTE_EDIT || mode == KB_TIMER_NEW){
     if(!kb_text_.empty()){
