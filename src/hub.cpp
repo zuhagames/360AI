@@ -88,7 +88,9 @@ void ModelHub::view(HubView& v){gx_mutex_lock(mutex_);if(v.revision!=data_.revis
 void ModelHub::set(HubState state,const std::string& message){gx_mutex_lock(mutex_);data_.state=state;data_.message=message;gx_mutex_unlock(mutex_);}
 bool ModelHub::begin(int job){
   gx_mutex_lock(mutex_);bool busy=busy_;gx_mutex_unlock(mutex_);if(busy) return false;if(thread_){gx_thread_join(thread_);thread_=0;}
-  job_=job;cancel_=false;busy_=true;body_.clear();gx_mutex_lock(mutex_);data_.received=0;data_.total=job==3 ? choice_.bytes : 0;data_.installed.clear();gx_mutex_unlock(mutex_);
+  job_=job;cancel_=false;busy_=true;body_.clear();gx_mutex_lock(mutex_);data_.received=0;data_.total=job==3 ? choice_.bytes : 0;data_.installed.clear();
+  if(job==1){data_.models.clear();data_.next.clear();++data_.revision;}
+  gx_mutex_unlock(mutex_);
   set(job==1 ? HS_SEARCHING : (job==2 ? HS_DETAILS : HS_DOWNLOADING),job==3 ? "Checking disk space..." : "Contacting Hugging Face...");thread_=gx_thread_begin(entry,this);
   if(!thread_){busy_=false;set(HS_ERROR,"Could not start the model browser worker.");return false;}return true;
 }
