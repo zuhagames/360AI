@@ -148,7 +148,7 @@ void App::restart_for_update(){
 #ifdef _XBOX
   if(assistant_.dirty()) queue_assistant_save();assistant_store_.stop();poll_assistant_save();
   if(assistant_.dirty()){chat_notice_="Notes could not be saved. Update restart stopped. Check the drive and try again.";assistant_store_.start("game:\\360AI-assistant.json");return;}
-  updater_.stop();gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;gx_thread_join(load_thread_);load_thread_=0;
+  hub_.stop();updater_.stop();gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;gx_thread_join(load_thread_);load_thread_=0;
   XLaunchNewImage("game:\\360AI-updater.xex",0);
   chat_notice_="Installer could not start. Copy the complete USB ZIP again.";assistant_store_.start("game:\\360AI-assistant.json");
 #else

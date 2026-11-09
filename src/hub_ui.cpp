@@ -3,6 +3,8 @@
 static std::string short_hub(const std::string& s,size_t limit){std::string out;for(size_t i=0;i<s.size();++i){u8 c=(u8)s[i];if((c&0xc0)==0x80) continue;out+=c<32 || c>=127 ? '?' : c;}if(out.size()>limit) out=out.substr(0,limit-3)+"...";return out;}
 static void hub_lines(f32 x,f32 y,const std::string& s,int width,int rows,u32 color){std::string text=short_hub(s,1024);for(int i=0;i<rows && !text.empty();++i){size_t n=GX_MIN((size_t)width,text.size());if(n<text.size()){size_t space=text.rfind(' ',n);if(space!=std::string::npos && space>0) n=space;}gxui_label(x,y+i*26,color,text.substr(0,n).c_str(),.72f);text=text.substr(n);while(!text.empty() && text[0]==' ') text.erase(0,1);}}
 static std::string parameter_label(u64 n){if(!n) return "Unknown";char text[40];if(n>=1000000000) snprintf(text,sizeof(text),"%.2fB",n/1e9);else snprintf(text,sizeof(text),"%.0fM",n/1e6);return text;}
+static bool selected_ready(const HubView& v,int selected){if(v.state!=HS_DONE || selected<0 || selected>=(int)v.choices.size() || v.choices[selected].files.empty()) return false;
+  return gx_hub_local_name(v.model,v.choices[selected],v.choices[selected].files[0])==v.installed;}
 void App::open_hub(){screen_=AS_HUB;hub_confirm_=false;
 #ifdef _XBOX
   if(hub_view_.state==HS_IDLE) hub_.search(hub_query_);
@@ -24,10 +26,10 @@ void App::hub_frame(){
     }
     if(!choices.empty()){const HubChoice& c=choices[hub_file_sel_];char disk[140];snprintf(disk,sizeof(disk),"Needs %.2f GB free / %u file(s) / %s",(c.bytes+32u*1024u*1024u)/1e9,(unsigned)c.files.size(),c.bytes>=300000000 ? "HDD/USB stream recommended" : "RAM candidate");gxui_label(64,528,GX_MUTED,disk,.70f);hub_lines(64,562,c.reason,103,2,GX_MUTED);}
     if(!busy && !hub_confirm_){if(p&GX_BTN_DUP) --hub_file_sel_;if(p&GX_BTN_DDOWN) ++hub_file_sel_;hub_file_sel_=GX_CLAMP(hub_file_sel_,0,GX_MAX(0,(int)choices.size()-1));
-      if((p&GX_BTN_A) && hub_view_.state==HS_DONE){refresh_models();for(size_t i=0;i<files_.size();++i) if(files_[i].name==hub_view_.installed){file_sel_=(int)i;model_name_=files_[i].name;model_path_="game:\\"+model_name_;settings_.last_model=model_name_;settings_.weight_mode=files_[i].size>=300000000 ? 2 : 0;save_settings();screen_=AS_SETTINGS;return;}}
+      if((p&GX_BTN_A) && selected_ready(hub_view_,hub_file_sel_)){refresh_models();for(size_t i=0;i<files_.size();++i) if(files_[i].name==hub_view_.installed){file_sel_=(int)i;model_name_=files_[i].name;model_path_="game:\\"+model_name_;settings_.last_model=model_name_;settings_.weight_mode=files_[i].size>=300000000 ? 2 : 0;save_settings();screen_=AS_SETTINGS;return;}}
       else if((p&GX_BTN_A) && !choices.empty() && choices[hub_file_sel_].downloadable) hub_confirm_=true;
     }
-    gxui_prompt(64,658,GX_BTN_A,hub_view_.state==HS_DONE ? "Use model" : "Download");gxui_prompt(1010,658,GX_BTN_B,"Results");
+    gxui_prompt(64,658,GX_BTN_A,selected_ready(hub_view_,hub_file_sel_) ? "Use model" : "Download");gxui_prompt(1010,658,GX_BTN_B,"Results");
   }else {
     std::string filter="Search: "+hub_query_.text+" / Max: "+(hub_query_.max_parameters ? parameter_label(hub_query_.max_parameters) : "Any")+" / Families: "+(hub_query_.supported_only ? "Candidates" : "All");gxui_label(64,132,GX_INK,short_hub(filter,99).c_str(),.72f);
     gxui_label(64,170,GX_MUTED,"File sizes appear after opening a repository. Unknown parameter counts are excluded by size filters.",.64f);
