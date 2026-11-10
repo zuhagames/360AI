@@ -38,6 +38,7 @@ App::App(){
   file_scroll_ = 0;
   set_sel_ = 0;
   home_sel_=tool_sel_=note_sel_=timer_sel_=confirm_id_=edit_id_=0;
+  answer_sel_=0;
   note_view_id_=0;
   kb_mode_ = KB_NONE;
   kb_cur_ = 0;
@@ -476,6 +477,7 @@ void App::assistant_send(const std::string& text){
   else if(reply.action==AA_MODELS){assistant_mode_=false;chat_log_.clear();turns_.clear();chat_view_=ChatView();screen_=AS_BROWSE;return;}
   else if(reply.action==AA_UPDATES) screen_=AS_UPDATES;
   else if(reply.action==AA_MODEL_LIBRARY) open_hub();
+  else if(reply.action==AA_ANSWERS) open_answers();
   queue_assistant_save();
   append_chat("Assistant: ",reply.text);
   if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}
@@ -661,7 +663,7 @@ void App::kb_input(){
   }
   if(p & GX_BTN_A){
     if(kb_cur_ < kKbChars){
-      if(kb_text_.size() < 512){
+      if(kb_text_.size() < ((kb_mode_&0xff)==KB_ANSWER_PHRASE ? 80u : 512u)){
         char c = kKbSet[kb_cur_];
         if(kb_upper_ && c >= 'a' && c <= 'z') c = (char)(c - 32);
         kb_text_ += c;
@@ -677,7 +679,20 @@ void App::kb_input(){
 void App::kb_commit(){
   int mode = kb_mode_ & 0xFF;
   kb_mode_ = KB_NONE;
-  if(mode == KB_CTX){
+  if(mode==KB_ANSWER_PHRASE){
+    std::string key;if(!Assistant::answer_phrase(kb_text_,key)){chat_notice_="Use a phrase of 3-80 bytes, with words or numbers.";return;}
+    const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==key){answer_sel_=(int)i;chat_notice_="That phrase already exists. Press A to edit its answer.";return;}
+    answer_draft_=key;kb_open(KB_ANSWER_TEXT,"Your answer","Literal text, 1-512 bytes. B cancels without saving.","");kb_swallow_=true;return;
+  } else if(mode==KB_ANSWER_TEXT){
+    if(assistant_.write_answer(answer_draft_,kb_text_,chat_notice_)){
+      const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==answer_draft_) answer_sel_=(int)i;
+      answer_preview_.clear();queue_assistant_save();
+    }return;
+  } else if(mode==KB_ANSWER_TEST){
+    std::string key,response;
+    answer_preview_=assistant_.preview_answer(kb_text_,key,response) ? "Matches: "+key+"\n\n"+response : "No saved text answer matches those words.";
+    answer_view_key_.clear();chat_notice_="Preview only. Commands and file-based answers are not executed; command priority still applies in chat.";return;
+  } else if(mode == KB_CTX){
     int v = atoi(kb_text_.c_str());
     if(v < 256) v = 256;
     if(v > 8192) v = 8192;

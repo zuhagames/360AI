@@ -34,7 +34,7 @@ void App::shell(const char* title,const char* subtitle){
   gxui_label(1032,112,GX_MUTED,save_status_.c_str(),.60f);
   gxui_fill(64,640,1152,2,GXRGB(195,201,189));
 }
-void App::home(){assistant_.cancel_followup();screen_=AS_HOME;confirm_id_=0;kb_mode_=KB_NONE;chat_notice_.clear();}
+void App::home(){assistant_.cancel_followup();screen_=AS_HOME;confirm_id_=0;answer_confirm_.clear();answer_draft_.clear();kb_mode_=KB_NONE;chat_notice_.clear();}
 void App::home_frame(){
   shell("360AI","YOUR XBOX. A LITTLE MORE USEFUL.");
   const char* titles[]={"ASSISTANT","NOTES","TIMERS","MODELS"};
@@ -129,8 +129,8 @@ void App::timers_frame(){
 }
 void App::tools_frame(){
   shell("Quick tools","A FEW SHORTCUTS. LESS TYPING.");
-  const char* names[]={"CALCULATE","CONVERT","NEW TIMER","NEW NOTE","TEACH AN ANSWER","COMMAND GUIDE"};
-  const char* tips[]={"Numbers, percentages and expressions.","Length, weight, temperature and more.","A break, a reminder, a cup of tea.","Write it down. Find it later.","Your phrase. Your own saved answer.","See everything the assistant can do."};
+  const char* names[]={"CALCULATE","CONVERT","NEW TIMER","NEW NOTE","SAVED ANSWERS","COMMAND GUIDE"};
+  const char* tips[]={"Numbers, percentages and expressions.","Length, weight, temperature and more.","A break, a reminder, a cup of tea.","Write it down. Find it later.","Add, edit and test your own replies.","See everything the assistant can do."};
   for(int i=0;i<6;++i){f32 x=64+(i%2)*584,y=148+(i/2)*148;bool selected=i==tool_sel_;
     gxui_fill(x,y,568,132,selected ? GX_INK : GX_PANEL);gxui_fill(x,y,5,132,selected ? GX_ACCENT : GXRGB(190,198,180));
     gxui_label(x+24,y+18,selected ? GX_PANEL : GX_INK,names[i],.9f);paragraph(x+24,y+68,tips[i],36,2,selected ? GXRGB(207,217,198) : GX_MUTED);}
@@ -140,6 +140,7 @@ void App::tools_frame(){
   if(p&GX_BTN_A){
     if(tool_sel_==2){screen_=AS_TIMERS;kb_open(KB_TIMER_NEW,"Set a timer","Try 5 minutes called tea","");}
     else if(tool_sel_==3){screen_=AS_NOTES;kb_open(KB_NOTE_NEW,"Write a note","Your note is saved on this drive","");}
+    else if(tool_sel_==4) open_answers();
     else {open_assistant();const char* initial[]={"calculate ","convert ","","","teach ",""};
       if(tool_sel_==5) assistant_send("help");else kb_open(KB_CHAT,"360AI tools",tool_sel_==4 ? "teach favorite game: Halo 3" : "Complete the command, then press START",initial[tool_sel_]);}
   }
@@ -186,7 +187,7 @@ void App::frame(){
 #endif
   poll_assistant_save();assistant_poll();gxui_begin_frame(GX_PAPER);
   switch(screen_){case AS_HOME:home_frame();break;case AS_NOTES:notes_frame();break;case AS_TIMERS:timers_frame();break;case AS_TOOLS:tools_frame();break;
-    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;case AS_UPDATES:updates_frame();break;case AS_HUB:hub_frame();break;}
+    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;case AS_UPDATES:updates_frame();break;case AS_HUB:hub_frame();break;case AS_ANSWERS:answers_frame();break;}
   if(!timer_notice_.empty() && gx_time_seconds()<timer_notice_until_ && !kb_mode_){gxui_fill(64,110,1152,40,GX_INK);gxui_label(80,115,GX_PANEL,short_text(timer_notice_,90).c_str(),.75f);}
   gxui_end_frame();u32 p=gxui_buttons_pressed();bool swallowed=kb_swallow_;kb_swallow_=false;
   // Join inference/server workers only after releasing the renderer's GPU lock.
@@ -194,6 +195,7 @@ void App::frame(){
   if(!swallowed && !kb_mode_ && (p&(GX_BTN_B|GX_BTN_BACK))){
     confirm_id_=0;
     if(screen_==AS_CHAT && !assistant_mode_){gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;engine_.reset();kv_=KVCache();model_loaded_=false;turns_.clear();chat_log_.clear();screen_=AS_BROWSE;}
+    else if(screen_==AS_ANSWERS){if(!answer_confirm_.empty()) answer_confirm_.clear();else {answer_draft_.clear();screen_=AS_TOOLS;}}
     else if(screen_==AS_HUB){if(hub_confirm_){hub_confirm_=false;}
       else if(hub_files_){hub_files_=false;}else screen_=AS_BROWSE;}
     else if(screen_==AS_SETTINGS) screen_=AS_BROWSE;
