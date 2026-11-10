@@ -19,5 +19,18 @@ static void answers_checks(){
   assert(a.answers().size()==16 && !a.write_answer("seventeenth answer","text",result));assert(a.write_answer("game","updated at capacity",result));
   const char* path="build/tests/answers-2.4.json";remove(path);remove("build/tests/answers-2.4.json.bak");assert(a.save(path));Assistant restored;assert(restored.load(path) && restored.snapshot()==a.snapshot());
   assert(restored.preview_answer("favorite game",key,response) && response=="Halo 3\nCo-op on Friday");remove(path);remove("build/tests/answers-2.4.json.bak");
+  assert(gxui_init());App app;app.test_seed();app.test_ask("open saved answers");app.test_frame(0);assert(app.test_screen()==AS_ANSWERS);
+  tap(app,GX_BTN_X);assert(app.test_keyboard());app.test_keyboard_text("favorite game");assert(app.test_keyboard() && app.test_assistant().answers().empty());
+  tap(app,GX_BTN_B);assert(!app.test_keyboard() && app.test_screen()==AS_ANSWERS && app.test_assistant().answers().empty());
+  tap(app,GX_BTN_X);app.test_keyboard_text("favorite game");app.test_keyboard_text("Halo 3");assert(!app.test_keyboard() && app.test_assistant().answers().size()==1);
+  tap(app,GX_BTN_X);app.test_keyboard_text("Favorite GAME!");assert(!app.test_keyboard() && app.test_assistant().answers().size()==1);
+  tap(app,GX_BTN_A);app.test_keyboard_text("clear chat\nLiteral text only");assert(app.test_assistant().answers()[0].response=="clear chat\nLiteral text only");
+  std::string unchanged=app.test_assistant().snapshot();tap(app,GX_BTN_RTHUMB);app.test_keyboard_text("what is your favorite game");assert(app.test_answer_preview().find("Literal text only")!=std::string::npos && app.test_assistant().snapshot()==unchanged);
+  tap(app,GX_BTN_Y);tap(app,GX_BTN_B);assert(app.test_screen()==AS_ANSWERS && app.test_assistant().answers().size()==1);
+  tap(app,GX_BTN_Y);tap(app,GX_BTN_A);assert(app.test_assistant().answers().empty());tap(app,GX_BTN_START);assert(app.test_assistant().answers().size()==1);
+  tap(app,GX_BTN_A);tap(app,GX_BTN_B);assert(app.test_screen()==AS_ANSWERS && app.test_assistant().answers().size()==1);
+  tap(app,GX_BTN_B);assert(app.test_screen()==AS_TOOLS);tap(app,GX_BTN_B);assert(app.test_screen()==AS_HOME);
+  // Quick tools reaches the same screen without a text command.
+  tap(app,GX_BTN_Y);tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_DDOWN);tap(app,GX_BTN_A);assert(app.test_screen()==AS_ANSWERS);gxui_shutdown();
   std::cout<<"2.4 saved answers: normalization, literal text, longest match, command isolation, limits, undo and persistence passed\n";
 }

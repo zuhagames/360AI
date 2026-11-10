@@ -248,6 +248,7 @@ void App::test_seed(){
   gx_file_entry f;f.name="SmolLM2-135M-Instruct-Q8_0.gguf";f.size=144811072;files_.push_back(f);f.name="gemma-3-270m-it-Q8_0.gguf";f.size=291545600;files_.push_back(f);
 }
 bool App::test_capture(const char* name,const char* path){
+  if(!strcmp(name,"answers")){std::string result;assistant_.write_answer("favorite game","Halo 3. Friday night co-op with friends.",result);assistant_.write_answer("project idea","Give the Xbox 360 one more useful job.",result);assistant_.write_answer("tea break","Take five minutes, stretch, and come back ready.",result);open_answers();test_frame(0);return gxui_capture(path);}
   if(!strcmp(name,"hub") || !strcmp(name,"hub-files")){
     HubView v;v.revision=10;v.page=2;v.has_previous=true;v.state=!strcmp(name,"hub") ? HS_MODELS : HS_FILES;v.message=!strcmp(name,"hub") ? "Cached results. No network request needed." : "Choose a quantization. All shards are downloaded together.";
     HubModel m;m.id="example/SmolLM2-135M-Instruct-GGUF";m.revision=std::string(40,'a');m.architecture="llama";m.parameters=135000000;m.license="apache-2.0";v.models.push_back(m);v.model=m;
