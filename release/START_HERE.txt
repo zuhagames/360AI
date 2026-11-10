@@ -1,4 +1,4 @@
-360AI 2.3 - Xbox 360 USB package
+360AI 2.4 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -8,6 +8,10 @@ On Home, X opens input and Y opens Quick tools. Say hello or type help.
 360 Assistant handles calculations, conversions, notes, session timers and
 taught answers. Search/edit notes, pause/resume timers and undo data changes.
 This mode uses text, not voice. It works even with no GGUF files installed.
+Home > Y Quick tools > Saved answers lets you add/edit your own instant replies.
+X: new phrase then answer. A: edit. Y: delete confirmation. START: undo.
+Click right stick to preview a saved-text match without running any command.
+Cancelling a keyboard keeps existing answers. Wait for Saved after an edit.
 
 1. Extract the ZIP on your PC.
 2. Copy the entire 360AI folder to your USB drive.

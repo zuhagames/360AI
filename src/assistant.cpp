@@ -248,6 +248,7 @@ const char* help_text="360 Assistant works offline without a model. Try:\n"
   "remember to clean the controller | find notes controller | read note 1\n"
   "edit note 1: buy batteries | delete note 1 | undo\n"
   "teach favorite game: Halo 3 | list learned answers | forget answer favorite game\n"
+  "open saved answers (controller editor and text-match preview)\n"
   "my name is Martin | what is my name | time | date | status\n"
   "quick preset | balanced preset | creative preset\n"
   "help with GPU | help with models | find models | open updates | joke | export chat | clear chat\n"
@@ -264,7 +265,7 @@ const Fact facts[]={
   {"controller|controls|buttons","A opens the keyboard. D-pad scrolls chat; LB/RB pages; right-stick click follows the latest text. X starts a fresh chat, START exports it, and B returns to models. Y cancels a model reply."},
   {"timer|timers|reminder|reminders","Try set timer 5 minutes called pizza, pause timer pizza, resume it, extend timer pizza by 2 minutes, list timers, or cancel timer 1. Up to eight timers run while 360AI is open. Timers do not survive restarting the app."},
   {"notes|note|remember","Try remember to buy batteries, find notes batteries, read note 1, edit note 1: buy a controller, or delete note 1. Undo restores the last notes/name/taught-answer change. Up to 32 notes save as plain text beside the app. Clearing chat keeps notes."},
-  {"teach|learned answers|custom answers","Teach favorite game: Halo 3 saves a text answer directly on your Xbox. List learned answers shows up to 16 entries; forget answer favorite game removes one. Built-in commands take priority. Learned answers cannot run commands."},
+  {"teach|learned answers|custom answers","Open Saved answers from Quick tools to add, edit, preview or delete up to 16 local text replies. You can also type teach favorite game: Halo 3. Built-in commands keep priority. Saved answers cannot run commands."},
   {"calculator|math|calculate","Use calculate (12 + 8) * 3, sqrt(81), 2^8, abs(-5) or 20 percent of 80. ans refers to the last successful result. % is remainder; use percent of for percentages."},
   {"conversion|conversions|units|convert","Convert lengths, masses, temperatures, time and byte storage: convert 5 miles to km. Then say and 10 to reuse those units. MB/GB use decimal bytes; MiB/GiB use binary bytes. No currency or live exchange rates."},
   {"context|tokens|token","Model context contains prompt and reply tokens. A smaller context/reply budget limits waiting but cannot guarantee higher tokens per second. The keyword assistant has bounded rule-based follow-up state instead of a model context."},
@@ -444,7 +445,7 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
   if(norm=="cancel" || norm=="never mind" || norm=="nevermind" || norm=="stop"){
     bool had=pending_!=P_NONE;pending_=P_NONE;pending_label_.clear();return AssistantReply(had ? "Cancelled the follow-up. Existing notes and timers are unchanged." : "No follow-up is waiting. Use cancel timer followed by its number to stop a timer.");}
   if(norm=="help" || norm=="commands" || norm=="show commands" || norm=="what can you do"){pending_=P_NONE;pending_label_.clear();return AssistantReply(help_text);}
-  if(norm=="open saved answers" || norm=="open learned answers" || norm=="manage answers"){
+  if(norm=="open saved answers" || norm=="open learned answers" || norm=="open answers" || norm=="manage answers"){
     pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening Saved answers. Add, edit and preview your own text replies.",AA_ANSWERS);
   }
   if(norm=="find models" || norm=="get models" || norm=="open model library" || norm=="open hugging face"){
