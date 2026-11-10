@@ -39,6 +39,7 @@ App::App(){
   set_sel_ = 0;
   home_sel_=tool_sel_=note_sel_=timer_sel_=confirm_id_=edit_id_=0;
   answer_sel_=0;
+  starter_sel_=0;answer_starters_=false;
   note_view_id_=0;
   kb_mode_ = KB_NONE;
   kb_cur_ = 0;
@@ -686,11 +687,11 @@ void App::kb_commit(){
   } else if(mode==KB_ANSWER_TEXT){
     if(assistant_.write_answer(answer_draft_,kb_text_,chat_notice_)){
       const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==answer_draft_) answer_sel_=(int)i;
-      answer_preview_.clear();answer_view_key_.clear();queue_assistant_save();
+      answer_starters_=false;answer_preview_.clear();answer_view_key_.clear();queue_assistant_save();
     }return;
   } else if(mode==KB_ANSWER_TEST){
     std::string key,response;
-    answer_preview_=assistant_.preview_answer(kb_text_,key,response) ? "Matches: "+key+"\n\n"+response : "No saved text answer matches those words.";
+    answer_preview_=assistant_.preview_answer(kb_text_,key,response,answer_starters_) ? "Matches: "+key+"\n\n"+response : "No matching text answer. Starter questions need an exact phrase.";
     answer_view_key_.clear();chat_notice_="Preview only. Commands keep priority in chat.";return;
   } else if(mode == KB_CTX){
     int v = atoi(kb_text_.c_str());
