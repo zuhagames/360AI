@@ -248,6 +248,7 @@ const char* help_text="360 Assistant works offline without a model. Try:\n"
   "remember to clean the controller | find notes controller | read note 1\n"
   "edit note 1: buy batteries | delete note 1 | undo\n"
   "teach favorite game: Halo 3 | list learned answers | forget answer favorite game\n"
+  "open saved answers (controller editor and text-match preview)\n"
   "my name is Martin | what is my name | time | date | status\n"
   "quick preset | balanced preset | creative preset\n"
   "help with GPU | help with models | find models | open updates | joke | export chat | clear chat\n"
@@ -264,7 +265,7 @@ const Fact facts[]={
   {"controller|controls|buttons","A opens the keyboard. D-pad scrolls chat; LB/RB pages; right-stick click follows the latest text. X starts a fresh chat, START exports it, and B returns to models. Y cancels a model reply."},
   {"timer|timers|reminder|reminders","Try set timer 5 minutes called pizza, pause timer pizza, resume it, extend timer pizza by 2 minutes, list timers, or cancel timer 1. Up to eight timers run while 360AI is open. Timers do not survive restarting the app."},
   {"notes|note|remember","Try remember to buy batteries, find notes batteries, read note 1, edit note 1: buy a controller, or delete note 1. Undo restores the last notes/name/taught-answer change. Up to 32 notes save as plain text beside the app. Clearing chat keeps notes."},
-  {"teach|learned answers|custom answers","Teach favorite game: Halo 3 saves a text answer directly on your Xbox. List learned answers shows up to 16 entries; forget answer favorite game removes one. Built-in commands take priority. Learned answers cannot run commands."},
+  {"teach|learned answers|custom answers","Open Saved answers from Quick tools to add, edit, preview or delete up to 16 local text replies. You can also type teach favorite game: Halo 3. Built-in commands keep priority. Saved answers cannot run commands."},
   {"calculator|math|calculate","Use calculate (12 + 8) * 3, sqrt(81), 2^8, abs(-5) or 20 percent of 80. ans refers to the last successful result. % is remainder; use percent of for percentages."},
   {"conversion|conversions|units|convert","Convert lengths, masses, temperatures, time and byte storage: convert 5 miles to km. Then say and 10 to reuse those units. MB/GB use decimal bytes; MiB/GiB use binary bytes. No currency or live exchange rates."},
   {"context|tokens|token","Model context contains prompt and reply tokens. A smaller context/reply budget limits waiting but cannot guarantee higher tokens per second. The keyword assistant has bounded rule-based follow-up state instead of a model context."},
@@ -400,13 +401,28 @@ AssistantReply Assistant::edit_note(int id,const std::string& text){
 }
 AssistantReply Assistant::teach(const std::string& text){
   size_t colon=text.find(':');if(colon==std::string::npos) return AssistantReply("Use teach favorite game: Halo 3. The answer is saved locally and can be undone.");
-  std::string key=words(text.substr(0,colon)),response=trim(text.substr(colon+1));
-  if(key.size()<3 || key.size()>80 || response.empty() || response.size()>512) return AssistantReply("Use a phrase of 3-80 bytes and an answer of 1-512 bytes.");
+  std::string result;write_answer(text.substr(0,colon),text.substr(colon+1),result);return AssistantReply(result);
+}
+bool Assistant::answer_phrase(const std::string& text,std::string& key){
+  key.clear();if(text.size()>512 || !valid_text(text)) return false;key=words(text);return key.size()>=3 && key.size()<=80;
+}
+bool Assistant::write_answer(const std::string& phrase_text,const std::string& answer_text,std::string& result){
+  std::string key,response=trim(answer_text);
+  if(!answer_phrase(phrase_text,key) || response.empty() || response.size()>512 || !valid_text(response,true)){result="Use a phrase of 3-80 bytes and valid answer text of 1-512 bytes.";return false;}
   size_t found=answers_.size();for(size_t i=0;i<answers_.size();++i) if(answers_[i].phrase==key){found=i;break;}
-  if(found==answers_.size() && answers_.size()>=16) return AssistantReply("All 16 taught-answer slots are full. Use forget answer followed by a phrase first.");
+  if(found==answers_.size() && answers_.size()>=16){result="All 16 taught-answer slots are full. Use forget answer followed by a phrase first.";return false;}
   if(found==answers_.size() || answers_[found].response!=response){
     remember_undo();if(found==answers_.size()){Answer a;a.phrase=key;a.response=response;answers_.push_back(a);}else answers_[found].response=response;dirty_=true;
-  }return AssistantReply("Learned answer for \""+key+"\". Built-in commands still take priority.");
+  }result="Learned answer for \""+key+"\". Built-in commands still take priority.";return true;
+}
+bool Assistant::remove_answer(const std::string& phrase_text,std::string& result){
+  std::string key;if(answer_phrase(phrase_text,key)) for(size_t i=0;i<answers_.size();++i) if(answers_[i].phrase==key){remember_undo();answers_.erase(answers_.begin()+i);dirty_=true;result="Forgot the answer for \""+key+"\". Use undo to restore it.";return true;}
+  result="No taught answer has that exact phrase. Try list learned answers.";return false;
+}
+bool Assistant::preview_answer(const std::string& text,std::string& key,std::string& response) const{
+  key.clear();response.clear();if(text.size()>512 || !valid_text(text)) return false;std::string norm=words(text);
+  for(size_t i=0;i<answers_.size();++i) if(phrase(norm,answers_[i].phrase) && answers_[i].phrase.size()>key.size()){key=answers_[i].phrase;response=answers_[i].response;}
+  return !key.empty();
 }
 std::string Assistant::state_text() const{
   Json j=Json::object();j["version"]=Json(2.0);j["name"]=Json(name_);j["next_note"]=Json((double)next_note_);j["notes"]=Json::array();j["answers"]=Json::array();
@@ -429,6 +445,9 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
   if(norm=="cancel" || norm=="never mind" || norm=="nevermind" || norm=="stop"){
     bool had=pending_!=P_NONE;pending_=P_NONE;pending_label_.clear();return AssistantReply(had ? "Cancelled the follow-up. Existing notes and timers are unchanged." : "No follow-up is waiting. Use cancel timer followed by its number to stop a timer.");}
   if(norm=="help" || norm=="commands" || norm=="show commands" || norm=="what can you do"){pending_=P_NONE;pending_label_.clear();return AssistantReply(help_text);}
+  if(norm=="open saved answers" || norm=="open learned answers" || norm=="open answers" || norm=="manage answers"){
+    pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening Saved answers. Add, edit and preview your own text replies.",AA_ANSWERS);
+  }
   if(norm=="find models" || norm=="get models" || norm=="open model library" || norm=="open hugging face"){
     pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening the Hugging Face model library. Search GGUF text-generation models and choose a file to download.",AA_MODEL_LIBRARY);
   }
@@ -554,8 +573,7 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
     std::string result="Taught answers:";for(size_t i=0;i<answers_.size();++i) result+="\n"+answers_[i].phrase+": "+answers_[i].response;return AssistantReply(result);
   }
   if(take(raw,"forget answer",rest) || take(raw,"delete answer",rest)){
-    std::string key=words(command_tail(rest));for(size_t i=0;i<answers_.size();++i) if(answers_[i].phrase==key){remember_undo();answers_.erase(answers_.begin()+i);dirty_=true;return AssistantReply("Forgot the answer for \""+key+"\". Use undo to restore it.");}
-    return AssistantReply("No taught answer has that exact phrase. Try list learned answers.");
+    std::string result;remove_answer(command_tail(rest),result);return AssistantReply(result);
   }
   if(take(raw,"teach",rest) || take(raw,"learn",rest)) return teach(rest);
   if(take(raw,"remember that",rest) || take(raw,"remember",rest) || take(raw,"add note",rest) || take(raw,"take a note",rest) || take(raw,"note",rest)) return add_note(rest);

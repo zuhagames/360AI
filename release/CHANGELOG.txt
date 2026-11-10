@@ -1,3 +1,21 @@
+360AI 2.4 - Your own instant replies
+==================================
+
+- New native Saved answers screen: Home > Y Quick tools > Saved answers.
+- Also open it with open saved answers, open learned answers or manage answers.
+- X collects a phrase then reply; no saved change until both are valid.
+- A edits an existing response; duplicate phrases select that entry.
+- Y asks before deleting; START undoes the latest saved-data change.
+- LB/RB scroll long replies; B cancels editors/confirmations or returns to Tools.
+- Click right stick to preview a saved-text match without executing commands.
+- Whole-word/longest-phrase preview; chat commands retain priority.
+- Literal multiline text, bounded input, background saves and existing backups.
+- Existing taught answers appear without a save-format migration.
+- No model loading, inference or network request is needed for these replies.
+- Add backend and controller regressions for limits, cancellation, preview and undo.
+- All four bundled models and the compatible GitHub updater remain included.
+- Physical Xbox UI, keyboard and persistence still need hardware testing.
+
 360AI 2.3 - Less typing, easier model browsing
 =============================================
 

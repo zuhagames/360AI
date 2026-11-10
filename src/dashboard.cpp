@@ -34,7 +34,7 @@ void App::shell(const char* title,const char* subtitle){
   gxui_label(1032,112,GX_MUTED,save_status_.c_str(),.60f);
   gxui_fill(64,640,1152,2,GXRGB(195,201,189));
 }
-void App::home(){assistant_.cancel_followup();screen_=AS_HOME;confirm_id_=0;kb_mode_=KB_NONE;chat_notice_.clear();}
+void App::home(){assistant_.cancel_followup();screen_=AS_HOME;confirm_id_=0;answer_confirm_.clear();answer_draft_.clear();kb_mode_=KB_NONE;chat_notice_.clear();}
 void App::home_frame(){
   shell("360AI","YOUR XBOX. A LITTLE MORE USEFUL.");
   const char* titles[]={"ASSISTANT","NOTES","TIMERS","MODELS"};
@@ -129,8 +129,8 @@ void App::timers_frame(){
 }
 void App::tools_frame(){
   shell("Quick tools","A FEW SHORTCUTS. LESS TYPING.");
-  const char* names[]={"CALCULATE","CONVERT","NEW TIMER","NEW NOTE","TEACH AN ANSWER","COMMAND GUIDE"};
-  const char* tips[]={"Numbers, percentages and expressions.","Length, weight, temperature and more.","A break, a reminder, a cup of tea.","Write it down. Find it later.","Your phrase. Your own saved answer.","See everything the assistant can do."};
+  const char* names[]={"CALCULATE","CONVERT","NEW TIMER","NEW NOTE","SAVED ANSWERS","COMMAND GUIDE"};
+  const char* tips[]={"Numbers, percentages and expressions.","Length, weight, temperature and more.","A break, a reminder, a cup of tea.","Write it down. Find it later.","Add, edit and test your own replies.","See everything the assistant can do."};
   for(int i=0;i<6;++i){f32 x=64+(i%2)*584,y=148+(i/2)*148;bool selected=i==tool_sel_;
     gxui_fill(x,y,568,132,selected ? GX_INK : GX_PANEL);gxui_fill(x,y,5,132,selected ? GX_ACCENT : GXRGB(190,198,180));
     gxui_label(x+24,y+18,selected ? GX_PANEL : GX_INK,names[i],.9f);paragraph(x+24,y+68,tips[i],36,2,selected ? GXRGB(207,217,198) : GX_MUTED);}
@@ -140,8 +140,43 @@ void App::tools_frame(){
   if(p&GX_BTN_A){
     if(tool_sel_==2){screen_=AS_TIMERS;kb_open(KB_TIMER_NEW,"Set a timer","Try 5 minutes called tea","");}
     else if(tool_sel_==3){screen_=AS_NOTES;kb_open(KB_NOTE_NEW,"Write a note","Your note is saved on this drive","");}
+    else if(tool_sel_==4) open_answers();
     else {open_assistant();const char* initial[]={"calculate ","convert ","","","teach ",""};
       if(tool_sel_==5) assistant_send("help");else kb_open(KB_CHAT,"360AI tools",tool_sel_==4 ? "teach favorite game: Halo 3" : "Complete the command, then press START",initial[tool_sel_]);}
+  }
+}
+void App::open_answers(){assistant_.cancel_followup();screen_=AS_ANSWERS;answer_confirm_.clear();answer_draft_.clear();answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();}
+void App::answers_frame(){
+  shell("Saved answers","YOUR WORDS. READY WITHOUT A MODEL.");
+  const std::vector<Assistant::Answer>& answers=assistant_.answers();answer_sel_=GX_CLAMP(answer_sel_,0,GX_MAX(0,(int)answers.size()-1));
+  gxui_fill(64,146,528,422,GX_PANEL);gxui_fill(616,146,600,422,GX_PANEL);
+  if(answers.empty()){paragraph(92,186,"Make it your own. Press X, enter a phrase, then write the answer you want to hear.",31,5);}
+  else {int start=GX_MAX(0,answer_sel_-5);for(int i=start;i<(int)answers.size() && i<start+6;++i){f32 y=160+(i-start)*64;bool selected=i==answer_sel_;
+      if(selected) gxui_fill(76,y,504,60,GX_INK);char number[16];snprintf(number,sizeof(number),"%02d",i+1);
+      gxui_label(92,y+13,selected ? GX_ACCENT : GX_MUTED,number,.8f);gxui_label(150,y+13,selected ? GX_PANEL : GX_INK,short_text(answers[i].phrase,31).c_str(),.8f);}}
+  gxui_label(644,164,GX_MUTED,answer_preview_.empty() ? "THE SAVED REPLY" : "SAVED-TEXT MATCH PREVIEW",.7f);
+  std::string selected=answers.empty() ? "" : answers[answer_sel_].phrase;
+  std::string text=!answer_preview_.empty() ? answer_preview_ : (answers.empty() ? "Up to 16 local answers. Commands keep priority in chat. Preview never runs a command." : answers[answer_sel_].response);
+  std::string view_key=selected+"\n"+answer_preview_;answer_view_.update(text,40,12);
+  if(answer_view_key_!=view_key){answer_view_key_=view_key;answer_view_.scroll(-100000);}
+  const std::vector<std::string>& lines=answer_view_.lines();for(int i=answer_view_.top();i<(int)lines.size() && i<answer_view_.top()+12;++i) gxui_label(644,210+(i-answer_view_.top())*28,GX_INK,lines[i].c_str(),.85f);
+  char count[64];snprintf(count,sizeof(count),"%u / 16 ANSWERS",(unsigned)answers.size());gxui_label(92,536,GX_MUTED,count,.65f);
+  if(!chat_notice_.empty()) paragraph(64,580,chat_notice_,38,2,GX_MUTED);
+  gxui_label(644,592,GX_MUTED,"LB/RB: read / Right stick: test match",.65f);
+  gxui_prompt(64,658,GX_BTN_A,"Edit");gxui_prompt(232,658,GX_BTN_X,"New");gxui_prompt(400,658,GX_BTN_Y,"Delete");gxui_prompt(606,658,GX_BTN_START,"Undo");gxui_prompt(1010,658,GX_BTN_B,"Tools");
+  u32 p=gxui_buttons_pressed();if(kb_mode_){kb_draw();kb_input();return;}
+  if(!answer_confirm_.empty()){gxui_fill(280,250,720,220,GX_INK);gxui_label(312,272,GX_PANEL,"Delete this saved answer?",1.0f);
+    gxui_label(312,324,GX_ACCENT,short_text(answer_confirm_,42).c_str(),.8f);gxui_prompt(312,404,GX_BTN_A,"Delete",GX_PANEL);gxui_prompt(716,404,GX_BTN_B,"Keep",GX_PANEL);
+    if(p&GX_BTN_A){assistant_.remove_answer(answer_confirm_,chat_notice_);answer_confirm_.clear();answer_preview_.clear();answer_view_key_.clear();queue_assistant_save();}return;}
+  int previous=answer_sel_;if(p&GX_BTN_DUP) --answer_sel_;if(p&GX_BTN_DDOWN) ++answer_sel_;answer_sel_=GX_CLAMP(answer_sel_,0,GX_MAX(0,(int)answers.size()-1));
+  if(previous!=answer_sel_) answer_preview_.clear();
+  if(p&GX_BTN_LB) answer_view_.scroll(-12);if(p&GX_BTN_RB) answer_view_.scroll(12);
+  if(p&GX_BTN_X){if(answers.size()>=16) chat_notice_="All 16 slots are full. Edit or delete an answer first.";else {answer_draft_.clear();kb_open(KB_ANSWER_PHRASE,"Your phrase","3-80 bytes. Example: favorite game","");}}
+  else if(p&GX_BTN_START){local_command("undo");answer_preview_.clear();answer_view_key_.clear();}
+  else if(p&GX_BTN_RTHUMB) kb_open(KB_ANSWER_TEST,"Test a saved-text match","Preview only. No commands run.",answers.empty() ? "" : answers[answer_sel_].phrase);
+  else if(!answers.empty()){
+    if(p&GX_BTN_A){answer_draft_=answers[answer_sel_].phrase;kb_open(KB_ANSWER_TEXT,"Edit your answer","Literal text, 1-512 bytes",answers[answer_sel_].response);}
+    else if(p&GX_BTN_Y) answer_confirm_=answers[answer_sel_].phrase;
   }
 }
 void App::restart_for_update(){
@@ -186,7 +221,7 @@ void App::frame(){
 #endif
   poll_assistant_save();assistant_poll();gxui_begin_frame(GX_PAPER);
   switch(screen_){case AS_HOME:home_frame();break;case AS_NOTES:notes_frame();break;case AS_TIMERS:timers_frame();break;case AS_TOOLS:tools_frame();break;
-    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;case AS_UPDATES:updates_frame();break;case AS_HUB:hub_frame();break;}
+    case AS_BROWSE:browse_frame();break;case AS_SETTINGS:settings_frame();break;case AS_LOADING:loading_frame();break;case AS_CHAT:chat_frame();break;case AS_UPDATES:updates_frame();break;case AS_HUB:hub_frame();break;case AS_ANSWERS:answers_frame();break;}
   if(!timer_notice_.empty() && gx_time_seconds()<timer_notice_until_ && !kb_mode_){gxui_fill(64,110,1152,40,GX_INK);gxui_label(80,115,GX_PANEL,short_text(timer_notice_,90).c_str(),.75f);}
   gxui_end_frame();u32 p=gxui_buttons_pressed();bool swallowed=kb_swallow_;kb_swallow_=false;
   // Join inference/server workers only after releasing the renderer's GPU lock.
@@ -194,6 +229,7 @@ void App::frame(){
   if(!swallowed && !kb_mode_ && (p&(GX_BTN_B|GX_BTN_BACK))){
     confirm_id_=0;
     if(screen_==AS_CHAT && !assistant_mode_){gen_stop_=true;server_stop();gx_thread_join(gen_thread_);gen_thread_=0;engine_.reset();kv_=KVCache();model_loaded_=false;turns_.clear();chat_log_.clear();screen_=AS_BROWSE;}
+    else if(screen_==AS_ANSWERS){if(!answer_confirm_.empty()) answer_confirm_.clear();else {answer_draft_.clear();screen_=AS_TOOLS;}}
     else if(screen_==AS_HUB){if(hub_confirm_){hub_confirm_=false;}
       else if(hub_files_){hub_files_=false;}else screen_=AS_BROWSE;}
     else if(screen_==AS_SETTINGS) screen_=AS_BROWSE;
@@ -212,6 +248,7 @@ void App::test_seed(){
   gx_file_entry f;f.name="SmolLM2-135M-Instruct-Q8_0.gguf";f.size=144811072;files_.push_back(f);f.name="gemma-3-270m-it-Q8_0.gguf";f.size=291545600;files_.push_back(f);
 }
 bool App::test_capture(const char* name,const char* path){
+  if(!strcmp(name,"answers")){std::string result;assistant_.write_answer("favorite game","Halo 3. Friday night co-op with friends.",result);assistant_.write_answer("project idea","Give the Xbox 360 one more useful job.",result);assistant_.write_answer("tea break","Take five minutes, stretch, and come back ready.",result);open_answers();test_frame(0);return gxui_capture(path);}
   if(!strcmp(name,"hub") || !strcmp(name,"hub-files")){
     HubView v;v.revision=10;v.page=2;v.has_previous=true;v.state=!strcmp(name,"hub") ? HS_MODELS : HS_FILES;v.message=!strcmp(name,"hub") ? "Cached results. No network request needed." : "Choose a quantization. All shards are downloaded together.";
     HubModel m;m.id="example/SmolLM2-135M-Instruct-GGUF";m.revision=std::string(40,'a');m.architecture="llama";m.parameters=135000000;m.license="apache-2.0";v.models.push_back(m);v.model=m;

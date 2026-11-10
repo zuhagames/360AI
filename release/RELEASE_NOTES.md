@@ -1,18 +1,17 @@
-# 360AI 2.3 - Less typing, easier model browsing
+# 360AI 2.4 - Your own instant replies
 
-Find smaller local models and browse the native Hugging Face library with fewer keyboard entries.
+Personalize the offline assistant from a native controller screen, without loading a language model.
 
-- **Family presets:** press START in Model library to cycle SmolLM2, TinyStories, Qwen2.5, Llama and Gemma searches. Presets choose candidate filtering and a 200M/1B parameter limit; compatibility still depends on each GGUF.
-- **Remembered searches:** search text, parameter limit and candidate filter survive restarts. Saved exact `owner/repository` searches reopen through repository details.
-- **Cached browsing:** D-pad Left goes back; RB or D-pad Right goes forward. The last eight search pages stay in RAM, so revisiting them needs no network request. Changing the search/filter clears them. A failed next-page request keeps the current results available to retry.
-- **Clearer downloads:** percentage, average transfer speed, approximate remaining transfer time and a progress bar. Verification remains a separate step; reused shards and local hashing do not inflate the network speed estimate.
-- **Local model sorting:** LB switches smallest-first/name order while keeping the selected model. The preference is saved; list sorting now uses `std::sort`.
-- **Regression coverage:** cache reuse/eviction, failed-page recovery, stale-query clearing, saved settings validation, transfer/reuse statistics and controller selection.
+- **Saved answers:** open Home → Y Quick tools → Saved answers, or type `open saved answers`.
+- **Add or edit:** X asks for a phrase and then its reply; A edits an existing response. Duplicate phrases point to the existing entry. Cancelling either keyboard keeps saved data unchanged.
+- **Preview matches:** click the right stick and enter a sentence. The preview shows the longest matching saved phrase and its literal reply, without executing any command. Chat still gives built-in commands priority; the preview covers saved text only.
+- **Manage safely:** Y confirms deletion; START undoes the latest saved-data change. LB/RB scroll long replies. Existing taught answers appear automatically, with the same limits and background save/backup system.
+- **Debugging:** bounded input, valid UTF-8/control checks, capacity tests, cancelled drafts, duplicate phrases, literal command-like/multiline replies, preview isolation, delete/cancel/undo and persistence round-trips.
 
-**Already on 2.1 or 2.2?** Open **START on Home → Updates** for the small app-only download. For a fresh installation or 2.0/older, extract **360AI-2.3-USB.zip** and copy its entire `360AI` folder to your drive. All four bundled model weights and their notices remain included. App-only updates preserve models, notes, settings and custom rules.
+**Already on 2.1–2.3?** Open **START on Home → Updates** for the small app-only download. For a first installation or 2.0/older, extract **360AI-2.4-USB.zip** and copy its entire `360AI` folder to your drive. All four model weights and their notices remain included. App-only updates preserve your models, notes, answers, settings and custom rules.
 
-This update improves browsing and download feedback. It does not change model inference speed or add support for new architectures. HDD streaming still needs RAM and larger models can be extremely slow.
+Saved answers are explicit text replies, not neural training or general reasoning. This release does not change GGUF inference speed or add model architectures.
 
-Validation: native assistant/engine/Hub/updater/controller checks, Xbox SDK app/installer builds, tokenizer/protocol/package regressions, UI captures and package/model checksums. Physical Xbox networking, large downloads, FATX behavior and inference remain hardware validation tasks.
+Validation: native assistant/Hub/engine/updater/controller checks, Xbox SDK app/installer builds, tokenizer/protocol/package regressions, native UI captures, complete model/package checksums and an actual previous-version installer/recovery trial. Physical Xbox UI, keyboard, persistence, networking and inference remain hardware validation tasks.
 
 Made by **ZuhaGames & Canyons**. Forked from [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex). AI tools assisted development, debugging and documentation.

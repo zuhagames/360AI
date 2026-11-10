@@ -20,7 +20,7 @@ priority. A phrase inside an unrelated sentence does not trigger an action.
 
 CONTROLLER SCREENS
 Home: D-pad selects Assistant, Notes, Timers or Models. A opens the selection.
-Quick tools: calculations, conversions, new timer/note, teaching and help.
+Quick tools: calculations, conversions, new timer/note, Saved answers and help.
 Notes: up/down select, A edits, X adds, Y asks to delete, START undoes.
 LB/RB pages through a long note. Typed note content is saved literally.
 Timers: up/down select, A pauses/resumes, X adds, Y asks to cancel.
@@ -111,6 +111,20 @@ automatically. Invalid saved text/control characters are rejected before
 changing memory; backup recovery is attempted when the main file is invalid.
 
 TEACH ANSWERS ON YOUR XBOX
+Open Home > Y Quick tools > Saved answers, or type open saved answers.
+Up/down: select. A: edit the reply. X: new phrase, then new reply.
+Y: confirm deletion. START: undo the latest saved-data change.
+LB/RB: read a long reply. Click right stick: test a saved-text match.
+B cancels a keyboard or deletion; B on the main screen returns to Tools.
+New drafts do not change saved data until both fields are valid. Cancelling
+either keyboard keeps existing answers. Duplicate phrases select the existing
+entry and ask you to edit it, rather than replacing its reply silently.
+Previews show the longest saved phrase matching whole words in your input.
+They never run commands, alter saved data or test file/built-in FAQ answers.
+Chat still gives built-in commands priority. An answer saying delete all notes
+is only text. Editing and deletion use the same background save and undo path
+as typed teaching. Existing taught answers appear without a migration.
+
   teach favorite game: Halo 3
   what is your favorite game
   list learned answers

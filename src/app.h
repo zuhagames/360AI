@@ -20,7 +20,8 @@ enum app_screen{
   AS_TIMERS,
   AS_TOOLS,
   AS_UPDATES,
-  AS_HUB
+  AS_HUB,
+  AS_ANSWERS
 };
 
 enum debug_cycle{
@@ -28,7 +29,7 @@ enum debug_cycle{
 };
 
 enum kb_kind{
-  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_NOTE_NEW, KB_NOTE_EDIT, KB_TIMER_NEW, KB_HUB_SEARCH, KB_SYS=0x100
+  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_NOTE_NEW, KB_NOTE_EDIT, KB_TIMER_NEW, KB_HUB_SEARCH, KB_ANSWER_PHRASE, KB_ANSWER_TEXT, KB_ANSWER_TEST, KB_SYS=0x100
 };
 
 struct AppSettings{
@@ -73,6 +74,8 @@ public:
   std::string test_model_name(int i) const {return files_[i].name;}
   int test_model_selection() const {return file_sel_;}
   void test_add_model(const char* name,u64 bytes){gx_file_entry f;f.name=name;f.size=bytes;files_.push_back(f);}
+  void test_keyboard_text(const std::string& text){kb_text_=text;kb_commit();}
+  const std::string& test_answer_preview() const {return answer_preview_;}
 #endif
 
 private:
@@ -87,6 +90,9 @@ private:
 
   int set_sel_;
   int home_sel_,tool_sel_,note_sel_,timer_sel_,confirm_id_,edit_id_;
+  int answer_sel_;
+  std::string answer_draft_,answer_confirm_,answer_view_key_,answer_preview_;
+  ChatView answer_view_;
 
   int kb_mode_;
   int kb_cur_;
@@ -157,6 +163,8 @@ private:
   void notes_frame();
   void timers_frame();
   void tools_frame();
+  void answers_frame();
+  void open_answers();
   void updates_frame();
   void restart_for_update();
   void shell(const char* title,const char* subtitle);
