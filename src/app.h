@@ -76,6 +76,8 @@ public:
   void test_add_model(const char* name,u64 bytes){gx_file_entry f;f.name=name;f.size=bytes;files_.push_back(f);}
   void test_keyboard_text(const std::string& text){kb_text_=text;kb_commit();}
   const std::string& test_answer_preview() const {return answer_preview_;}
+  bool test_starter_mode() const {return answer_starters_;}
+  int test_starter_selection() const {return starter_sel_;}
 #endif
 
 private:
@@ -91,6 +93,8 @@ private:
   int set_sel_;
   int home_sel_,tool_sel_,note_sel_,timer_sel_,confirm_id_,edit_id_;
   int answer_sel_;
+  int starter_sel_;
+  bool answer_starters_;
   std::string answer_draft_,answer_confirm_,answer_view_key_,answer_preview_;
   ChatView answer_view_;
 

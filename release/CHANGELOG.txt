@@ -1,3 +1,21 @@
+360AI 2.5 - 150 more ready-made answers
+======================================
+
+- Add exactly 150 distinct starter questions/replies across ten categories.
+- Keep the existing 106 fixed phrase variants and all personal saved answers.
+- Exact normalized lookup shares the once-built reply index; no model inference.
+- Saved answers: left-stick click switches Starter/My answers.
+- Up/down selects; D-pad Left/Right jumps categories; full question/reply shown.
+- A customizes a starter into a personal slot; B cancels without saving.
+- Existing overrides edit in place; deletion restores the original starter.
+- All 150 starters work even when the 16 personal slots are full.
+- Preview checks exact starter questions after personal matches in Starter view.
+- Personal files, save format, background persistence and undo stay compatible.
+- Test every reply, uniqueness, category counts, case/punctuation, exact matching,
+  zero actions, untouched data, customization, cancellation and capacity isolation.
+- No new model weights or architecture changes; four bundled models remain.
+- Physical Xbox UI, keyboard and persistence still need hardware validation.
+
 360AI 2.4 - Your own instant replies
 ==================================
 

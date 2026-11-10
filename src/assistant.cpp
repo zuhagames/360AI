@@ -3,6 +3,7 @@
 #include "platform.h"
 #include "textstream.h"
 #include "replies.h"
+#include "starter_answers.h"
 #include <ctype.h>
 #include <float.h>
 #include <map>
@@ -227,7 +228,9 @@ const char* fixed_reply(const std::string& normalized){
     std::map<std::string,const char*> entries;
     Index(){for(size_t i=0;i<sizeof(gx_replies)/sizeof(gx_replies[0]);++i){std::string aliases=gx_replies[i].phrases;size_t start=0;
       for(;;){size_t end=aliases.find('|',start);entries[aliases.substr(start,end==std::string::npos ? end : end-start)]=gx_replies[i].answer;
-        if(end==std::string::npos) break;start=end+1;}}}
+        if(end==std::string::npos) break;start=end+1;}}
+      for(size_t i=0;i<sizeof(gx_starter_answers)/sizeof(gx_starter_answers[0]);++i) entries[gx_starter_answers[i].phrase]=gx_starter_answers[i].response;
+    }
   };
   static const Index index;std::map<std::string,const char*>::const_iterator found=index.entries.find(normalized);
   return found==index.entries.end() ? 0 : found->second;
@@ -419,9 +422,14 @@ bool Assistant::remove_answer(const std::string& phrase_text,std::string& result
   std::string key;if(answer_phrase(phrase_text,key)) for(size_t i=0;i<answers_.size();++i) if(answers_[i].phrase==key){remember_undo();answers_.erase(answers_.begin()+i);dirty_=true;result="Forgot the answer for \""+key+"\". Use undo to restore it.";return true;}
   result="No taught answer has that exact phrase. Try list learned answers.";return false;
 }
-bool Assistant::preview_answer(const std::string& text,std::string& key,std::string& response) const{
+size_t Assistant::starter_count(){return sizeof(gx_starter_answers)/sizeof(gx_starter_answers[0]);}
+const char* Assistant::starter_phrase(size_t i){return i<starter_count() ? gx_starter_answers[i].phrase : "";}
+const char* Assistant::starter_response(size_t i){return i<starter_count() ? gx_starter_answers[i].response : "";}
+const char* Assistant::starter_category(size_t i){return i<starter_count() ? gx_starter_answers[i].category : "";}
+bool Assistant::preview_answer(const std::string& text,std::string& key,std::string& response,bool include_starters) const{
   key.clear();response.clear();if(text.size()>512 || !valid_text(text)) return false;std::string norm=words(text);
   for(size_t i=0;i<answers_.size();++i) if(phrase(norm,answers_[i].phrase) && answers_[i].phrase.size()>key.size()){key=answers_[i].phrase;response=answers_[i].response;}
+  if(key.empty() && include_starters) for(size_t i=0;i<starter_count();++i) if(norm==starter_phrase(i)){key=norm;response=starter_response(i);break;}
   return !key.empty();
 }
 std::string Assistant::state_text() const{

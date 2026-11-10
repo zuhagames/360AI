@@ -17,6 +17,7 @@
 #include "updater_checks.h"
 #include "hub_checks.h"
 #include "answers_checks.h"
+#include "starter_checks.h"
 
 static std::string path(const char* name){ return std::string("build/tests/")+name+".gguf"; }
 static std::string completion(const std::string& prompt,int n,void*){
@@ -149,6 +150,7 @@ static void checks(){
   updater_checks();
   hub_checks();
   answers_checks();
+  starter_checks();
   {
     GGUF g;assert(g.load(path("stories-tokenizer").c_str()));Tokenizer tok;assert(tok.load(g) && tok.completion_only());
     std::vector<std::pair<std::string,std::string> > messages;

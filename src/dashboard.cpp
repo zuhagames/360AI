@@ -145,38 +145,48 @@ void App::tools_frame(){
       if(tool_sel_==5) assistant_send("help");else kb_open(KB_CHAT,"360AI tools",tool_sel_==4 ? "teach favorite game: Halo 3" : "Complete the command, then press START",initial[tool_sel_]);}
   }
 }
-void App::open_answers(){assistant_.cancel_followup();screen_=AS_ANSWERS;answer_confirm_.clear();answer_draft_.clear();answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();}
+void App::open_answers(){assistant_.cancel_followup();screen_=AS_ANSWERS;answer_starters_=assistant_.answers().empty();answer_confirm_.clear();answer_draft_.clear();answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();}
 void App::answers_frame(){
-  shell("Saved answers","YOUR WORDS. READY WITHOUT A MODEL.");
-  const std::vector<Assistant::Answer>& answers=assistant_.answers();answer_sel_=GX_CLAMP(answer_sel_,0,GX_MAX(0,(int)answers.size()-1));
+  shell("Saved answers",answer_starters_ ? "STARTER ANSWERS / READY WITHOUT A MODEL" : "MY ANSWERS / YOUR WORDS, YOUR REPLIES");
+  const std::vector<Assistant::Answer>& answers=assistant_.answers();size_t count=answer_starters_ ? Assistant::starter_count() : answers.size();
+  int& selection=answer_starters_ ? starter_sel_ : answer_sel_;selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));
   gxui_fill(64,146,528,422,GX_PANEL);gxui_fill(616,146,600,422,GX_PANEL);
-  if(answers.empty()){paragraph(92,186,"Make it your own. Press X, enter a phrase, then write the answer you want to hear.",31,5);}
-  else {int start=GX_MAX(0,answer_sel_-5);for(int i=start;i<(int)answers.size() && i<start+6;++i){f32 y=160+(i-start)*64;bool selected=i==answer_sel_;
+  if(!count){paragraph(92,186,"Make it your own. Press X for a personal reply, or click the left stick for 150 ready-made answers.",31,5);}
+  else {int start=GX_MAX(0,selection-5);for(int i=start;i<(int)count && i<start+6;++i){f32 y=160+(i-start)*64;bool selected=i==selection;
       if(selected) gxui_fill(76,y,504,60,GX_INK);char number[16];snprintf(number,sizeof(number),"%02d",i+1);
-      gxui_label(92,y+13,selected ? GX_ACCENT : GX_MUTED,number,.8f);gxui_label(150,y+13,selected ? GX_PANEL : GX_INK,short_text(answers[i].phrase,31).c_str(),.8f);}}
-  gxui_label(644,164,GX_MUTED,answer_preview_.empty() ? "THE SAVED REPLY" : "SAVED-TEXT MATCH PREVIEW",.7f);
-  std::string selected=answers.empty() ? "" : answers[answer_sel_].phrase;
-  std::string text=!answer_preview_.empty() ? answer_preview_ : (answers.empty() ? "Up to 16 local answers. Commands keep priority in chat. Preview never runs a command." : answers[answer_sel_].response);
+      gxui_label(92,y+13,selected ? GX_ACCENT : GX_MUTED,number,.8f);gxui_label(150,y+13,selected ? GX_PANEL : GX_INK,short_text(answer_starters_ ? Assistant::starter_phrase(i) : answers[i].phrase,31).c_str(),.8f);}}
+  gxui_label(644,164,GX_MUTED,!answer_preview_.empty() ? "TEXT MATCH PREVIEW" : (answer_starters_ ? Assistant::starter_category(selection) : "THE SAVED REPLY"),.7f);
+  std::string selected=!count ? "" : (answer_starters_ ? Assistant::starter_phrase(selection) : answers[selection].phrase);
+  std::string text=!answer_preview_.empty() ? answer_preview_ : (!count ? "16 personal slots, separate from the starter pack. Commands keep priority in chat." : (answer_starters_ ? Assistant::starter_response(selection) : answers[selection].response));
+  if(answer_starters_ && answer_preview_.empty()) text="Question: "+selected+"\n\n"+text;
   std::string view_key=selected+"\n"+answer_preview_;answer_view_.update(text,40,12);
   if(answer_view_key_!=view_key){answer_view_key_=view_key;answer_view_.scroll(-100000);}
   const std::vector<std::string>& lines=answer_view_.lines();for(int i=answer_view_.top();i<(int)lines.size() && i<answer_view_.top()+12;++i) gxui_label(644,210+(i-answer_view_.top())*28,GX_INK,lines[i].c_str(),.85f);
-  char count[64];snprintf(count,sizeof(count),"%u / 16 ANSWERS",(unsigned)answers.size());gxui_label(92,536,GX_MUTED,count,.65f);
+  char counter[80];if(answer_starters_) snprintf(counter,sizeof(counter),"%u / %u STARTERS / A: CUSTOMIZE",(unsigned)selection+1,(unsigned)count);
+  else snprintf(counter,sizeof(counter),"%u / 16 PERSONAL ANSWERS",(unsigned)count);gxui_label(92,536,GX_MUTED,counter,.65f);
   if(!chat_notice_.empty()) paragraph(64,580,chat_notice_,38,2,GX_MUTED);
-  gxui_label(644,592,GX_MUTED,"LB/RB: read / Right stick: test match",.65f);
-  gxui_prompt(64,658,GX_BTN_A,"Edit");gxui_prompt(232,658,GX_BTN_X,"New");gxui_prompt(400,658,GX_BTN_Y,"Delete");gxui_prompt(606,658,GX_BTN_START,"Undo");gxui_prompt(1010,658,GX_BTN_B,"Tools");
+  gxui_label(644,580,GX_MUTED,"Left stick: starters / my answers",.65f);
+  gxui_label(644,608,GX_MUTED,answer_starters_ ? "L/R: category / LB/RB: read / RS: test" : "LB/RB: read / Right stick: test match",.65f);
+  gxui_prompt(64,658,GX_BTN_A,answer_starters_ ? "Customize" : "Edit");gxui_prompt(320,658,GX_BTN_X,"New");gxui_prompt(488,658,GX_BTN_Y,answer_starters_ ? "My answers" : "Delete");gxui_prompt(772,658,GX_BTN_START,"Undo");gxui_prompt(1010,658,GX_BTN_B,"Tools");
   u32 p=gxui_buttons_pressed();if(kb_mode_){kb_draw();kb_input();return;}
   if(!answer_confirm_.empty()){gxui_fill(280,250,720,220,GX_INK);gxui_label(312,272,GX_PANEL,"Delete this saved answer?",1.0f);
     gxui_label(312,324,GX_ACCENT,short_text(answer_confirm_,42).c_str(),.8f);gxui_prompt(312,404,GX_BTN_A,"Delete",GX_PANEL);gxui_prompt(716,404,GX_BTN_B,"Keep",GX_PANEL);
     if(p&GX_BTN_A){assistant_.remove_answer(answer_confirm_,chat_notice_);answer_confirm_.clear();answer_preview_.clear();answer_view_key_.clear();queue_assistant_save();}return;}
-  int previous=answer_sel_;if(p&GX_BTN_DUP) --answer_sel_;if(p&GX_BTN_DDOWN) ++answer_sel_;answer_sel_=GX_CLAMP(answer_sel_,0,GX_MAX(0,(int)answers.size()-1));
-  if(previous!=answer_sel_) answer_preview_.clear();
+  if((p&GX_BTN_LTHUMB) || (answer_starters_ && (p&GX_BTN_Y))){answer_starters_=!answer_starters_;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return;}
+  int previous=selection;if(p&GX_BTN_DUP) --selection;if(p&GX_BTN_DDOWN) ++selection;
+  if(answer_starters_ && (p&(GX_BTN_DLEFT|GX_BTN_DRIGHT))){int category=selection/15+((p&GX_BTN_DLEFT) ? -1 : 1);if(category>=0 && category<10) selection=category*15;}
+  selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));if(previous!=selection) answer_preview_.clear();
   if(p&GX_BTN_LB) answer_view_.scroll(-12);if(p&GX_BTN_RB) answer_view_.scroll(12);
   if(p&GX_BTN_X){if(answers.size()>=16) chat_notice_="All 16 slots are full. Edit or delete an answer first.";else {answer_draft_.clear();kb_open(KB_ANSWER_PHRASE,"Your phrase","3-80 bytes. Example: favorite game","");}}
   else if(p&GX_BTN_START){local_command("undo");answer_preview_.clear();answer_view_key_.clear();}
-  else if(p&GX_BTN_RTHUMB) kb_open(KB_ANSWER_TEST,"Test a saved-text match","Preview only. No commands run.",answers.empty() ? "" : answers[answer_sel_].phrase);
-  else if(!answers.empty()){
-    if(p&GX_BTN_A){answer_draft_=answers[answer_sel_].phrase;kb_open(KB_ANSWER_TEXT,"Edit your answer","Literal text, 1-512 bytes",answers[answer_sel_].response);}
-    else if(p&GX_BTN_Y) answer_confirm_=answers[answer_sel_].phrase;
+  else if(p&GX_BTN_RTHUMB) kb_open(KB_ANSWER_TEST,"Test a text match","Starters: exact question. Personal: whole words.",!count ? "" : (answer_starters_ ? Assistant::starter_phrase(selection) : answers[selection].phrase));
+  else if(count){
+    if(p&GX_BTN_A){answer_draft_=answer_starters_ ? Assistant::starter_phrase(selection) : answers[selection].phrase;
+      std::string reply=answer_starters_ ? Assistant::starter_response(selection) : answers[selection].response;bool existing=false;
+      for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==answer_draft_){existing=true;reply=answers[i].response;break;}
+      if(!existing && answers.size()>=16){chat_notice_="Personal slots are full. Edit or delete one in My answers.";return;}
+      kb_open(KB_ANSWER_TEXT,answer_starters_ ? "Customize this reply" : "Edit your answer","Literal text, 1-512 bytes",reply);}
+    else if(!answer_starters_ && (p&GX_BTN_Y)) answer_confirm_=answers[selection].phrase;
   }
 }
 void App::restart_for_update(){
@@ -248,6 +258,7 @@ void App::test_seed(){
   gx_file_entry f;f.name="SmolLM2-135M-Instruct-Q8_0.gguf";f.size=144811072;files_.push_back(f);f.name="gemma-3-270m-it-Q8_0.gguf";f.size=291545600;files_.push_back(f);
 }
 bool App::test_capture(const char* name,const char* path){
+  if(!strcmp(name,"starters")){open_answers();answer_starters_=true;starter_sel_=0;test_frame(0);return gxui_capture(path);}
   if(!strcmp(name,"answers")){std::string result;assistant_.write_answer("favorite game","Halo 3. Friday night co-op with friends.",result);assistant_.write_answer("project idea","Give the Xbox 360 one more useful job.",result);assistant_.write_answer("tea break","Take five minutes, stretch, and come back ready.",result);open_answers();test_frame(0);return gxui_capture(path);}
   if(!strcmp(name,"hub") || !strcmp(name,"hub-files")){
     HubView v;v.revision=10;v.page=2;v.has_previous=true;v.state=!strcmp(name,"hub") ? HS_MODELS : HS_FILES;v.message=!strcmp(name,"hub") ? "Cached results. No network request needed." : "Choose a quantization. All shards are downloaded together.";

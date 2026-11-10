@@ -40,7 +40,11 @@ public:
   static bool answer_phrase(const std::string& text,std::string& normalized);
   bool write_answer(const std::string& phrase,const std::string& response,std::string& result);
   bool remove_answer(const std::string& phrase,std::string& result);
-  bool preview_answer(const std::string& text,std::string& key,std::string& response) const;
+  bool preview_answer(const std::string& text,std::string& key,std::string& response,bool include_starters=false) const;
+  static size_t starter_count();
+  static const char* starter_phrase(size_t index);
+  static const char* starter_response(size_t index);
+  static const char* starter_category(size_t index);
   const std::vector<Answer>& answers() const {return answers_;}
   bool dirty() const { return dirty_; }
   size_t timer_count() const { return timers_.size(); }
