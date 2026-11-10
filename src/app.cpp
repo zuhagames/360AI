@@ -686,12 +686,12 @@ void App::kb_commit(){
   } else if(mode==KB_ANSWER_TEXT){
     if(assistant_.write_answer(answer_draft_,kb_text_,chat_notice_)){
       const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==answer_draft_) answer_sel_=(int)i;
-      answer_preview_.clear();queue_assistant_save();
+      answer_preview_.clear();answer_view_key_.clear();queue_assistant_save();
     }return;
   } else if(mode==KB_ANSWER_TEST){
     std::string key,response;
     answer_preview_=assistant_.preview_answer(kb_text_,key,response) ? "Matches: "+key+"\n\n"+response : "No saved text answer matches those words.";
-    answer_view_key_.clear();chat_notice_="Preview only. Commands and file-based answers are not executed; command priority still applies in chat.";return;
+    answer_view_key_.clear();chat_notice_="Preview only. Commands keep priority in chat.";return;
   } else if(mode == KB_CTX){
     int v = atoi(kb_text_.c_str());
     if(v < 256) v = 256;
