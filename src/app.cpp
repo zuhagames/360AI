@@ -682,7 +682,7 @@ void App::kb_commit(){
   kb_mode_ = KB_NONE;
   if(mode==KB_ANSWER_PHRASE){
     std::string key;if(!Assistant::answer_phrase(kb_text_,key)){chat_notice_="Use a phrase of 3-80 bytes, with words or numbers.";return;}
-    const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==key){answer_sel_=(int)i;chat_notice_="That phrase already exists. Press A to edit its answer.";return;}
+    const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==key){answer_sel_=(int)i;answer_starters_=false;answer_preview_.clear();answer_view_key_.clear();chat_notice_="That phrase already exists. Press A to edit its answer.";return;}
     answer_draft_=key;kb_open(KB_ANSWER_TEXT,"Your answer","Literal text, 1-512 bytes. B cancels without saving.","");kb_swallow_=true;return;
   } else if(mode==KB_ANSWER_TEXT){
     if(assistant_.write_answer(answer_draft_,kb_text_,chat_notice_)){
