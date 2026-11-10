@@ -11,6 +11,24 @@ It is a text assistant: microphone input, speech recognition and voice output
 are not implemented. It matches supported intents, not arbitrary conversation.
 
 PREDEFINED ANSWERS
+150 starter answers are included in addition to the 106 existing phrase variants.
+They cover getting started, notes, timers, personal answers, local models,
+performance, the model library, updates, chat controls and everyday conversation.
+Each of the ten categories has 15 distinct questions and written replies.
+These are exact normalized question matches, with no model inference or actions.
+Use the shown question; case and ordinary punctuation do not matter.
+
+Open Saved answers and click the left stick for Starter/My answers.
+D-pad Left/Right jumps categories; up/down selects a question. The right panel
+shows the full question and reply. LB/RB reads long text; right stick previews.
+A copies a starter reply into an editor. Saving uses one personal slot;
+cancelling leaves everything unchanged. Existing personal overrides are edited
+in place. Y in Starter view opens My answers; Y there confirms deletion.
+Removing an override exposes the original starter again. All 150 starters
+remain available even when the 16 personal slots are full. No starter is written
+over your personal data or counted against those slots. A fresh empty notebook
+opens Starter view by default; existing personal answers are kept as-is.
+
 106 exact phrase variants cover greetings, thanks, everyday conversation and
 common questions. Examples: hello, good morning, how are you, i am bored,
 and what do you think about the xbox 360. Matching ignores case and ordinary
@@ -120,7 +138,9 @@ New drafts do not change saved data until both fields are valid. Cancelling
 either keyboard keeps existing answers. Duplicate phrases select the existing
 entry and ask you to edit it, rather than replacing its reply silently.
 Previews show the longest saved phrase matching whole words in your input.
-They never run commands, alter saved data or test file/built-in FAQ answers.
+They never run commands or alter saved data. In Starter view, preview also
+checks exact starter questions after personal matches. File FAQ rules are
+not part of preview; actual chat still applies its normal answer priority.
 Chat still gives built-in commands priority. An answer saying delete all notes
 is only text. Editing and deletion use the same background save and undo path
 as typed teaching. Existing taught answers appear without a migration.
