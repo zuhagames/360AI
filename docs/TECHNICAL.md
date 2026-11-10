@@ -314,4 +314,3 @@ The bundled models are **Gemma 3 270M Instruct**, created by Google, using [Seco
   <a href="https://github.com/zuhagames/360AI/issues">Report an issue</a> ·
   <a href="https://ko-fi.com/zuhagames">Support on Ko-fi</a>
 </p>
-
