@@ -1,17 +1,18 @@
-# 360AI 2.4 - Your own instant replies
+# 360AI 2.5 - 150 more ready-made answers
 
-Personalize the offline assistant from a native controller screen, without loading a language model.
+Adds exactly **150 new starter questions and written replies**, available offline with no model loading.
 
-- **Saved answers:** open Home → Y Quick tools → Saved answers, or type `open saved answers`.
-- **Add or edit:** X asks for a phrase and then its reply; A edits an existing response. Duplicate phrases point to the existing entry. Cancelling either keyboard keeps saved data unchanged.
-- **Preview matches:** click the right stick and enter a sentence. The preview shows the longest matching saved phrase and its literal reply, without executing any command. Chat still gives built-in commands priority; the preview covers saved text only.
-- **Manage safely:** Y confirms deletion; START undoes the latest saved-data change. LB/RB scroll long replies. Existing taught answers appear automatically, with the same limits and background save/backup system.
-- **Debugging:** bounded input, valid UTF-8/control checks, capacity tests, cancelled drafts, duplicate phrases, literal command-like/multiline replies, preview isolation, delete/cancel/undo and persistence round-trips.
+- **Ten categories, 15 answers each:** getting started, notes, timers, personal answers, local models, performance, model downloads, updates, chat controls and everyday conversation.
+- **Browse them on Xbox:** Home → Y Quick tools → Saved answers. Click the left stick to switch Starter/My answers; D-pad Left/Right jumps categories. Select a question to read its complete wording and reply.
+- **Instant matching:** starter questions use the existing once-built exact-phrase index. Case and ordinary punctuation are ignored. Unrelated sentences do not trigger a starter merely because they contain its question.
+- **Make one yours:** A opens a starter reply for customization. Saving uses one of the existing 16 personal slots; cancelling changes nothing. Existing overrides edit in place, and deleting one restores the original starter reply.
+- **Personal data preserved:** the 150 starters are compiled into the app, do not consume personal slots and are not written over your save. They remain available even with all personal slots full. The existing 106 phrase variants remain.
+- **Debugging:** every new question/reply is checked for exact count, unique normalized wording, valid bounds, category counts, case/punctuation handling and no app actions. Controller checks cover category jumps, preview, cancelled copies, overrides, deletion/undo and full personal-slot behavior.
 
-**Already on 2.1–2.3?** Open **START on Home → Updates** for the small app-only download. For a first installation or 2.0/older, extract **360AI-2.4-USB.zip** and copy its entire `360AI` folder to your drive. All four model weights and their notices remain included. App-only updates preserve your models, notes, answers, settings and custom rules.
+**Already on 2.1–2.4?** Open **START on Home → Updates** for the small app-only download. For a first installation or 2.0/older, extract **360AI-2.5-USB.zip** and copy its entire `360AI` folder to your drive. All four existing model weights and their notices are included. Personal data and models are preserved by app-only updates.
 
-Saved answers are explicit text replies, not neural training or general reasoning. This release does not change GGUF inference speed or add model architectures.
+These are predefined text replies, not neural training or new model capabilities. GGUF inference speed is unchanged.
 
-Validation: native assistant/Hub/engine/updater/controller checks, Xbox SDK app/installer builds, tokenizer/protocol/package regressions, native UI captures, complete model/package checksums and an actual previous-version installer/recovery trial. Physical Xbox UI, keyboard, persistence, networking and inference remain hardware validation tasks.
+Validation: native assistant/Hub/engine/updater/controller checks, Xbox SDK app/installer builds, tokenizer/protocol/package regressions, native UI captures, complete package/model checksums and a previous-version installer/recovery trial. Physical Xbox menus, keyboard, persistence, networking and inference remain hardware validation tasks.
 
 Made by **ZuhaGames & Canyons**. Forked from [Canyons' gemma.xex](https://gitlab.com/canyons0/gemma.xex). AI tools assisted development, debugging and documentation.
