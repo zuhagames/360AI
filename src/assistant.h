@@ -2,7 +2,7 @@
 #define GX_ASSISTANT_H
 #include "common.h"
 
-enum AssistantAction { AA_NONE, AA_PROFILE, AA_EXPORT, AA_CLEAR_CHAT, AA_MODELS, AA_UPDATES, AA_MODEL_LIBRARY };
+enum AssistantAction { AA_NONE, AA_PROFILE, AA_EXPORT, AA_CLEAR_CHAT, AA_MODELS, AA_UPDATES, AA_MODEL_LIBRARY, AA_ANSWERS };
 struct AssistantReply {
   std::string text;
   AssistantAction action;
@@ -24,6 +24,7 @@ class Assistant {
 public:
   struct Note {int id;std::string text;};
   struct Timer {int id;double due,duration,left;bool paused;std::string label;};
+  struct Answer {std::string phrase,response;};
   Assistant();
   AssistantReply respond(const std::string& text,const AssistantContext& context);
   void poll(double now,std::vector<std::string>& notifications);
@@ -36,13 +37,17 @@ public:
   void saved_snapshot(const std::string& text) {if(state_text()==text) dirty_=false;}
   static bool write_snapshot(const char* path,const std::string& text);
   AssistantReply write_note(int id,const std::string& text);
+  static bool answer_phrase(const std::string& text,std::string& normalized);
+  bool write_answer(const std::string& phrase,const std::string& response,std::string& result);
+  bool remove_answer(const std::string& phrase,std::string& result);
+  bool preview_answer(const std::string& text,std::string& key,std::string& response) const;
+  const std::vector<Answer>& answers() const {return answers_;}
   bool dirty() const { return dirty_; }
   size_t timer_count() const { return timers_.size(); }
   size_t note_count() const { return notes_.size(); }
   const std::vector<Note>& notes() const {return notes_;}
   const std::vector<Timer>& timers() const {return timers_;}
 private:
-  struct Answer { std::string phrase,response; };
   struct Rule { std::vector<std::string> phrases;std::string response; };
   enum Pending { P_NONE,P_TIMER,P_NOTE,P_CALC,P_NAME,P_CLEAR_NOTES,P_CLEAR_CHAT,P_TIMER_CANCEL,P_TIMER_SELECT,P_NOTE_SEARCH,P_NOTE_EDIT };
   enum TimerAction { TA_STATUS,TA_CANCEL,TA_PAUSE,TA_RESUME,TA_RESTART,TA_EXTEND };

@@ -400,13 +400,28 @@ AssistantReply Assistant::edit_note(int id,const std::string& text){
 }
 AssistantReply Assistant::teach(const std::string& text){
   size_t colon=text.find(':');if(colon==std::string::npos) return AssistantReply("Use teach favorite game: Halo 3. The answer is saved locally and can be undone.");
-  std::string key=words(text.substr(0,colon)),response=trim(text.substr(colon+1));
-  if(key.size()<3 || key.size()>80 || response.empty() || response.size()>512) return AssistantReply("Use a phrase of 3-80 bytes and an answer of 1-512 bytes.");
+  std::string result;write_answer(text.substr(0,colon),text.substr(colon+1),result);return AssistantReply(result);
+}
+bool Assistant::answer_phrase(const std::string& text,std::string& key){
+  key.clear();if(text.size()>512 || !valid_text(text)) return false;key=words(text);return key.size()>=3 && key.size()<=80;
+}
+bool Assistant::write_answer(const std::string& phrase_text,const std::string& answer_text,std::string& result){
+  std::string key,response=trim(answer_text);
+  if(!answer_phrase(phrase_text,key) || response.empty() || response.size()>512 || !valid_text(response,true)){result="Use a phrase of 3-80 bytes and valid answer text of 1-512 bytes.";return false;}
   size_t found=answers_.size();for(size_t i=0;i<answers_.size();++i) if(answers_[i].phrase==key){found=i;break;}
-  if(found==answers_.size() && answers_.size()>=16) return AssistantReply("All 16 taught-answer slots are full. Use forget answer followed by a phrase first.");
+  if(found==answers_.size() && answers_.size()>=16){result="All 16 taught-answer slots are full. Use forget answer followed by a phrase first.";return false;}
   if(found==answers_.size() || answers_[found].response!=response){
     remember_undo();if(found==answers_.size()){Answer a;a.phrase=key;a.response=response;answers_.push_back(a);}else answers_[found].response=response;dirty_=true;
-  }return AssistantReply("Learned answer for \""+key+"\". Built-in commands still take priority.");
+  }result="Learned answer for \""+key+"\". Built-in commands still take priority.";return true;
+}
+bool Assistant::remove_answer(const std::string& phrase_text,std::string& result){
+  std::string key;if(answer_phrase(phrase_text,key)) for(size_t i=0;i<answers_.size();++i) if(answers_[i].phrase==key){remember_undo();answers_.erase(answers_.begin()+i);dirty_=true;result="Forgot the answer for \""+key+"\". Use undo to restore it.";return true;}
+  result="No taught answer has that exact phrase. Try list learned answers.";return false;
+}
+bool Assistant::preview_answer(const std::string& text,std::string& key,std::string& response) const{
+  key.clear();response.clear();if(text.size()>512 || !valid_text(text)) return false;std::string norm=words(text);
+  for(size_t i=0;i<answers_.size();++i) if(phrase(norm,answers_[i].phrase) && answers_[i].phrase.size()>key.size()){key=answers_[i].phrase;response=answers_[i].response;}
+  return !key.empty();
 }
 std::string Assistant::state_text() const{
   Json j=Json::object();j["version"]=Json(2.0);j["name"]=Json(name_);j["next_note"]=Json((double)next_note_);j["notes"]=Json::array();j["answers"]=Json::array();
@@ -429,6 +444,9 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
   if(norm=="cancel" || norm=="never mind" || norm=="nevermind" || norm=="stop"){
     bool had=pending_!=P_NONE;pending_=P_NONE;pending_label_.clear();return AssistantReply(had ? "Cancelled the follow-up. Existing notes and timers are unchanged." : "No follow-up is waiting. Use cancel timer followed by its number to stop a timer.");}
   if(norm=="help" || norm=="commands" || norm=="show commands" || norm=="what can you do"){pending_=P_NONE;pending_label_.clear();return AssistantReply(help_text);}
+  if(norm=="open saved answers" || norm=="open learned answers" || norm=="manage answers"){
+    pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening Saved answers. Add, edit and preview your own text replies.",AA_ANSWERS);
+  }
   if(norm=="find models" || norm=="get models" || norm=="open model library" || norm=="open hugging face"){
     pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening the Hugging Face model library. Search GGUF text-generation models and choose a file to download.",AA_MODEL_LIBRARY);
   }
@@ -554,8 +572,7 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
     std::string result="Taught answers:";for(size_t i=0;i<answers_.size();++i) result+="\n"+answers_[i].phrase+": "+answers_[i].response;return AssistantReply(result);
   }
   if(take(raw,"forget answer",rest) || take(raw,"delete answer",rest)){
-    std::string key=words(command_tail(rest));for(size_t i=0;i<answers_.size();++i) if(answers_[i].phrase==key){remember_undo();answers_.erase(answers_.begin()+i);dirty_=true;return AssistantReply("Forgot the answer for \""+key+"\". Use undo to restore it.");}
-    return AssistantReply("No taught answer has that exact phrase. Try list learned answers.");
+    std::string result;remove_answer(command_tail(rest),result);return AssistantReply(result);
   }
   if(take(raw,"teach",rest) || take(raw,"learn",rest)) return teach(rest);
   if(take(raw,"remember that",rest) || take(raw,"remember",rest) || take(raw,"add note",rest) || take(raw,"take a note",rest) || take(raw,"note",rest)) return add_note(rest);
