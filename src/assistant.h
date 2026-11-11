@@ -45,6 +45,7 @@ public:
   static const char* starter_phrase(size_t index);
   static const char* starter_response(size_t index);
   static const char* starter_category(size_t index);
+  static bool find_starters(const std::string& query,std::vector<size_t>& results);
   const std::vector<Answer>& answers() const {return answers_;}
   bool dirty() const { return dirty_; }
   size_t timer_count() const { return timers_.size(); }
