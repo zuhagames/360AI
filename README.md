@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v2.7/360AI-2.7-USB.zip"><strong>Download 360AI 2.7</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v2.8/360AI-2.8-USB.zip"><strong>Download 360AI 2.8</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
@@ -33,7 +33,7 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-2.7-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.7/360AI-2.7-USB.zip)**.
+1. Download and extract **[360AI-2.8-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.8/360AI-2.8-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
 4. Select **Assistant** for instant replies, or **Models** for GGUF chat. Leave model compute/storage on **Auto**.

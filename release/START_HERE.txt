@@ -1,4 +1,4 @@
-360AI 2.7 - Xbox 360 USB package
+360AI 2.8 - Xbox 360 USB package
 ================================
 
 INSTALL

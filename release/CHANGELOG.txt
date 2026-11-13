@@ -1,3 +1,17 @@
+360AI 2.8 - Find your next answer
+=================================
+
+- BACK in Starter answers opens a native topic picker with all 15 categories.
+- Browse a topic without typing; Left/Right pages its result list by six.
+- Recently asked keeps the last 12 distinct questions asked from the browser.
+- Reasking promotes a question; returning from chat keeps the displayed list.
+- X on Recently asked in the picker clears session recents, not saved data.
+- Cancelled/invalid searches and picker cancellation preserve the current view.
+- Cache normalized searchable text once and skip lower-priority field matches.
+- Preserve all 250 starter replies, personal slots, four models and updater.
+- Cover topics, recents, overrides, empty lists and diagonal/back input in tests.
+- Physical Xbox UI, networking and persistence still need hardware validation.
+
 360AI 2.7 - 100 more offline replies
 ===================================
 
