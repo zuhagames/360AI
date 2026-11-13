@@ -1,4 +1,4 @@
-360AI 2.5 - Xbox 360 USB package
+360AI 2.6 - Xbox 360 USB package
 ================================
 
 INSTALL
@@ -14,6 +14,9 @@ Click right stick to preview a saved-text match without running any command.
 150 new starter questions/replies are included, separate from personal slots.
 Click left stick in Saved answers for Starter/My; D-pad Left/Right changes
 category. A customizes a starter. The full question is shown with the reply.
+START in Starter view finds keywords; Y clears the filter. Right-stick click
+asks the selected question, and B returns to the results. You can also type
+find answers timer in Assistant. My answers keeps START undo and text preview.
 Cancelling a keyboard keeps existing answers. Wait for Saved after an edit.
 
 1. Extract the ZIP on your PC.

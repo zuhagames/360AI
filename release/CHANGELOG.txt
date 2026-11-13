@@ -1,3 +1,21 @@
+360AI 2.6 - Find an answer faster
+=================================
+
+- START in Starter answers searches all 150 questions/replies/categories.
+- Bounded, case/punctuation-insensitive whole-word search; all words must match.
+- Rank exact questions first, then question/category/reply matches deterministically.
+- Type find answers timer or search answers notes to open filtered results.
+- Right-stick click asks the selected starter question without keyboard entry.
+- B returns from that chat to the same search, selection and result list.
+- Y clears active filters; Left/Right pages filtered results by six.
+- Keep My answers text preview, START undo and personal customization behavior.
+- Empty and cancelled searches keep data safe; invalid searches retain old results.
+- Compute results only on query submission; empty searches skip body matching.
+- Regression coverage for all exact ranks, matching, bounds, filtered editing,
+  empty lists, personal overrides, direct asking and return navigation.
+- Existing 150 starters, personal data, four model weights and updater remain.
+- Physical Xbox UI, keyboard and persistence still need hardware validation.
+
 360AI 2.5 - 150 more ready-made answers
 ======================================
 
