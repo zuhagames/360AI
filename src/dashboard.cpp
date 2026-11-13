@@ -185,9 +185,13 @@ void App::answer_topics_frame(){
   if(topic_sel_==1 && starter_recent_.empty()) paragraph(644,440,"Nothing asked yet. Open a starter question and click the right stick to begin.",40,3,GX_MUTED);
   char counter[64];snprintf(counter,sizeof(counter),"%d / %d CHOICES / L-R: PAGE",topic_sel_+1,count);gxui_label(92,536,GX_MUTED,counter,.65f);
   gxui_prompt(64,658,GX_BTN_A,"Open topic");gxui_prompt(1010,658,GX_BTN_B,"Answers");
+  if(topic_sel_==1 && !starter_recent_.empty()) gxui_prompt(400,658,GX_BTN_X,"Clear recents");
   u32 p=gxui_buttons_pressed();if(p&(GX_BTN_B|GX_BTN_BACK)) return;
   if(p&GX_BTN_DUP) --topic_sel_;if(p&GX_BTN_DDOWN) ++topic_sel_;if(p&GX_BTN_DLEFT) topic_sel_-=6;if(p&GX_BTN_DRIGHT) topic_sel_+=6;
-  topic_sel_=GX_CLAMP(topic_sel_,0,count-1);if(p&GX_BTN_A) select_answer_topic();
+  topic_sel_=GX_CLAMP(topic_sel_,0,count-1);
+  if((p&GX_BTN_X) && topic_sel_==1){starter_recent_.clear();
+    if(starter_topic_=="Recently asked"){starter_rows_.clear();starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();}return;}
+  if(p&GX_BTN_A) select_answer_topic();
 }
 void App::answers_frame(){
   shell("Saved answers",answer_starters_ ? "STARTER ANSWERS / READY WITHOUT A MODEL" : "MY ANSWERS / YOUR WORDS, YOUR REPLIES");

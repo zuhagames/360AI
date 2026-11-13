@@ -33,6 +33,8 @@ static void topic_checks(){
   for(int i=0;i<3;++i) tap(app,GX_BTN_DRIGHT);assert(app.test_starter_selection()==11 && app.test_starter_index()==2);
   pick_answer_topic(app,1);tap(app,GX_BTN_A);app.test_keyboard_text("My recent override");assert(!app.test_starter_mode() && app.test_assistant().answers().size()==1 && app.test_assistant().answers()[0].phrase==Assistant::starter_phrase(12));
   tap(app,GX_BTN_LTHUMB);tap(app,GX_BTN_RTHUMB);assert(app.test_chat_text().find("My recent override")!=std::string::npos);tap(app,GX_BTN_B);assert(app.test_recent_count()==12);
+  before=app.test_assistant().snapshot();tap(app,GX_BTN_BACK);tap(app,GX_BTN_X);assert(app.test_recent_count()==0);tap(app,GX_BTN_B);
+  assert(app.test_starter_matches()==0 && app.test_assistant().snapshot()==before && app.test_chat_text().find("My recent override")!=std::string::npos);
   tap(app,GX_BTN_Y);assert(app.test_starter_matches()==250);tap(app,GX_BTN_LTHUMB);tap(app,GX_BTN_BACK);assert(app.test_screen()==AS_TOOLS);
   {App fresh;assert(fresh.test_recent_count()==0);}
   gxui_shutdown();std::cout<<"2.8 topics: all 15 groups, empty recents, bounded deduplicated history, scoped paging, cancellation, overrides and back/diagonal input passed\n";
