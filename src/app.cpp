@@ -41,6 +41,8 @@ App::App(){
   answer_sel_=0;
   starter_sel_=0;answer_starters_=false;
   answer_chat_return_=false;Assistant::find_starters("",starter_rows_);
+  topic_sel_=0;starter_recent_.reserve(12);
+  for(size_t i=0;i<Assistant::starter_count();++i) if(!i || strcmp(Assistant::starter_category(i),Assistant::starter_category(i-1))) starter_topics_.push_back(i);
   note_view_id_=0;
   kb_mode_ = KB_NONE;
   kb_cur_ = 0;
@@ -463,7 +465,7 @@ AssistantContext App::assistant_context() const{
 }
 bool App::search_answers(const std::string& query){
   std::vector<size_t> rows;if(!Assistant::find_starters(query,rows)) return false;
-  starter_query_=query.find_first_not_of(" \t\r\n")==std::string::npos ? "" : query;starter_rows_.swap(rows);starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return true;
+  starter_query_=query.find_first_not_of(" \t\r\n")==std::string::npos ? "" : query;starter_topic_.clear();starter_rows_.swap(rows);starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return true;
 }
 void App::open_assistant(){
   answer_chat_return_=false;

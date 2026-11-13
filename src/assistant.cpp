@@ -440,6 +440,13 @@ size_t Assistant::starter_category_step(size_t index,int direction){
 namespace {
 struct StarterMatch {size_t index;int score;};
 bool starter_match_less(const StarterMatch& a,const StarterMatch& b){return a.score==b.score ? a.index<b.index : a.score>b.score;}
+struct StarterSearchText {std::string question,category,body;};
+struct StarterSearchIndex {
+  std::vector<StarterSearchText> rows;
+  StarterSearchIndex(){rows.reserve(Assistant::starter_count());for(size_t i=0;i<Assistant::starter_count();++i){
+    StarterSearchText row;row.question=" "+std::string(Assistant::starter_phrase(i))+" ";
+    row.category=" "+words(Assistant::starter_category(i))+" ";row.body=" "+words(Assistant::starter_response(i))+" ";rows.push_back(row);}}
+};
 }
 bool Assistant::find_starters(const std::string& query,std::vector<size_t>& results){
   if(query.size()>96 || !valid_text(query)) return false;std::string normalized=words(query);std::vector<std::string> terms;
@@ -447,10 +454,12 @@ bool Assistant::find_starters(const std::string& query,std::vector<size_t>& resu
   for(size_t at=0;at<normalized.size();){size_t end=normalized.find(' ',at);std::string term=normalized.substr(at,end==std::string::npos ? end : end-at);
     if(std::find(terms.begin(),terms.end(),term)==terms.end()) terms.push_back(term);if(terms.size()>16) return false;
     if(end==std::string::npos) break;at=end+1;}
-  std::vector<StarterMatch> matches;
-  for(size_t i=0;i<starter_count();++i){std::string question=starter_phrase(i),body=words(starter_response(i)),category=words(starter_category(i));int score=normalized==question ? 1000 : 0;bool match=true;
-    for(size_t t=0;t<terms.size();++t){bool q=phrase(question,terms[t]),c=phrase(category,terms[t]),b=phrase(body,terms[t]);
-      if(!q && !c && !b){match=false;break;}score+=q ? 4 : (c ? 2 : 1);}
+  for(size_t t=0;t<terms.size();++t) terms[t]=" "+terms[t]+" ";
+  static const StarterSearchIndex index;std::vector<StarterMatch> matches;
+  for(size_t i=0;i<starter_count();++i){const StarterSearchText& row=index.rows[i];int score=normalized==starter_phrase(i) ? 1000 : 0;bool match=true;
+    for(size_t t=0;t<terms.size();++t){int hit=row.question.find(terms[t])!=std::string::npos ? 4 :
+        (row.category.find(terms[t])!=std::string::npos ? 2 : (row.body.find(terms[t])!=std::string::npos ? 1 : 0));
+      if(!hit){match=false;break;}score+=hit;}
     if(match){StarterMatch row;row.index=i;row.score=score;matches.push_back(row);}}
   std::sort(matches.begin(),matches.end(),starter_match_less);std::vector<size_t> next;next.reserve(matches.size());for(size_t i=0;i<matches.size();++i) next.push_back(matches[i].index);results.swap(next);return true;
 }

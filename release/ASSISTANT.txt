@@ -20,17 +20,29 @@ These are exact normalized question matches, with no model inference or actions.
 Use the shown question; case and ordinary punctuation do not matter.
 
 Open Saved answers and click the left stick for Starter/My answers.
-D-pad Left/Right jumps categories; up/down selects a question. The right panel
+In All answers, D-pad Left/Right jumps categories; up/down selects a question.
+The right panel
 shows the full question and reply. LB/RB reads long text.
 START in Starter view searches question/reply/category words; all supplied
 whole words must match somewhere. Exact questions rank first. Search is bounded
 to 96 bytes and 16 distinct words, with no model inference or Internet lookup.
 Use find answers timer, or search answers notes, to open filtered results from
-Assistant. Y clears an active search. Left/Right pages filtered results by six.
+Assistant. Y clears an active filter. Left/Right pages filtered results by six.
 Click right stick in Starter view to ask the selected question in Assistant,
 using the normal personal/file/starter answer priority. No typing is needed.
 B returns to the same result list, selection and session search. In My answers,
 right stick still opens a non-executing text preview, and START still undoes.
+BACK in Starter view opens Answer topics: All answers, Recently asked and the
+15 individual topics. A opens a choice; B cancels without changing the list.
+D-pad Left/Right pages topic choices. A topic contains only its own questions.
+Recently asked holds up to 12 different questions asked with right-stick click
+from this browser, newest first. Asking one again moves it to the front when
+you reopen Recently asked; B from chat keeps the current result list unchanged.
+Recents stay only for the current app session and use no personal slots or disk
+writes. X on Recently asked in the topic picker clears recents, leaving chat,
+notes, personal answers and timers alone. Y in the answer list shows All answers.
+A cancelled or invalid search keeps your current topic and selection.
+
 A copies a starter reply into an editor. Saving uses one personal slot;
 cancelling leaves everything unchanged. Existing personal overrides are edited
 in place. Y in Starter view opens My answers; Y there confirms deletion.
