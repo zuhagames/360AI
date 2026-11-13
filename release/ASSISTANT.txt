@@ -139,7 +139,7 @@ changing memory; backup recovery is attempted when the main file is invalid.
 
 TEACH ANSWERS ON YOUR XBOX
 Open Home > Y Quick tools > Saved answers, or type open saved answers.
-Up/down: select. A: edit the reply. X: new phrase, then new reply.
+In My answers: up/down selects. A edits. X adds a phrase, then reply.
 Y: confirm deletion. START: undo the latest saved-data change.
 LB/RB: read a long reply. Click right stick: test a saved-text match.
 B cancels a keyboard or deletion; B on the main screen returns to Tools.
