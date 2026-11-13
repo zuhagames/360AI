@@ -194,7 +194,7 @@ void App::answers_frame(){
   const std::vector<Assistant::Answer>& answers=assistant_.answers();size_t count=answer_starters_ ? starter_rows_.size() : answers.size();
   int& selection=answer_starters_ ? starter_sel_ : answer_sel_;selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));
   gxui_fill(64,146,528,422,GX_PANEL);gxui_fill(616,146,600,422,GX_PANEL);
-  if(answer_starters_){gxui_label(64,118,GX_MUTED,short_text(!starter_topic_.empty() ? "Topic: "+starter_topic_ : (starter_query_.empty() ? "START: find a question, reply or category" : "Find: "+starter_query_),65).c_str(),.62f);gxui_prompt(1000,118,GX_BTN_BACK,"Topics");}
+  if(answer_starters_){gxui_label(64,118,GX_MUTED,short_text(!starter_topic_.empty() ? "Topic: "+starter_topic_ : (starter_query_.empty() ? "START: find a question, reply or category" : "Find: "+starter_query_),65).c_str(),.62f);gxui_prompt(740,118,GX_BTN_BACK,"Topics");}
   if(!count){paragraph(92,186,answer_starters_ ? (starter_topic_=="Recently asked" ? "No recent questions yet. Press Y for all answers, then click the right stick on a question to ask it." : "No matching starter answers. Press START for fewer words, or Y to clear the filter.") : "Make it your own. Press X for a personal reply, or click the left stick for ready-made answers.",31,5);}
   else {int start=answer_starters_ && starter_filtered() ? (selection/6)*6 : GX_MAX(0,selection-5);for(int i=start;i<(int)count && i<start+6;++i){f32 y=160+(i-start)*64;bool selected=i==selection;
       if(selected) gxui_fill(76,y,504,60,GX_INK);char number[16];snprintf(number,sizeof(number),"%02d",i+1);
@@ -202,7 +202,7 @@ void App::answers_frame(){
   gxui_label(644,164,GX_MUTED,!answer_preview_.empty() ? "TEXT MATCH PREVIEW" : (answer_starters_ ? Assistant::starter_category(selected_starter()) : "THE SAVED REPLY"),.7f);
   std::string selected=!count ? "" : (answer_starters_ ? Assistant::starter_phrase(selected_starter()) : answers[selection].phrase);
   std::string text=!answer_preview_.empty() ? answer_preview_ : (!count ? "16 personal slots, separate from the starter pack. Commands keep priority in chat." : (answer_starters_ ? Assistant::starter_response(selected_starter()) : answers[selection].response));
-  if(answer_starters_ && answer_preview_.empty()) text=count ? "Question: "+selected+"\n\n"+text : "Search all starter answers using words from a question, reply or category. Try fewer words, or press Y to show all.";
+  if(answer_starters_ && answer_preview_.empty()) text=count ? "Question: "+selected+"\n\n"+text : (starter_topic_=="Recently asked" ? "Questions asked from this browser appear here for the current session. Your personal answers and notes are kept separately." : "Search all starter answers using words from a question, reply or category. Try fewer words, or press Y to show all.");
   std::string view_key=selected+"\n"+answer_preview_;answer_view_.update(text,40,12);
   if(answer_view_key_!=view_key){answer_view_key_=view_key;answer_view_.scroll(-100000);}
   const std::vector<std::string>& lines=answer_view_.lines();for(int i=answer_view_.top();i<(int)lines.size() && i<answer_view_.top()+12;++i) gxui_label(644,210+(i-answer_view_.top())*28,GX_INK,lines[i].c_str(),.85f);
