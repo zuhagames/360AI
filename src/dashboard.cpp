@@ -160,7 +160,7 @@ void App::answers_frame(){
   gxui_label(644,164,GX_MUTED,!answer_preview_.empty() ? "TEXT MATCH PREVIEW" : (answer_starters_ ? Assistant::starter_category(selected_starter()) : "THE SAVED REPLY"),.7f);
   std::string selected=!count ? "" : (answer_starters_ ? Assistant::starter_phrase(selected_starter()) : answers[selection].phrase);
   std::string text=!answer_preview_.empty() ? answer_preview_ : (!count ? "16 personal slots, separate from the starter pack. Commands keep priority in chat." : (answer_starters_ ? Assistant::starter_response(selected_starter()) : answers[selection].response));
-  if(answer_starters_ && answer_preview_.empty()) text="Question: "+selected+"\n\n"+text;
+  if(answer_starters_ && answer_preview_.empty()) text=count ? "Question: "+selected+"\n\n"+text : "Search all 150 starter answers using words from a question, reply or category. Try fewer words, or press Y to show all.";
   std::string view_key=selected+"\n"+answer_preview_;answer_view_.update(text,40,12);
   if(answer_view_key_!=view_key){answer_view_key_=view_key;answer_view_.scroll(-100000);}
   const std::vector<std::string>& lines=answer_view_.lines();for(int i=answer_view_.top();i<(int)lines.size() && i<answer_view_.top()+12;++i) gxui_label(644,210+(i-answer_view_.top())*28,GX_INK,lines[i].c_str(),.85f);
@@ -262,6 +262,7 @@ void App::test_seed(){
   gx_file_entry f;f.name="SmolLM2-135M-Instruct-Q8_0.gguf";f.size=144811072;files_.push_back(f);f.name="gemma-3-270m-it-Q8_0.gguf";f.size=291545600;files_.push_back(f);
 }
 bool App::test_capture(const char* name,const char* path){
+  if(!strcmp(name,"finder")){open_answers();answer_starters_=true;starter_query_="cancel timer";Assistant::find_starters(starter_query_,starter_rows_);starter_sel_=0;test_frame(0);return gxui_capture(path);}
   if(!strcmp(name,"starters")){open_answers();answer_starters_=true;starter_sel_=0;test_frame(0);return gxui_capture(path);}
   if(!strcmp(name,"answers")){std::string result;assistant_.write_answer("favorite game","Halo 3. Friday night co-op with friends.",result);assistant_.write_answer("project idea","Give the Xbox 360 one more useful job.",result);assistant_.write_answer("tea break","Take five minutes, stretch, and come back ready.",result);open_answers();test_frame(0);return gxui_capture(path);}
   if(!strcmp(name,"hub") || !strcmp(name,"hub-files")){
