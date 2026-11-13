@@ -433,6 +433,7 @@ bool starter_match_less(const StarterMatch& a,const StarterMatch& b){return a.sc
 }
 bool Assistant::find_starters(const std::string& query,std::vector<size_t>& results){
   if(query.size()>96 || !valid_text(query)) return false;std::string normalized=words(query);std::vector<std::string> terms;
+  if(normalized.empty()){std::vector<size_t> all;all.reserve(starter_count());for(size_t i=0;i<starter_count();++i) all.push_back(i);results.swap(all);return true;}
   for(size_t at=0;at<normalized.size();){size_t end=normalized.find(' ',at);std::string term=normalized.substr(at,end==std::string::npos ? end : end-at);
     if(std::find(terms.begin(),terms.end(),term)==terms.end()) terms.push_back(term);if(terms.size()>16) return false;
     if(end==std::string::npos) break;at=end+1;}

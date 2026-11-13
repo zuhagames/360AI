@@ -154,7 +154,7 @@ void App::answers_frame(){
   gxui_fill(64,146,528,422,GX_PANEL);gxui_fill(616,146,600,422,GX_PANEL);
   if(answer_starters_) gxui_label(64,118,GX_MUTED,short_text(starter_query_.empty() ? "START: find a question, reply or category" : "Find: "+starter_query_,90).c_str(),.62f);
   if(!count){paragraph(92,186,answer_starters_ ? "No matching starter answers. Press START for fewer words, or Y to clear the search." : "Make it your own. Press X for a personal reply, or click the left stick for 150 ready-made answers.",31,5);}
-  else {int start=GX_MAX(0,selection-5);for(int i=start;i<(int)count && i<start+6;++i){f32 y=160+(i-start)*64;bool selected=i==selection;
+  else {int start=answer_starters_ && !starter_query_.empty() ? (selection/6)*6 : GX_MAX(0,selection-5);for(int i=start;i<(int)count && i<start+6;++i){f32 y=160+(i-start)*64;bool selected=i==selection;
       if(selected) gxui_fill(76,y,504,60,GX_INK);char number[16];snprintf(number,sizeof(number),"%02d",i+1);
       gxui_label(92,y+13,selected ? GX_ACCENT : GX_MUTED,number,.8f);gxui_label(150,y+13,selected ? GX_PANEL : GX_INK,short_text(answer_starters_ ? Assistant::starter_phrase(starter_rows_[i]) : answers[i].phrase,31).c_str(),.8f);}}
   gxui_label(644,164,GX_MUTED,!answer_preview_.empty() ? "TEXT MATCH PREVIEW" : (answer_starters_ ? Assistant::starter_category(selected_starter()) : "THE SAVED REPLY"),.7f);
