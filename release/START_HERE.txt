@@ -11,7 +11,7 @@ This mode uses text, not voice. It works even with no GGUF files installed.
 Home > Y Quick tools > Saved answers lets you add/edit your own instant replies.
 X: new phrase then answer. A: edit. Y: delete confirmation. START: undo.
 In My answers, click right stick for a non-executing saved-text preview.
-150 new starter questions/replies are included, separate from personal slots.
+250 starter questions/replies are included, separate from personal slots.
 Click left stick in Saved answers for Starter/My; D-pad Left/Right changes
 category. A customizes a starter. The full question is shown with the reply.
 START in Starter view finds keywords; Y clears the filter. Right-stick click

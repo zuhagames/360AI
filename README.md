@@ -64,9 +64,10 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 
 ## Features
 
-- **360 Assistant:** 150 starter answers plus the existing 106 phrase variants, calculations, conversions, notes and timers. No weights needed. [Commands](release/ASSISTANT.txt).
+- **360 Assistant:** 250 starter answers plus the existing 106 phrase variants, calculations, conversions, notes and timers. No weights needed. [Commands](release/ASSISTANT.txt).
+- **New starter topics:** gaming ideas, tech basics, creative prompts, planning and conversation.
 - **Saved answers:** Home → Y → Saved answers to add, edit, preview and delete your own instant replies. Controller menus, undo and background saving; no model required.
-- Click the **left stick** there to browse Starter/My answers. D-pad Left/Right jumps categories; **A** customizes a starter into one of your 16 personal slots. All 150 starters work without taking those slots.
+- Click the **left stick** there to browse Starter/My answers. D-pad Left/Right jumps categories; **A** customizes a starter into one of your 16 personal slots. All 250 starters work without taking those slots.
 - **Answer finder:** START searches Starter answers, or type `find answers timer`. Right-stick click asks the selected question instantly; B returns to your results. Y clears a search.
 - GitHub update checks, small verified app downloads and a recovery copy; models and personal files stay in place.
 - **Hugging Face model library:** search GGUF text-generation models, filter parameter counts/families, inspect file sizes and download on Xbox. Models → Y, or `find models`. [Guide](release/MODEL_LIBRARY.txt).
