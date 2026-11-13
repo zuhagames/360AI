@@ -457,8 +457,9 @@ bool Assistant::find_starters(const std::string& query,std::vector<size_t>& resu
   for(size_t t=0;t<terms.size();++t) terms[t]=" "+terms[t]+" ";
   static const StarterSearchIndex index;std::vector<StarterMatch> matches;
   for(size_t i=0;i<starter_count();++i){const StarterSearchText& row=index.rows[i];int score=normalized==starter_phrase(i) ? 1000 : 0;bool match=true;
-    for(size_t t=0;t<terms.size();++t){bool q=row.question.find(terms[t])!=std::string::npos,c=row.category.find(terms[t])!=std::string::npos,b=row.body.find(terms[t])!=std::string::npos;
-      if(!q && !c && !b){match=false;break;}score+=q ? 4 : (c ? 2 : 1);}
+    for(size_t t=0;t<terms.size();++t){int hit=row.question.find(terms[t])!=std::string::npos ? 4 :
+        (row.category.find(terms[t])!=std::string::npos ? 2 : (row.body.find(terms[t])!=std::string::npos ? 1 : 0));
+      if(!hit){match=false;break;}score+=hit;}
     if(match){StarterMatch row;row.index=i;row.score=score;matches.push_back(row);}}
   std::sort(matches.begin(),matches.end(),starter_match_less);std::vector<size_t> next;next.reserve(matches.size());for(size_t i=0;i<matches.size();++i) next.push_back(matches[i].index);results.swap(next);return true;
 }
