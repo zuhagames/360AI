@@ -20,7 +20,16 @@ Use the shown question; case and ordinary punctuation do not matter.
 
 Open Saved answers and click the left stick for Starter/My answers.
 D-pad Left/Right jumps categories; up/down selects a question. The right panel
-shows the full question and reply. LB/RB reads long text; right stick previews.
+shows the full question and reply. LB/RB reads long text.
+START in Starter view searches question/reply/category words; all supplied
+whole words must match somewhere. Exact questions rank first. Search is bounded
+to 96 bytes and 16 distinct words, with no model inference or Internet lookup.
+Use find answers timer, or search answers notes, to open filtered results from
+Assistant. Y clears an active search. Left/Right pages filtered results by six.
+Click right stick in Starter view to ask the selected question in Assistant,
+using the normal personal/file/starter answer priority. No typing is needed.
+B returns to the same result list, selection and session search. In My answers,
+right stick still opens a non-executing text preview, and START still undoes.
 A copies a starter reply into an editor. Saving uses one personal slot;
 cancelling leaves everything unchanged. Existing personal overrides are edited
 in place. Y in Starter view opens My answers; Y there confirms deletion.
@@ -130,17 +139,16 @@ changing memory; backup recovery is attempted when the main file is invalid.
 
 TEACH ANSWERS ON YOUR XBOX
 Open Home > Y Quick tools > Saved answers, or type open saved answers.
-Up/down: select. A: edit the reply. X: new phrase, then new reply.
+In My answers: up/down selects. A edits. X adds a phrase, then reply.
 Y: confirm deletion. START: undo the latest saved-data change.
 LB/RB: read a long reply. Click right stick: test a saved-text match.
 B cancels a keyboard or deletion; B on the main screen returns to Tools.
 New drafts do not change saved data until both fields are valid. Cancelling
 either keyboard keeps existing answers. Duplicate phrases select the existing
 entry and ask you to edit it, rather than replacing its reply silently.
-Previews show the longest saved phrase matching whole words in your input.
-They never run commands or alter saved data. In Starter view, preview also
-checks exact starter questions after personal matches. File FAQ rules are
-not part of preview; actual chat still applies its normal answer priority.
+My answers previews show the longest personal phrase matching whole words.
+They never run commands or alter saved data, and do not evaluate file FAQ rules.
+Starter view now asks the selected question in actual Assistant chat instead.
 Chat still gives built-in commands priority. An answer saying delete all notes
 is only text. Editing and deletion use the same background save and undo path
 as typed teaching. Existing taught answers appear without a migration.

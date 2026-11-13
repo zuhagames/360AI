@@ -29,7 +29,7 @@ enum debug_cycle{
 };
 
 enum kb_kind{
-  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_NOTE_NEW, KB_NOTE_EDIT, KB_TIMER_NEW, KB_HUB_SEARCH, KB_ANSWER_PHRASE, KB_ANSWER_TEXT, KB_ANSWER_TEST, KB_SYS=0x100
+  KB_NONE=0, KB_CTX, KB_TEMP, KB_TOPK, KB_CHAT, KB_REPLY, KB_TOPP, KB_REPEAT, KB_NOTE_NEW, KB_NOTE_EDIT, KB_TIMER_NEW, KB_HUB_SEARCH, KB_ANSWER_PHRASE, KB_ANSWER_TEXT, KB_ANSWER_TEST, KB_ANSWER_SEARCH, KB_SYS=0x100
 };
 
 struct AppSettings{
@@ -78,6 +78,9 @@ public:
   const std::string& test_answer_preview() const {return answer_preview_;}
   bool test_starter_mode() const {return answer_starters_;}
   int test_starter_selection() const {return starter_sel_;}
+  size_t test_starter_matches() const {return starter_rows_.size();}
+  size_t test_starter_index() const {return selected_starter();}
+  const std::string& test_chat_text() const {return chat_log_;}
 #endif
 
 private:
@@ -95,6 +98,9 @@ private:
   int answer_sel_;
   int starter_sel_;
   bool answer_starters_;
+  bool answer_chat_return_;
+  std::vector<size_t> starter_rows_;
+  std::string starter_query_;
   std::string answer_draft_,answer_confirm_,answer_view_key_,answer_preview_;
   ChatView answer_view_;
 
@@ -169,6 +175,8 @@ private:
   void tools_frame();
   void answers_frame();
   void open_answers();
+  size_t selected_starter() const;
+  bool search_answers(const std::string& query);
   void updates_frame();
   void restart_for_update();
   void shell(const char* title,const char* subtitle);

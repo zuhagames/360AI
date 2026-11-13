@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/zuhagames/360AI/releases/download/v2.5/360AI-2.5-USB.zip"><strong>Download 360AI 2.5</strong></a> ·
+  <a href="https://github.com/zuhagames/360AI/releases/download/v2.6/360AI-2.6-USB.zip"><strong>Download 360AI 2.6</strong></a> ·
   <a href="docs/TECHNICAL.md">Documentation</a> ·
   <a href="https://github.com/zuhagames/360AI/issues">Help</a>
 </p>
@@ -33,7 +33,7 @@ AI tools were used to assist with development, debugging, and documentation.
 
 ## Installation
 
-1. Download and extract **[360AI-2.5-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.5/360AI-2.5-USB.zip)**.
+1. Download and extract **[360AI-2.6-USB.zip](https://github.com/zuhagames/360AI/releases/download/v2.6/360AI-2.6-USB.zip)**.
 2. Copy the entire `360AI` folder to your USB drive.
 3. Launch `360AI.xex` on your modded Xbox 360 with your XEX launcher.
 4. Select **Assistant** for instant replies, or **Models** for GGUF chat. Leave model compute/storage on **Auto**.
@@ -67,6 +67,7 @@ HDD streaming uses an **8 MB weight cache**; the tokenizer and KV cache still ne
 - **360 Assistant:** 150 starter answers plus the existing 106 phrase variants, calculations, conversions, notes and timers. No weights needed. [Commands](release/ASSISTANT.txt).
 - **Saved answers:** Home → Y → Saved answers to add, edit, preview and delete your own instant replies. Controller menus, undo and background saving; no model required.
 - Click the **left stick** there to browse Starter/My answers. D-pad Left/Right jumps categories; **A** customizes a starter into one of your 16 personal slots. All 150 starters work without taking those slots.
+- **Answer finder:** START searches Starter answers, or type `find answers timer`. Right-stick click asks the selected question instantly; B returns to your results. Y clears a search.
 - GitHub update checks, small verified app downloads and a recovery copy; models and personal files stay in place.
 - **Hugging Face model library:** search GGUF text-generation models, filter parameter counts/families, inspect file sizes and download on Xbox. Models → Y, or `find models`. [Guide](release/MODEL_LIBRARY.txt).
 - Native dashboard, Quick tools, dedicated Notes/Timers screens and Xbox 360 button artwork.

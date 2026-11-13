@@ -20,11 +20,11 @@ static void starter_checks(){
   assert(gxui_init());App app;app.test_seed();app.test_ask("open saved answers");app.test_frame(0);assert(app.test_starter_mode());
   tap(app,GX_BTN_DRIGHT);assert(app.test_starter_selection()==15);tap(app,GX_BTN_DLEFT);assert(app.test_starter_selection()==0);
   before=app.test_assistant().snapshot();tap(app,GX_BTN_A);assert(app.test_keyboard());tap(app,GX_BTN_B);assert(app.test_starter_mode() && app.test_assistant().snapshot()==before);
-  tap(app,GX_BTN_RTHUMB);app.test_keyboard_text(phrase);assert(app.test_answer_preview().find(Assistant::starter_response(0))!=std::string::npos && app.test_assistant().snapshot()==before);
+  tap(app,GX_BTN_RTHUMB);assert(app.test_screen()==AS_CHAT && !app.test_keyboard() && app.test_chat_text().find(Assistant::starter_response(0))!=std::string::npos && app.test_assistant().snapshot()==before);tap(app,GX_BTN_B);assert(app.test_screen()==AS_ANSWERS);
   tap(app,GX_BTN_A);app.test_keyboard_text("My controller reply");assert(!app.test_starter_mode() && app.test_assistant().answers().size()==1 && app.test_assistant().answers()[0].phrase==phrase);
   tap(app,GX_BTN_LTHUMB);assert(app.test_starter_mode());tap(app,GX_BTN_A);tap(app,GX_BTN_B);assert(app.test_assistant().answers()[0].response=="My controller reply");
-  tap(app,GX_BTN_Y);assert(!app.test_starter_mode());tap(app,GX_BTN_Y);tap(app,GX_BTN_A);assert(app.test_assistant().answers().empty());tap(app,GX_BTN_LTHUMB);tap(app,GX_BTN_RTHUMB);app.test_keyboard_text(phrase);assert(app.test_answer_preview().find(Assistant::starter_response(0))!=std::string::npos);
-  tap(app,GX_BTN_START);assert(app.test_assistant().answers().size()==1);
+  tap(app,GX_BTN_Y);assert(!app.test_starter_mode());tap(app,GX_BTN_Y);tap(app,GX_BTN_A);assert(app.test_assistant().answers().empty());tap(app,GX_BTN_LTHUMB);tap(app,GX_BTN_RTHUMB);assert(app.test_chat_text().find(Assistant::starter_response(0))!=std::string::npos);tap(app,GX_BTN_B);
+  tap(app,GX_BTN_Y);tap(app,GX_BTN_START);assert(app.test_assistant().answers().size()==1);tap(app,GX_BTN_LTHUMB);
   for(int i=1;i<16;++i){char command[64];snprintf(command,sizeof(command),"teach personal answer %d: text",i);app.test_ask(command);}assert(app.test_assistant().answers().size()==16);
   tap(app,GX_BTN_DRIGHT);tap(app,GX_BTN_A);assert(!app.test_keyboard());tap(app,GX_BTN_DLEFT);tap(app,GX_BTN_A);assert(app.test_keyboard());tap(app,GX_BTN_B);gxui_shutdown();
   std::cout<<"2.5 starters: exactly 150 unique answers, 10 categories, punctuation/case, exact matching, zero actions, overrides, controller browsing and capacity isolation passed\n";

@@ -2,9 +2,10 @@
 #define GX_ASSISTANT_H
 #include "common.h"
 
-enum AssistantAction { AA_NONE, AA_PROFILE, AA_EXPORT, AA_CLEAR_CHAT, AA_MODELS, AA_UPDATES, AA_MODEL_LIBRARY, AA_ANSWERS };
+enum AssistantAction { AA_NONE, AA_PROFILE, AA_EXPORT, AA_CLEAR_CHAT, AA_MODELS, AA_UPDATES, AA_MODEL_LIBRARY, AA_ANSWERS, AA_FIND_ANSWERS };
 struct AssistantReply {
   std::string text;
+  std::string argument;
   AssistantAction action;
   int value;
   AssistantReply(const std::string& t="",AssistantAction a=AA_NONE,int v=0):text(t),action(a),value(v){}
@@ -45,6 +46,7 @@ public:
   static const char* starter_phrase(size_t index);
   static const char* starter_response(size_t index);
   static const char* starter_category(size_t index);
+  static bool find_starters(const std::string& query,std::vector<size_t>& results);
   const std::vector<Answer>& answers() const {return answers_;}
   bool dirty() const { return dirty_; }
   size_t timer_count() const { return timers_.size(); }

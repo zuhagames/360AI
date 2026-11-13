@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <float.h>
 #include <map>
+#include <algorithm>
 
 namespace {
 std::string trim(const std::string& s){
@@ -252,6 +253,7 @@ const char* help_text="360 Assistant works offline without a model. Try:\n"
   "edit note 1: buy batteries | delete note 1 | undo\n"
   "teach favorite game: Halo 3 | list learned answers | forget answer favorite game\n"
   "open saved answers (controller editor and text-match preview)\n"
+  "find answers timer (search starter questions and replies)\n"
   "my name is Martin | what is my name | time | date | status\n"
   "quick preset | balanced preset | creative preset\n"
   "help with GPU | help with models | find models | open updates | joke | export chat | clear chat\n"
@@ -426,6 +428,23 @@ size_t Assistant::starter_count(){return sizeof(gx_starter_answers)/sizeof(gx_st
 const char* Assistant::starter_phrase(size_t i){return i<starter_count() ? gx_starter_answers[i].phrase : "";}
 const char* Assistant::starter_response(size_t i){return i<starter_count() ? gx_starter_answers[i].response : "";}
 const char* Assistant::starter_category(size_t i){return i<starter_count() ? gx_starter_answers[i].category : "";}
+namespace {
+struct StarterMatch {size_t index;int score;};
+bool starter_match_less(const StarterMatch& a,const StarterMatch& b){return a.score==b.score ? a.index<b.index : a.score>b.score;}
+}
+bool Assistant::find_starters(const std::string& query,std::vector<size_t>& results){
+  if(query.size()>96 || !valid_text(query)) return false;std::string normalized=words(query);std::vector<std::string> terms;
+  if(normalized.empty()){std::vector<size_t> all;all.reserve(starter_count());for(size_t i=0;i<starter_count();++i) all.push_back(i);results.swap(all);return true;}
+  for(size_t at=0;at<normalized.size();){size_t end=normalized.find(' ',at);std::string term=normalized.substr(at,end==std::string::npos ? end : end-at);
+    if(std::find(terms.begin(),terms.end(),term)==terms.end()) terms.push_back(term);if(terms.size()>16) return false;
+    if(end==std::string::npos) break;at=end+1;}
+  std::vector<StarterMatch> matches;
+  for(size_t i=0;i<starter_count();++i){std::string question=starter_phrase(i),body=words(starter_response(i)),category=words(starter_category(i));int score=normalized==question ? 1000 : 0;bool match=true;
+    for(size_t t=0;t<terms.size();++t){bool q=phrase(question,terms[t]),c=phrase(category,terms[t]),b=phrase(body,terms[t]);
+      if(!q && !c && !b){match=false;break;}score+=q ? 4 : (c ? 2 : 1);}
+    if(match){StarterMatch row;row.index=i;row.score=score;matches.push_back(row);}}
+  std::sort(matches.begin(),matches.end(),starter_match_less);std::vector<size_t> next;next.reserve(matches.size());for(size_t i=0;i<matches.size();++i) next.push_back(matches[i].index);results.swap(next);return true;
+}
 bool Assistant::preview_answer(const std::string& text,std::string& key,std::string& response,bool include_starters) const{
   key.clear();response.clear();if(text.size()>512 || !valid_text(text)) return false;std::string norm=words(text);
   for(size_t i=0;i<answers_.size();++i) if(phrase(norm,answers_[i].phrase) && answers_[i].phrase.size()>key.size()){key=answers_[i].phrase;response=answers_[i].response;}
@@ -453,6 +472,10 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
   if(norm=="cancel" || norm=="never mind" || norm=="nevermind" || norm=="stop"){
     bool had=pending_!=P_NONE;pending_=P_NONE;pending_label_.clear();return AssistantReply(had ? "Cancelled the follow-up. Existing notes and timers are unchanged." : "No follow-up is waiting. Use cancel timer followed by its number to stop a timer.");}
   if(norm=="help" || norm=="commands" || norm=="show commands" || norm=="what can you do"){pending_=P_NONE;pending_label_.clear();return AssistantReply(help_text);}
+  if(take(raw,"find answers",rest) || take(raw,"search answers",rest)){
+    pending_=P_NONE;pending_label_.clear();if(rest.size()>96) return AssistantReply("Keep an answer search within 96 bytes.");
+    AssistantReply reply("Opening starter answer search.",AA_FIND_ANSWERS);reply.argument=rest;return reply;
+  }
   if(norm=="open saved answers" || norm=="open learned answers" || norm=="open answers" || norm=="manage answers"){
     pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening Saved answers. Add, edit and preview your own text replies.",AA_ANSWERS);
   }

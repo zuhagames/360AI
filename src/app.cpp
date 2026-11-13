@@ -40,6 +40,7 @@ App::App(){
   home_sel_=tool_sel_=note_sel_=timer_sel_=confirm_id_=edit_id_=0;
   answer_sel_=0;
   starter_sel_=0;answer_starters_=false;
+  answer_chat_return_=false;Assistant::find_starters("",starter_rows_);
   note_view_id_=0;
   kb_mode_ = KB_NONE;
   kb_cur_ = 0;
@@ -460,7 +461,12 @@ AssistantContext App::assistant_context() const{
   if(local){if(strftime(text,sizeof(text),"%H:%M:%S",local)) c.clock=text;if(strftime(text,sizeof(text),"%Y-%m-%d",local)) c.date=text;}
   return c;
 }
+bool App::search_answers(const std::string& query){
+  std::vector<size_t> rows;if(!Assistant::find_starters(query,rows)) return false;
+  starter_query_=query.find_first_not_of(" \t\r\n")==std::string::npos ? "" : query;starter_rows_.swap(rows);starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return true;
+}
 void App::open_assistant(){
+  answer_chat_return_=false;
   if(assistant_mode_ && !chat_log_.empty()){model_name_="360 Assistant";screen_=AS_CHAT;return;}
   assistant_mode_=true;model_name_="360 Assistant";
   turns_.clear();chat_log_.clear();chat_notice_.clear();chat_view_=ChatView();assistant_.reset_conversation();
@@ -479,6 +485,7 @@ void App::assistant_send(const std::string& text){
   else if(reply.action==AA_UPDATES) screen_=AS_UPDATES;
   else if(reply.action==AA_MODEL_LIBRARY) open_hub();
   else if(reply.action==AA_ANSWERS) open_answers();
+  else if(reply.action==AA_FIND_ANSWERS){if(search_answers(reply.argument)){open_answers();answer_starters_=true;}else reply.text="Search: use valid text within 96 bytes and 16 distinct words.";}
   queue_assistant_save();
   append_chat("Assistant: ",reply.text);
   if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}
@@ -664,7 +671,8 @@ void App::kb_input(){
   }
   if(p & GX_BTN_A){
     if(kb_cur_ < kKbChars){
-      if(kb_text_.size() < ((kb_mode_&0xff)==KB_ANSWER_PHRASE ? 80u : 512u)){
+      size_t limit=(kb_mode_&0xff)==KB_ANSWER_PHRASE ? 80u : ((kb_mode_&0xff)==KB_ANSWER_SEARCH ? 96u : 512u);
+      if(kb_text_.size() < limit){
         char c = kKbSet[kb_cur_];
         if(kb_upper_ && c >= 'a' && c <= 'z') c = (char)(c - 32);
         kb_text_ += c;
@@ -680,7 +688,9 @@ void App::kb_input(){
 void App::kb_commit(){
   int mode = kb_mode_ & 0xFF;
   kb_mode_ = KB_NONE;
-  if(mode==KB_ANSWER_PHRASE){
+  if(mode==KB_ANSWER_SEARCH){
+    if(!search_answers(kb_text_)) chat_notice_="Search: use valid text within 96 bytes and 16 distinct words.";return;
+  } else if(mode==KB_ANSWER_PHRASE){
     std::string key;if(!Assistant::answer_phrase(kb_text_,key)){chat_notice_="Use a phrase of 3-80 bytes, with words or numbers.";return;}
     const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==key){answer_sel_=(int)i;answer_starters_=false;answer_preview_.clear();answer_view_key_.clear();chat_notice_="That phrase already exists. Press A to edit its answer.";return;}
     answer_draft_=key;kb_open(KB_ANSWER_TEXT,"Your answer","Literal text, 1-512 bytes. B cancels without saving.","");kb_swallow_=true;return;
