@@ -1,3 +1,17 @@
+360AI 2.7 - 100 more offline replies
+===================================
+
+- Add exactly 100 original predefined questions/replies, for 250 starters total.
+- Five new groups: Gaming ideas, Tech basics, Creative prompts, Planning,
+  and Conversation, with 20 replies each.
+- Keep the original 150 starters, 106 phrase variants and 16 personal slots.
+- All additions use the existing once-built exact lookup, without model work.
+- Search and right-stick direct asking include every new question.
+- Category jumps follow real boundaries, supporting groups of different sizes.
+- Test all 250 responses/ranks, pending prompts and every category boundary.
+- Preserve personal data, existing models and app-only update compatibility.
+- Physical Xbox menus, keyboard and persistence still need hardware validation.
+
 360AI 2.6 - Find an answer faster
 =================================
 

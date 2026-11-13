@@ -428,6 +428,15 @@ size_t Assistant::starter_count(){return sizeof(gx_starter_answers)/sizeof(gx_st
 const char* Assistant::starter_phrase(size_t i){return i<starter_count() ? gx_starter_answers[i].phrase : "";}
 const char* Assistant::starter_response(size_t i){return i<starter_count() ? gx_starter_answers[i].response : "";}
 const char* Assistant::starter_category(size_t i){return i<starter_count() ? gx_starter_answers[i].category : "";}
+size_t Assistant::starter_category_step(size_t index,int direction){
+  if(index>=starter_count()) return starter_count();
+  if(direction!=1 && direction!=-1) return index;
+  size_t begin=index;while(begin && !strcmp(starter_category(begin-1),starter_category(index))) --begin;
+  if(direction<0){if(!begin) return index;size_t previous=begin-1;
+    while(previous && !strcmp(starter_category(previous-1),starter_category(begin-1))) --previous;return previous;}
+  size_t next=index+1;while(next<starter_count() && !strcmp(starter_category(next),starter_category(index))) ++next;
+  return next<starter_count() ? next : index;
+}
 namespace {
 struct StarterMatch {size_t index;int score;};
 bool starter_match_less(const StarterMatch& a,const StarterMatch& b){return a.score==b.score ? a.index<b.index : a.score>b.score;}

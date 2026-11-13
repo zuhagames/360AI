@@ -46,6 +46,7 @@ public:
   static const char* starter_phrase(size_t index);
   static const char* starter_response(size_t index);
   static const char* starter_category(size_t index);
+  static size_t starter_category_step(size_t index,int direction);
   static bool find_starters(const std::string& query,std::vector<size_t>& results);
   const std::vector<Answer>& answers() const {return answers_;}
   bool dirty() const { return dirty_; }

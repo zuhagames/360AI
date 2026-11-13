@@ -11,10 +11,11 @@ It is a text assistant: microphone input, speech recognition and voice output
 are not implemented. It matches supported intents, not arbitrary conversation.
 
 PREDEFINED ANSWERS
-150 starter answers are included in addition to the 106 existing phrase variants.
+250 starter answers are included in addition to the 106 existing phrase variants.
 They cover getting started, notes, timers, personal answers, local models,
 performance, the model library, updates, chat controls and everyday conversation.
-Each of the ten categories has 15 distinct questions and written replies.
+Five more categories add gaming ideas, tech basics, creative prompts, planning
+and conversation: 20 new replies each, alongside the original ten groups of 15.
 These are exact normalized question matches, with no model inference or actions.
 Use the shown question; case and ordinary punctuation do not matter.
 
@@ -33,7 +34,7 @@ right stick still opens a non-executing text preview, and START still undoes.
 A copies a starter reply into an editor. Saving uses one personal slot;
 cancelling leaves everything unchanged. Existing personal overrides are edited
 in place. Y in Starter view opens My answers; Y there confirms deletion.
-Removing an override exposes the original starter again. All 150 starters
+Removing an override exposes the original starter again. All 250 starters
 remain available even when the 16 personal slots are full. No starter is written
 over your personal data or counted against those slots. A fresh empty notebook
 opens Starter view by default; existing personal answers are kept as-is.

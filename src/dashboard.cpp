@@ -153,14 +153,14 @@ void App::answers_frame(){
   int& selection=answer_starters_ ? starter_sel_ : answer_sel_;selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));
   gxui_fill(64,146,528,422,GX_PANEL);gxui_fill(616,146,600,422,GX_PANEL);
   if(answer_starters_) gxui_label(64,118,GX_MUTED,short_text(starter_query_.empty() ? "START: find a question, reply or category" : "Find: "+starter_query_,90).c_str(),.62f);
-  if(!count){paragraph(92,186,answer_starters_ ? "No matching starter answers. Press START for fewer words, or Y to clear the search." : "Make it your own. Press X for a personal reply, or click the left stick for 150 ready-made answers.",31,5);}
+  if(!count){paragraph(92,186,answer_starters_ ? "No matching starter answers. Press START for fewer words, or Y to clear the search." : "Make it your own. Press X for a personal reply, or click the left stick for ready-made answers.",31,5);}
   else {int start=answer_starters_ && !starter_query_.empty() ? (selection/6)*6 : GX_MAX(0,selection-5);for(int i=start;i<(int)count && i<start+6;++i){f32 y=160+(i-start)*64;bool selected=i==selection;
       if(selected) gxui_fill(76,y,504,60,GX_INK);char number[16];snprintf(number,sizeof(number),"%02d",i+1);
       gxui_label(92,y+13,selected ? GX_ACCENT : GX_MUTED,number,.8f);gxui_label(150,y+13,selected ? GX_PANEL : GX_INK,short_text(answer_starters_ ? Assistant::starter_phrase(starter_rows_[i]) : answers[i].phrase,31).c_str(),.8f);}}
   gxui_label(644,164,GX_MUTED,!answer_preview_.empty() ? "TEXT MATCH PREVIEW" : (answer_starters_ ? Assistant::starter_category(selected_starter()) : "THE SAVED REPLY"),.7f);
   std::string selected=!count ? "" : (answer_starters_ ? Assistant::starter_phrase(selected_starter()) : answers[selection].phrase);
   std::string text=!answer_preview_.empty() ? answer_preview_ : (!count ? "16 personal slots, separate from the starter pack. Commands keep priority in chat." : (answer_starters_ ? Assistant::starter_response(selected_starter()) : answers[selection].response));
-  if(answer_starters_ && answer_preview_.empty()) text=count ? "Question: "+selected+"\n\n"+text : "Search all 150 starter answers using words from a question, reply or category. Try fewer words, or press Y to show all.";
+  if(answer_starters_ && answer_preview_.empty()) text=count ? "Question: "+selected+"\n\n"+text : "Search all starter answers using words from a question, reply or category. Try fewer words, or press Y to show all.";
   std::string view_key=selected+"\n"+answer_preview_;answer_view_.update(text,40,12);
   if(answer_view_key_!=view_key){answer_view_key_=view_key;answer_view_.scroll(-100000);}
   const std::vector<std::string>& lines=answer_view_.lines();for(int i=answer_view_.top();i<(int)lines.size() && i<answer_view_.top()+12;++i) gxui_label(644,210+(i-answer_view_.top())*28,GX_INK,lines[i].c_str(),.85f);
@@ -177,7 +177,8 @@ void App::answers_frame(){
   if(answer_starters_ && (p&GX_BTN_Y) && !starter_query_.empty()){starter_query_.clear();Assistant::find_starters("",starter_rows_);starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return;}
   if((p&GX_BTN_LTHUMB) || (answer_starters_ && (p&GX_BTN_Y))){answer_starters_=!answer_starters_;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return;}
   int previous=selection;if(p&GX_BTN_DUP) --selection;if(p&GX_BTN_DDOWN) ++selection;
-  if(answer_starters_ && (p&(GX_BTN_DLEFT|GX_BTN_DRIGHT))){int direction=(p&GX_BTN_DLEFT) ? -1 : 1;if(!starter_query_.empty()) selection+=direction*6;else {int category=selection/15+direction;if(category>=0 && category<10) selection=category*15;}}
+  if(answer_starters_ && (p&(GX_BTN_DLEFT|GX_BTN_DRIGHT))){int direction=(p&GX_BTN_DLEFT) ? -1 : 1;if(!starter_query_.empty()) selection+=direction*6;else {
+      selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));selection=(int)Assistant::starter_category_step((size_t)selection,direction);}}
   selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));if(previous!=selection) answer_preview_.clear();
   if(p&GX_BTN_LB) answer_view_.scroll(-12);if(p&GX_BTN_RB) answer_view_.scroll(12);
   if(p&GX_BTN_X){if(answers.size()>=16) chat_notice_="All 16 slots are full. Edit or delete an answer first.";else {answer_draft_.clear();kb_open(KB_ANSWER_PHRASE,"Your phrase","3-80 bytes. Example: favorite game","");}}
