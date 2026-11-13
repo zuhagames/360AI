@@ -21,7 +21,8 @@ enum app_screen{
   AS_TOOLS,
   AS_UPDATES,
   AS_HUB,
-  AS_ANSWERS
+  AS_ANSWERS,
+  AS_ANSWER_TOPICS
 };
 
 enum debug_cycle{
@@ -80,6 +81,8 @@ public:
   int test_starter_selection() const {return starter_sel_;}
   size_t test_starter_matches() const {return starter_rows_.size();}
   size_t test_starter_index() const {return selected_starter();}
+  size_t test_recent_count() const {return starter_recent_.size();}
+  int test_topic_selection() const {return topic_sel_;}
   const std::string& test_chat_text() const {return chat_log_;}
 #endif
 
@@ -100,7 +103,9 @@ private:
   bool answer_starters_;
   bool answer_chat_return_;
   std::vector<size_t> starter_rows_;
-  std::string starter_query_;
+  std::vector<size_t> starter_topics_,starter_recent_;
+  std::string starter_query_,starter_topic_;
+  int topic_sel_;
   std::string answer_draft_,answer_confirm_,answer_view_key_,answer_preview_;
   ChatView answer_view_;
 
@@ -175,6 +180,11 @@ private:
   void tools_frame();
   void answers_frame();
   void open_answers();
+  void answer_topics_frame();
+  void open_answer_topics();
+  void select_answer_topic();
+  void remember_starter(size_t index);
+  bool starter_filtered() const {return !starter_query_.empty() || !starter_topic_.empty();}
   size_t selected_starter() const;
   bool search_answers(const std::string& query);
   void updates_frame();
