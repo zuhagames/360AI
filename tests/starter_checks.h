@@ -29,9 +29,11 @@ static void starter_checks(){
   assert(a.write_answer(phrase,"My customized reply",result));assert(a.respond(phrase,context).text=="My customized reply");assert(a.preview_answer(phrase,key,response,true) && response=="My customized reply");
   assert(a.remove_answer(phrase,result) && a.respond(phrase,context).text==Assistant::starter_response(0));
   assert(gxui_init());App app;app.test_seed();app.test_ask("open saved answers");app.test_frame(0);assert(app.test_starter_mode());
+  tap(app,GX_BTN_DUP|GX_BTN_DLEFT);assert(app.test_starter_index()==0);
   tap(app,GX_BTN_DRIGHT);assert(app.test_starter_selection()==15);tap(app,GX_BTN_DLEFT);assert(app.test_starter_selection()==0);
   for(size_t group=1;group<15;++group){tap(app,GX_BTN_DRIGHT);assert(app.test_starter_index()==starts[group]);}
   for(int i=0;i<19;++i) tap(app,GX_BTN_DDOWN);assert(app.test_starter_index()==249);tap(app,GX_BTN_DRIGHT);assert(app.test_starter_index()==249);
+  tap(app,GX_BTN_DDOWN|GX_BTN_DRIGHT);assert(app.test_starter_index()==249);
   before=app.test_assistant().snapshot();tap(app,GX_BTN_RTHUMB);assert(app.test_screen()==AS_CHAT && app.test_chat_text().find(Assistant::starter_response(249))!=std::string::npos && app.test_assistant().snapshot()==before);tap(app,GX_BTN_B);assert(app.test_starter_index()==249);
   for(int group=13;group>=0;--group){tap(app,GX_BTN_DLEFT);assert(app.test_starter_index()==starts[group]);}
   before=app.test_assistant().snapshot();tap(app,GX_BTN_A);assert(app.test_keyboard());tap(app,GX_BTN_B);assert(app.test_starter_mode() && app.test_assistant().snapshot()==before);

@@ -177,7 +177,8 @@ void App::answers_frame(){
   if(answer_starters_ && (p&GX_BTN_Y) && !starter_query_.empty()){starter_query_.clear();Assistant::find_starters("",starter_rows_);starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return;}
   if((p&GX_BTN_LTHUMB) || (answer_starters_ && (p&GX_BTN_Y))){answer_starters_=!answer_starters_;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return;}
   int previous=selection;if(p&GX_BTN_DUP) --selection;if(p&GX_BTN_DDOWN) ++selection;
-  if(answer_starters_ && (p&(GX_BTN_DLEFT|GX_BTN_DRIGHT))){int direction=(p&GX_BTN_DLEFT) ? -1 : 1;if(!starter_query_.empty()) selection+=direction*6;else selection=(int)Assistant::starter_category_step((size_t)selection,direction);}
+  if(answer_starters_ && (p&(GX_BTN_DLEFT|GX_BTN_DRIGHT))){int direction=(p&GX_BTN_DLEFT) ? -1 : 1;if(!starter_query_.empty()) selection+=direction*6;else {
+      selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));selection=(int)Assistant::starter_category_step((size_t)selection,direction);}}
   selection=GX_CLAMP(selection,0,GX_MAX(0,(int)count-1));if(previous!=selection) answer_preview_.clear();
   if(p&GX_BTN_LB) answer_view_.scroll(-12);if(p&GX_BTN_RB) answer_view_.scroll(12);
   if(p&GX_BTN_X){if(answers.size()>=16) chat_notice_="All 16 slots are full. Edit or delete an answer first.";else {answer_draft_.clear();kb_open(KB_ANSWER_PHRASE,"Your phrase","3-80 bytes. Example: favorite game","");}}
