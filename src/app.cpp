@@ -461,6 +461,10 @@ AssistantContext App::assistant_context() const{
   if(local){if(strftime(text,sizeof(text),"%H:%M:%S",local)) c.clock=text;if(strftime(text,sizeof(text),"%Y-%m-%d",local)) c.date=text;}
   return c;
 }
+bool App::search_answers(const std::string& query){
+  std::vector<size_t> rows;if(!Assistant::find_starters(query,rows)) return false;
+  starter_query_=query.find_first_not_of(" \t\r\n")==std::string::npos ? "" : query;starter_rows_.swap(rows);starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return true;
+}
 void App::open_assistant(){
   answer_chat_return_=false;
   if(assistant_mode_ && !chat_log_.empty()){model_name_="360 Assistant";screen_=AS_CHAT;return;}
@@ -481,6 +485,7 @@ void App::assistant_send(const std::string& text){
   else if(reply.action==AA_UPDATES) screen_=AS_UPDATES;
   else if(reply.action==AA_MODEL_LIBRARY) open_hub();
   else if(reply.action==AA_ANSWERS) open_answers();
+  else if(reply.action==AA_FIND_ANSWERS){if(search_answers(reply.argument)){open_answers();answer_starters_=true;}else reply.text="Search: use valid text within 96 bytes and 16 distinct words.";}
   queue_assistant_save();
   append_chat("Assistant: ",reply.text);
   if(chat_log_.size()>65536){size_t cut=chat_log_.find('\n',chat_log_.size()-49152);if(cut!=std::string::npos) chat_log_="[Earlier assistant messages trimmed]\n"+chat_log_.substr(cut+1);}
@@ -684,8 +689,7 @@ void App::kb_commit(){
   int mode = kb_mode_ & 0xFF;
   kb_mode_ = KB_NONE;
   if(mode==KB_ANSWER_SEARCH){
-    std::vector<size_t> rows;if(!Assistant::find_starters(kb_text_,rows)){chat_notice_="Search: use valid text within 96 bytes and 16 distinct words.";return;}
-    starter_query_=kb_text_.find_first_not_of(" \t\r\n")==std::string::npos ? "" : kb_text_;starter_rows_.swap(rows);starter_sel_=0;answer_preview_.clear();answer_view_key_.clear();chat_notice_.clear();return;
+    if(!search_answers(kb_text_)) chat_notice_="Search: use valid text within 96 bytes and 16 distinct words.";return;
   } else if(mode==KB_ANSWER_PHRASE){
     std::string key;if(!Assistant::answer_phrase(kb_text_,key)){chat_notice_="Use a phrase of 3-80 bytes, with words or numbers.";return;}
     const std::vector<Assistant::Answer>& answers=assistant_.answers();for(size_t i=0;i<answers.size();++i) if(answers[i].phrase==key){answer_sel_=(int)i;answer_starters_=false;answer_preview_.clear();answer_view_key_.clear();chat_notice_="That phrase already exists. Press A to edit its answer.";return;}

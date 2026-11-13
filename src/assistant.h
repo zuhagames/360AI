@@ -2,9 +2,10 @@
 #define GX_ASSISTANT_H
 #include "common.h"
 
-enum AssistantAction { AA_NONE, AA_PROFILE, AA_EXPORT, AA_CLEAR_CHAT, AA_MODELS, AA_UPDATES, AA_MODEL_LIBRARY, AA_ANSWERS };
+enum AssistantAction { AA_NONE, AA_PROFILE, AA_EXPORT, AA_CLEAR_CHAT, AA_MODELS, AA_UPDATES, AA_MODEL_LIBRARY, AA_ANSWERS, AA_FIND_ANSWERS };
 struct AssistantReply {
   std::string text;
+  std::string argument;
   AssistantAction action;
   int value;
   AssistantReply(const std::string& t="",AssistantAction a=AA_NONE,int v=0):text(t),action(a),value(v){}

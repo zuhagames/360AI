@@ -470,6 +470,10 @@ AssistantReply Assistant::respond(const std::string& text,const AssistantContext
   if(norm=="cancel" || norm=="never mind" || norm=="nevermind" || norm=="stop"){
     bool had=pending_!=P_NONE;pending_=P_NONE;pending_label_.clear();return AssistantReply(had ? "Cancelled the follow-up. Existing notes and timers are unchanged." : "No follow-up is waiting. Use cancel timer followed by its number to stop a timer.");}
   if(norm=="help" || norm=="commands" || norm=="show commands" || norm=="what can you do"){pending_=P_NONE;pending_label_.clear();return AssistantReply(help_text);}
+  if(take(raw,"find answers",rest) || take(raw,"search answers",rest)){
+    pending_=P_NONE;pending_label_.clear();if(rest.size()>96) return AssistantReply("Keep an answer search within 96 bytes.");
+    AssistantReply reply("Opening starter answer search.",AA_FIND_ANSWERS);reply.argument=rest;return reply;
+  }
   if(norm=="open saved answers" || norm=="open learned answers" || norm=="open answers" || norm=="manage answers"){
     pending_=P_NONE;pending_label_.clear();return AssistantReply("Opening Saved answers. Add, edit and preview your own text replies.",AA_ANSWERS);
   }

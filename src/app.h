@@ -176,6 +176,7 @@ private:
   void answers_frame();
   void open_answers();
   size_t selected_starter() const;
+  bool search_answers(const std::string& query);
   void updates_frame();
   void restart_for_update();
   void shell(const char* title,const char* subtitle);
